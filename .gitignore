@@ -1,0 +1,40 @@
+# --- Sırlar ---------------------------------------------------------------
+.env
+.env.local
+*.pem
+*.key
+
+# --- .NET -----------------------------------------------------------------
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+.vs/
+artifacts/
+TestResults/
+*.trx
+*.coverage
+coverage*.json
+coverage*.xml
+
+# --- Yüklenen dokümanlar (yerel depolama) --------------------------------
+storage/
+backend/src/T3.Api/storage/
+
+# --- Node / frontend ------------------------------------------------------
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Editör / işletim sistemi --------------------------------------------
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
