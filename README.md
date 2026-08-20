@@ -87,6 +87,48 @@ npm run dev
 Arayüz: http://localhost:5173 — `/api` ve `/health` istekleri Vite proxy'si
 üzerinden backend'e gider, tarayıcıda CORS devreye girmez.
 
+## Demo hesapları
+
+Backend `Development` ortamında ilk açılışta **demo verisini kendisi yükler**
+(5 program, 12 girişim, ekipler, yatırım/hibe/ödül kayıtları, kilometre
+taşları). Tüm hesapların şifresi aynıdır: `T3.Creathon!2026`
+
+| E-posta | Rol | Ne görür |
+|---|---|---|
+| `admin@t3ekosistem.test` | Süper Yönetici | 12 girişimin tamamı, tüm hassas alanlar |
+| `kulucka.yoneticisi@t3ekosistem.test` | Program Yöneticisi | Yalnızca Ön Kuluçka + Kuluçka'daki 6 girişim; vergi no **göremez** |
+| `teknofest.yoneticisi@t3ekosistem.test` | Program Yöneticisi | Yalnızca TEKNOFEST/DENEYAP/Hızlandırma'daki 6 girişim |
+| `karar.verici@t3ekosistem.test` | Karar Verici | 12 girişimin tamamı; tutarlar ve kişisel veriler maskeli |
+| `girisim@t3ekosistem.test` | Girişim Kullanıcısı | Yalnızca Anadolu Robotik |
+
+> Bu hesaplar yalnızca yerel geliştirme ve demo içindir. Tohumlayıcı üretim
+> ortamında hiçbir koşulda çalışmaz; şifre `T3_Seed__Password` ile,
+> yükleme `T3_Seed__Enabled=false` ile kapatılabilir.
+>
+> Verinin tamamı **kurgudur**. E-posta ve alan adları `.test` uzantısını
+> (RFC 6761) kullanır, telefonlar tahsis edilmemiş bir önek taşır.
+
+İki Program Yöneticisi hesabı bilinçli olarak ayrık programlara atanmıştır:
+aynı ucu çağırdıklarında tamamen farklı girişim listesi görürler. Rol bazlı
+yetkilendirmeyi göstermenin en hızlı yolu bu iki hesapla giriş yapmaktır.
+
+## API yüzeyi (Faz 2)
+
+| Uç | Yetki |
+|---|---|
+| `POST /api/auth/login` | herkese açık, dakikada 10 istek |
+| `GET /api/me` | kimlik doğrulanmış |
+| `GET /api/startups` | kimlik doğrulanmış — satırlar role göre daraltılır |
+| `GET /api/startups/{id}` | kimlik doğrulanmış — hassas alanlar role göre maskelenir |
+| `GET /api/startups/{id}/timeline` | kimlik doğrulanmış |
+| `POST /api/startups` · `PUT /api/startups/{id}` | Süper Yönetici, Program Yöneticisi |
+| `POST/PUT/DELETE /api/startups/{id}/team[/{memberId}]` | Süper Yönetici, Program Yöneticisi |
+| `GET /api/programs` | kimlik doğrulanmış — kapsama göre daraltılır |
+| `POST /api/participations` | Süper Yönetici, Program Yöneticisi (kendi programı) |
+
+Yetkilendirme varsayılan olarak kapalıdır (`FallbackPolicy`): üst veri
+taşımayan her uç kimlik ister, herkese açık uçlar bunu açıkça belirtir.
+
 ## Proje yapısı
 
 ```
@@ -131,8 +173,32 @@ docker compose down -v && docker compose up -d postgres
 ## Durum
 
 **Faz 0 tamamlandı** — çözüm iskeleti, veri modeli (12 tablo), Docker Postgres,
-JWT altyapısı, Swagger, sağlık uçları ve frontend iskeleti ayakta; uçtan uca
-zincir doğrulandı.
+JWT altyapısı, Swagger, sağlık uçları, frontend iskeleti.
 
-Sıradaki: **Faz 1** — kimlik doğrulama, rol bazlı yetkilendirme ve kullanıcı
-yönetimi. Faz listesi için bkz. [teknik plan](docs/Problem7_Teknik_Plan.md#8-faz-planı).
+**Faz 2 tamamlandı** — MVP #1 ve #2 çalışıyor:
+
+- **Kimlik ve yetki:** login + JWT, `/api/me`, rol politikaları, varsayılan
+  kapalı yetkilendirme, satır düzeyi kapsam (`IStartupScope`) ve alan düzeyi
+  KVKK maskelemesi (`StartupVisibility`)
+- **MVP #1 — merkezi girişim kartı:** arama/filtre/sıralama/sayfalama, tam
+  kart, ekip yönetimi, denetim izi
+- **MVP #2 — gelişim yolculuğu:** program katılımları, başarı kayıtları ve
+  kilometre taşlarından sorgu anında üretilen tek kronoloji
+- **Demo verisi:** 5 program, 12 kurgu girişim, 5 rol hesabı
+
+Arayüzde hassas alanlar "veri yok" (—) ile "yetkiniz yok" (🔒) ayrımını
+gösterir; bu ayrım kasıtlıdır, boş kutu kullanıcıyı yanıltır.
+
+Sıradaki: **Faz 3** — `ChangeRequest` onay akışı (MVP #3), girişim portalı,
+onay kuyruğu ve before/after diff görünümü, denetim izi ucu. Ayrıca Faz 1'in
+kalan parçası olan kullanıcı yönetimi CRUD'u. Faz listesi için bkz.
+[teknik plan](docs/Problem7_Teknik_Plan.md#8-faz-planı).
+
+### Bilinen açık işler
+
+- **Soft delete yalnızca sözleşme düzeyinde zincirleniyor.** Bağımlı varlıkların
+  hepsi `ISoftDelete` uyguluyor ve sorgu filtreleri ebeveynleriyle uyumlu, ama
+  bir girişim pasife alındığında çocuklarını işaretleyen kod henüz yok; silme
+  handler'ı bu zincirlemeyi açıkça yapmalı.
+- Doküman yükleme/indirme uçları Faz 4'te; kart şimdilik yalnızca doküman
+  sayısını gösteriyor.

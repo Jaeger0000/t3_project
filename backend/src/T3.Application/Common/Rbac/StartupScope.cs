@@ -48,6 +48,9 @@ public sealed class StartupScope(ICurrentUser user) : IStartupScope
         _ => false
     };
 
+    public bool CanCreateStartups =>
+        user.Role is UserRole.SuperAdmin or UserRole.ProgramManager;
+
     public bool CanReviewApprovals =>
         user.Role is UserRole.SuperAdmin or UserRole.ProgramManager;
 }

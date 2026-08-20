@@ -13,6 +13,7 @@ public static class HealthEndpoints
             service = "T3 Girişim Ekosistemi API",
             time = DateTimeOffset.UtcNow
         }))
+        .AllowAnonymous()
         .WithTags("Health")
         .WithSummary("Servisin ayakta olduğunu doğrular.");
 
@@ -25,6 +26,7 @@ public static class HealthEndpoints
                 ? Results.Ok(new { database = "ok", pendingMigrations = pending })
                 : Results.Problem("Veritabanına bağlanılamadı.", statusCode: 503);
         })
+        .AllowAnonymous()
         .WithTags("Health")
         .WithSummary("Veritabanı bağlantısını ve bekleyen migration'ları raporlar.");
 

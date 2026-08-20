@@ -80,7 +80,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
                 switch (entry.State)
                 {
                     case EntityState.Added:
-                        auditable.CreatedAt = now;
+                        // Açıkça verilmiş tarih korunur: tohum veri ve dışarıdan
+                        // aktarılan kayıtlar gerçek geçmiş tarihlerini taşıyabilsin.
+                        if (auditable.CreatedAt == default)
+                            auditable.CreatedAt = now;
                         break;
                     case EntityState.Modified:
                         auditable.UpdatedAt = now;

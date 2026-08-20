@@ -415,9 +415,9 @@ Bugün **20 Ağustos**. İlk teslim **26 Ağustos 10.00** (iş modeli canvası +
 
 | Faz | Gün | Çıktı | MVP maddesi |
 |---|---|---|---|
-| **0 — İskelet** | 20 Ağu | Solution + 4 proje, Docker Compose Postgres, EF Core ilk migration, health check endpoint, Vite+React iskeleti, Swagger açık | — |
-| **1 — Kimlik & RBAC** | 21 Ağu | User/Role/UserProgramAssignment, login + JWT, kapsam filtresi, korumalı endpoint, frontend login + route guard | roller |
-| **2 — Girişim kartı** | 22 Ağu | Startup + TeamMember CRUD, girişim kartı ekranı, arama/filtre, program geçmişi timeline | **#1, #2** |
+| **0 — İskelet** ✅ | 20 Ağu | Solution + 4 proje, Docker Compose Postgres, EF Core ilk migration, health check endpoint, Vite+React iskeleti, Swagger açık | — |
+| **1 — Kimlik & RBAC** ✅ | 20 Ağu | login + JWT, `/api/me`, kapsam filtresi, rol politikaları, frontend login + route guard. *Kullanıcı yönetimi CRUD'u Faz 3'e ertelendi — girişim kartı ona ihtiyaç duymuyor.* | roller |
+| **2 — Girişim kartı** ✅ | 20 Ağu | Startup + TeamMember CRUD, girişim kartı ekranı, arama/filtre/sıralama/sayfalama, program geçmişi timeline, demo verisi, RBAC + maskeleme birim testleri | **#1, #2** |
 | **3 — Onay akışı** | 23 Ağu | ChangeRequest, startup portalı, onay kuyruğu + diff görünümü, AuditLog | **#3** |
 | **4 — Finansal & doküman** | 24 Ağu | Achievement TPH (5 tip), doküman yükleme/indirme, maskeleme kuralları | **#4** |
 | **5 — Dashboard & AI** | 25 Ağu | EcosystemStats, grafikler, CSV dışa aktarma, MCP tool'ları, AI sohbet paneli, gerçekçi seed veri | karar destek |

@@ -14,6 +14,9 @@ public interface IStartupScope
     /// <summary>Kullanıcı bu girişimi doğrudan düzenleyebilir mi (onay akışı olmadan)?</summary>
     bool CanEditDirectly(Guid startupId);
 
+    /// <summary>Kullanıcı ekosisteme yeni girişim ekleyebilir mi?</summary>
+    bool CanCreateStartups { get; }
+
     /// <summary>Kullanıcı bu girişim için gelen onay isteklerini karara bağlayabilir mi?</summary>
     bool CanReviewApprovals { get; }
 }
