@@ -1,4 +1,5 @@
 using FluentValidation;
+using T3.Application.Common.Rbac;
 using T3.Domain.Startups;
 
 namespace T3.Application.Features.Startups;
@@ -32,6 +33,32 @@ public sealed record StartupWriteModel(
         s.Name, s.LegalName, s.TaxNumber, s.FoundedOn, s.Sector,
         [.. s.TechnologyAreas], s.ProductDescription, s.Website, s.LogoUrl,
         s.City, s.ContactEmail, s.ContactPhone, s.Status);
+
+    /// <summary>
+    /// Modeli varlığa uygular ama <b>kullanıcının göremediği alanı yazmaz</b>.
+    ///
+    /// Maskeli alan istemciye <c>null</c> gittiği için düz uygulama onu sessizce
+    /// <em>siliyordu</em>: vergi numarasını göremeyen Program Yöneticisi'nin
+    /// kaydettiği her düzenleme numarayı boşaltırdı. Maskeleme yalnızca okumayı
+    /// daraltan bir süzgeç değil; yazma yolunda da tutulmak zorunda.
+    /// </summary>
+    public void ApplyTo(Startup startup, StartupVisibility visibility)
+    {
+        var taxNumber = startup.TaxNumber;
+        var contactEmail = startup.ContactEmail;
+        var contactPhone = startup.ContactPhone;
+
+        this.ApplyTo(startup);
+
+        if (!visibility.ShowTaxNumber)
+            startup.TaxNumber = taxNumber;
+
+        if (!visibility.ShowContactDetails)
+        {
+            startup.ContactEmail = contactEmail;
+            startup.ContactPhone = contactPhone;
+        }
+    }
 }
 
 /// <summary>

@@ -32,10 +32,10 @@ export default function AssistantPanel() {
     <Card className="p-5" data-testid="assistant-panel">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-semibold text-slate-900 dark:text-slate-100">
+          <h2 className="font-semibold text-stone-900 dark:text-stone-100">
             Ekosisteme soru sor
           </h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-stone-500">
             Yanıtlar yalnızca sizin görme yetkiniz olan kayıtlardan üretilir.
           </p>
         </div>
@@ -43,8 +43,8 @@ export default function AssistantPanel() {
           <Badge
             tone={
               ask.data.mode === 'Model'
-                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                : 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200'
+                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                : 'bg-brand-100 text-brand-800 dark:bg-brand-950 dark:text-brand-200'
             }
           >
             {ask.data.mode === 'Model' ? `Model: ${ask.data.modelName}` : 'Yerel plan (model yok)'}
@@ -79,7 +79,7 @@ export default function AssistantPanel() {
             key={example}
             type="button"
             onClick={() => submit(example)}
-            className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 transition-colors hover:border-brand-500 hover:text-brand-600 dark:border-slate-700 dark:text-slate-300"
+            className="rounded-full border border-stone-200 px-3 py-1 text-xs text-stone-600 transition-colors hover:border-brand-500 hover:text-brand-700 dark:border-stone-700 dark:text-stone-300"
           >
             {example}
           </button>
@@ -91,10 +91,10 @@ export default function AssistantPanel() {
 
       {ask.data ? (
         <div className="mt-5 flex flex-col gap-4">
-          <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-950">
-            <p className="text-xs text-slate-500">{ask.data.question}</p>
+          <div className="rounded-lg bg-stone-50 p-4 dark:bg-stone-950">
+            <p className="text-xs text-stone-500">{ask.data.question}</p>
             <p
-              className="mt-2 text-sm whitespace-pre-line text-slate-900 dark:text-slate-100"
+              className="mt-2 text-sm whitespace-pre-line text-stone-900 dark:text-stone-100"
               data-testid="assistant-answer"
             >
               {ask.data.answer}
@@ -102,21 +102,21 @@ export default function AssistantPanel() {
           </div>
 
           <div>
-            <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">
+            <p className="text-xs font-medium tracking-wide text-stone-500 uppercase">
               Kaynaklar
             </p>
             {ask.data.sources.length === 0 ? (
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-stone-500">
                 Bu yanıt için hiçbir kayıt sorgulanamadı.
               </p>
             ) : (
               <ul className="mt-1.5 flex flex-col gap-1.5">
                 {ask.data.sources.map((source, index) => (
                   <li key={`${source.tool}-${index}`} className="flex flex-wrap items-baseline gap-2 text-sm">
-                    <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    <code className="rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-700 dark:bg-stone-800 dark:text-stone-300">
                       {source.tool}
                     </code>
-                    <span className="text-slate-600 dark:text-slate-300">{source.summary}</span>
+                    <span className="text-stone-600 dark:text-stone-300">{source.summary}</span>
                   </li>
                 ))}
               </ul>

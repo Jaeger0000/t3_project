@@ -129,7 +129,7 @@ demoda gerçek veriyle görünsün diye.
 
 | Uç | Yetki |
 |---|---|
-| `POST /api/auth/login` | herkese açık, dakikada 10 istek |
+| `POST /api/auth/login` | herkese açık — **IP + e-posta başına** dakikada 10 istek |
 | `GET /api/me` | kimlik doğrulanmış |
 | `GET /api/startups` | kimlik doğrulanmış — satırlar role göre daraltılır |
 | `GET /api/startups/{id}` | kimlik doğrulanmış — hassas alanlar role göre maskelenir |
@@ -151,7 +151,7 @@ demoda gerçek veriyle görünsün diye.
 | `POST /api/change-requests/{id}/approve` · `/reject` | Süper Yönetici, Program Yöneticisi (kendi kapsamı) |
 | `GET /api/reports/ecosystem` | kimlik doğrulanmış — sayılar kapsamla daralır, tutarlar role göre maskelenir |
 | `GET /api/reports/export` | kimlik doğrulanmış — CSV; maskeli hücre "yetkiniz yok" yazar, her aktarma denetim izine düşer |
-| `POST /api/ai/ask` | kimlik doğrulanmış, dakikada 20 istek — yanıt yalnızca kullanıcının görebildiği kayıtlardan üretilir |
+| `POST /api/ai/ask` | kimlik doğrulanmış, kullanıcı başına dakikada 20 istek — yanıt yalnızca kullanıcının görebildiği kayıtlardan üretilir |
 | `GET /api/ai/startups/{id}/summary` | kimlik doğrulanmış — kart ve kronolojiden üretilen yönetici özeti |
 | `POST /mcp` | kimlik doğrulanmış — JSON-RPC 2.0; araçlar aynı Application handler'larını sarar |
 | `GET /api/audit-logs` | Süper Yönetici |
@@ -310,9 +310,37 @@ gösterir; bu ayrım kasıtlıdır, boş kutu kullanıcıyı yanıltır.
 - **Gerçekçi demo verisi:** 32 girişim, 41 program katılımı, 97 başarı kaydı —
   bilinçli boşluklarıyla birlikte.
 
-**Doğrulama:** 153 birim testi, API'ye gerçek rollerle vuran 307 uçtan uca
-kontrol (81 + 123 + 103) ve headless Chrome'da 126 render kontrolü
-(32 + 41 + 53) — hepsi temiz veritabanında geçiyor. Render adımı yine iş gördü:
+**Denetim Dalga 0 tamamlandı** — ürün denetiminin videodan önce kapatılması
+gereken bulguları ([plan](docs/Denetim_Duzeltme_Plani.md)):
+
+- **Girişim/ekip/katılım yazma yolları arayüze açıldı.** "Girişimi sisteme kim
+  ekliyor?" sorusunun cevabı artık ekranda: `/girisimler`'de **Yeni girişim**,
+  kartta **Düzenle** ve **Kaydı pasife al** (yalnızca Süper Yönetici), ekip
+  sekmesinde ekle/düzenle/çıkar, programlar sekmesinde **Programa ekle**.
+  Portalın formları `features/startups/` altına taşındı ve `mode` propuyla iki
+  yolu birlikte besliyor: girişim kullanıcısı hâlâ yalnızca öneri gönderiyor.
+- **Program Yöneticisi yeni kayıttan sonra doğrudan katılım adımına düşüyor** —
+  kapsamı "programlarımdan geçmiş girişimler" olduğu için kayıt bir program
+  dönemine bağlanmadan kendi listesinde görünmüyor; ekran bu kuralı yazıyor.
+- **Giriş hız sınırı bölümlendi:** bir hesaba yapılan kaba kuvvet denemesi artık
+  diğer kullanıcıların girişini kilitlemiyor; reddedilen yanıt `Retry-After`
+  taşıyor.
+- **AI anahtarı gerçekten okunuyor** (`T3_Ai__ApiKey`) ve anahtar boşsa açılışta
+  uyarı log'u düşüyor — sessiz yedek mekanizma bir daha yanıltmasın.
+- **Sekme başlığı, sayfa dili ve meta etiketleri** eklendi; her ekranın başlığı
+  H1'iyle aynı, girişim kartında girişim adı.
+- **404 ekranı:** bilinmeyen adres sessizce panoya yönlendirilmiyor.
+- **Telefonda yatay taşma kapandı:** 360/375/414 px'te hiçbir ekran yatay
+  kaymıyor.
+- **Yazma yolunda maskeleme boşluğu kapandı** (denetimde görülmemişti): tam
+  değiştirmeli `PUT`, maskeli alanı istemciye `null` gönderdiği için geri
+  yazarken **siliyordu** — vergi numarasını göremeyen Program Yöneticisi'nin her
+  düzenlemesi numarayı boşaltırdı. Sunucu artık göremediği alanı korur, arayüz
+  o alanı formda hiç göstermez ve gerekçesini yazar.
+
+**Doğrulama:** 156 birim testi, API'ye gerçek rollerle vuran 307 uçtan uca
+kontrol (81 + 123 + 103) ve headless Chrome'da 201 render kontrolü
+(32 + 41 + 53 + 75) — hepsi temiz veritabanında geçiyor. Render adımı yine iş gördü:
 Faz 5'te panelin `data-testid`'sini yutan `Card` bileşenini ve Karar Verici'ye
 tekil tutar sızdıran ilk maskeleme sürümünü bu adım yakaladı. Betikler ve
 çalıştırma sırası: [scripts/](scripts/).
@@ -322,8 +350,13 @@ bkz. [teknik plan](docs/Problem7_Teknik_Plan.md#8-faz-planı).
 
 ### Bilinen açık işler
 
-- Girişim silme ucunun arayüz karşılığı yok — zincir yalnızca API'den ve
-  `scripts/e2e_faz3.py` üzerinden tetikleniyor.
+Denetim raporunun Dalga 1 ve Dalga 2 maddeleri açık:
+[Denetim_Duzeltme_Plani.md](docs/Denetim_Duzeltme_Plani.md). Başlıklar: program
+ve dönem yönetimi arayüzü yok (programlar yalnızca tohumlayıcıyla oluşuyor),
+şifre kurtarma/değiştirme uçları yok, erişim jetonu 15 dakikalık ve yenileme
+yok, KVKK aydınlatma metni ve başvuru yolu yok, üretim dağıtım yolu (tek origin
+statik sunum) yok.
+
 - Doküman deposu yerel disk; S3 uyumlu sürüm aynı arayüzün arkasında duruyor
   ama henüz yazılmadı.
 - Onaylanmayı bekleyen doküman yüklemeleri hiç karara bağlanmazsa dosyaları

@@ -12,15 +12,20 @@ import type { ReactNode } from 'react'
 
 export type ChartDatum = { key: string; label: string; value: number; hint?: string }
 
+/*
+ * Seriler T3KYS'in iki kurumsal renginin (kırmızı-turuncu ve sarı) arasında
+ * geziniyor. Sıra rastgele değil: komşu iki dilim hep farklı açıklıkta, yoksa
+ * halka grafikte bitişik dilimler birbirine karışıyor.
+ */
 const palette = [
   'var(--color-brand-500)',
-  'var(--color-accent-500)',
-  '#0ea5e9',
-  '#8b5cf6',
-  '#f59e0b',
-  '#10b981',
-  '#ef4444',
-  '#64748b',
+  'var(--color-gold-500)',
+  'var(--color-brand-700)',
+  'var(--color-brand-300)',
+  'var(--color-gold-400)',
+  'var(--color-brand-400)',
+  '#a8a29e',
+  '#44403c',
 ]
 
 export function BarChart({
@@ -35,17 +40,17 @@ export function BarChart({
   const max = Math.max(...data.map((d) => d.value), 0)
 
   if (data.length === 0 || max === 0) {
-    return <p className="py-6 text-center text-sm text-slate-500">{emptyHint}</p>
+    return <p className="py-6 text-center text-sm text-stone-500">{emptyHint}</p>
   }
 
   return (
     <ul className="flex flex-col gap-2.5">
       {data.map((datum, index) => (
-        <li key={datum.key} className="grid grid-cols-[9rem_1fr_auto] items-center gap-3">
-          <span className="truncate text-sm text-slate-600 dark:text-slate-300" title={datum.label}>
+        <li key={datum.key} className="grid grid-cols-[6rem_1fr_auto] items-center gap-3 sm:grid-cols-[9rem_1fr_auto]">
+          <span className="truncate text-sm text-stone-600 dark:text-stone-300" title={datum.label}>
             {datum.label}
           </span>
-          <span className="h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+          <span className="h-2.5 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800">
             <span
               className="block h-full rounded-full"
               style={{
@@ -54,7 +59,7 @@ export function BarChart({
               }}
             />
           </span>
-          <span className="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+          <span className="text-sm font-semibold tabular-nums text-stone-900 dark:text-stone-100">
             {formatValue(datum.value)}
           </span>
         </li>
@@ -79,7 +84,7 @@ export function DonutChart({
   const total = data.reduce((sum, datum) => sum + datum.value, 0)
 
   if (total === 0) {
-    return <p className="py-6 text-center text-sm text-slate-500">Gösterilecek veri yok.</p>
+    return <p className="py-6 text-center text-sm text-stone-500">Gösterilecek veri yok.</p>
   }
 
   const radius = 60
@@ -118,11 +123,11 @@ export function DonutChart({
           x="80"
           y="74"
           textAnchor="middle"
-          className="fill-slate-900 text-[22px] font-bold dark:fill-slate-100"
+          className="fill-stone-900 text-[22px] font-bold dark:fill-stone-100"
         >
           {centerValue}
         </text>
-        <text x="80" y="94" textAnchor="middle" className="fill-slate-500 text-[11px]">
+        <text x="80" y="94" textAnchor="middle" className="fill-stone-500 text-[11px]">
           {centerLabel}
         </text>
       </svg>
@@ -135,8 +140,8 @@ export function DonutChart({
               style={{ backgroundColor: palette[index % palette.length] }}
               aria-hidden
             />
-            <span className="flex-1 truncate text-slate-600 dark:text-slate-300">{datum.label}</span>
-            <span className="font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+            <span className="flex-1 truncate text-stone-600 dark:text-stone-300">{datum.label}</span>
+            <span className="font-semibold tabular-nums text-stone-900 dark:text-stone-100">
               {datum.value}
             </span>
           </li>
@@ -146,6 +151,10 @@ export function DonutChart({
   )
 }
 
+/**
+ * `min-w-0`: grid öğesinin örtük en küçük genişliği min-content'tir; kaldırmazsak
+ * içindeki `truncate` satır hiç kısalmıyor ve kart telefonda ekranı taşırıyor.
+ */
 export function ChartCard({
   title,
   hint,
@@ -156,10 +165,10 @@ export function ChartCard({
   children: ReactNode
 }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <section className="min-w-0 rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5 dark:border-stone-800 dark:bg-stone-900">
       <header className="mb-4">
-        <h2 className="font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
-        {hint ? <p className="mt-0.5 text-xs text-slate-500">{hint}</p> : null}
+        <h2 className="font-semibold text-stone-900 dark:text-stone-100">{title}</h2>
+        {hint ? <p className="mt-0.5 text-xs text-stone-500">{hint}</p> : null}
       </header>
       {children}
     </section>

@@ -152,7 +152,7 @@ export default function AchievementForm({
 
   return (
     <Card className="p-5">
-      <h3 className="font-semibold text-slate-900 dark:text-slate-100">
+      <h3 className="font-semibold text-stone-900 dark:text-stone-100">
         {existing ? 'Kaydı düzenle' : 'Yeni başarı / finans kaydı'}
       </h3>
 
@@ -307,12 +307,12 @@ export default function AchievementForm({
       </div>
 
       {existing ? (
-        <p className="mt-3 text-xs text-slate-500">
+        <p className="mt-3 text-xs text-stone-500">
           Kayıt türü değiştirilemez; farklı bir tür için kaydı kaldırıp yenisini ekleyin.
         </p>
       ) : null}
 
-      {error ? <p className="mt-3 text-sm text-rose-600">{error.message}</p> : null}
+      {error ? <p className="mt-3 text-sm text-red-600">{error.message}</p> : null}
 
       <div className="mt-4 flex gap-2">
         <Button onClick={submit} disabled={busy}>

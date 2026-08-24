@@ -1,6 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/apiClient'
 import type {
+  AddParticipationBody,
+  CardTeamMember,
+  DeleteStartupResult,
   PagedResult,
   Program,
   Sector,
@@ -9,6 +12,8 @@ import type {
   StartupSort,
   StartupStatus,
   StartupTimeline,
+  StartupWriteModel,
+  TeamMemberWriteModel,
 } from '@/api/types'
 
 export type StartupFilters = {
@@ -73,5 +78,92 @@ export function usePrograms() {
     queryKey: ['programs'],
     queryFn: () => api.get<Program[]>('/api/programs'),
     staleTime: 10 * 60 * 1000,
+  })
+}
+
+// --- Yazma yolları --------------------------------------------------------
+// Uçlar Faz 3'ten beri hazırdı ama hiçbir ekran çağırmıyordu: girişimi sisteme
+// yalnızca tohumlayıcı ekleyebiliyordu. Aşağıdaki kancalar o boşluğu kapatıyor.
+
+/**
+ * Yazma sonrası tazeleme. `['startups']` öneki liste, kart ve kronolojiyi
+ * birlikte kapsıyor; kartın finansal özeti ve yolculuk aynı kayıtlardan
+ * türediği için üçünü ayrı ayrı geçersizleştirmek birini bayat bırakırdı.
+ * Program listesi de tazeleniyor: katılım sayıları orada gösteriliyor.
+ */
+function useInvalidateStartups() {
+  const client = useQueryClient()
+  return () => {
+    void client.invalidateQueries({ queryKey: ['startups'] })
+    void client.invalidateQueries({ queryKey: ['programs'] })
+    void client.invalidateQueries({ queryKey: ['reports'] })
+  }
+}
+
+export function useCreateStartup() {
+  const invalidate = useInvalidateStartups()
+  return useMutation({
+    mutationFn: (model: StartupWriteModel) =>
+      api.post<{ id: string; name: string }>('/api/startups', model),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdateStartup(startupId: string) {
+  const invalidate = useInvalidateStartups()
+  return useMutation({
+    mutationFn: (model: StartupWriteModel) =>
+      api.put<StartupCard>(`/api/startups/${startupId}`, model),
+    onSuccess: invalidate,
+  })
+}
+
+/** Silme aslında soft delete; yanıt hangi bağlı kaydın pasife alındığını sayar. */
+export function useDeleteStartup() {
+  const invalidate = useInvalidateStartups()
+  return useMutation({
+    mutationFn: (startupId: string) =>
+      api.del<DeleteStartupResult>(`/api/startups/${startupId}`),
+    onSuccess: invalidate,
+  })
+}
+
+export function useAddTeamMember(startupId: string) {
+  const invalidate = useInvalidateStartups()
+  return useMutation({
+    mutationFn: (model: TeamMemberWriteModel) =>
+      api.post<CardTeamMember>(`/api/startups/${startupId}/team`, model),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdateTeamMember(startupId: string, memberId: string) {
+  const invalidate = useInvalidateStartups()
+  return useMutation({
+    mutationFn: (model: TeamMemberWriteModel) =>
+      api.put<CardTeamMember>(`/api/startups/${startupId}/team/${memberId}`, model),
+    onSuccess: invalidate,
+  })
+}
+
+export function useRemoveTeamMember(startupId: string) {
+  const invalidate = useInvalidateStartups()
+  return useMutation({
+    mutationFn: (memberId: string) =>
+      api.del<void>(`/api/startups/${startupId}/team/${memberId}`),
+    onSuccess: invalidate,
+  })
+}
+
+/**
+ * Girişimi bir program dönemine bağlar. Dönem listesi ayrı bir uçtan değil
+ * `GET /api/programs` yanıtındaki `terms` dizisinden geliyor.
+ */
+export function useAddParticipation() {
+  const invalidate = useInvalidateStartups()
+  return useMutation({
+    mutationFn: (body: AddParticipationBody) =>
+      api.post<{ id: string }>('/api/participations', body),
+    onSuccess: invalidate,
   })
 }

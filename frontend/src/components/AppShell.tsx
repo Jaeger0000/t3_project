@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import { roleLabels } from '@/lib/labels'
@@ -8,7 +9,7 @@ import { Badge, Button } from '@/components/ui'
  * Menü rol bazlı kurulur. Bu bir güvenlik önlemi değil — yetki sunucuda
  * uygulanıyor — ama kullanıcıya her tıklamada 403 yedirmenin alternatifi.
  */
-export default function AppShell() {
+export default function AppShell({ children }: { children?: ReactNode }) {
   const { session, logout } = useAuth()
   const permissions = session?.permissions
 
@@ -37,17 +38,17 @@ export default function AppShell() {
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-6 py-3">
+      <header className="sticky top-0 z-10 border-b border-stone-200 bg-white/90 backdrop-blur dark:border-stone-800 dark:bg-stone-950/90">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
-            <span className="flex size-9 items-center justify-center rounded-lg bg-brand-900 text-sm font-bold text-white">
+            <span className="flex size-9 items-center justify-center rounded-lg bg-brand-500 text-sm font-bold text-white">
               T3
             </span>
             <div className="leading-tight">
-              <p className="text-sm font-semibold text-brand-900 dark:text-brand-100">
+              <p className="text-sm font-semibold text-stone-900 dark:text-stone-50">
                 Girişim Ekosistemi
               </p>
-              <p className="text-xs text-slate-500">Yönetim Sistemi</p>
+              <p className="text-xs text-stone-500">Yönetim Sistemi</p>
             </div>
           </div>
 
@@ -61,14 +62,14 @@ export default function AppShell() {
                   className={({ isActive }) =>
                     `flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                       isActive
-                        ? 'bg-brand-50 text-brand-900 dark:bg-brand-950 dark:text-brand-100'
-                        : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                        ? 'bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300'
+                        : 'text-stone-600 hover:bg-brand-50 hover:text-brand-700 dark:text-stone-300 dark:hover:bg-stone-800'
                     }`
                   }
                 >
                   {link.label}
                   {link.badge ? (
-                    <span className="rounded-full bg-accent-500 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                    <span className="rounded-full bg-brand-500 px-1.5 py-0.5 text-[11px] font-semibold text-white">
                       {link.badge}
                     </span>
                   ) : null}
@@ -79,14 +80,14 @@ export default function AppShell() {
           {session ? (
             <div className="ml-auto flex items-center gap-3">
               <div className="text-right leading-tight">
-                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                <p className="text-sm font-medium text-stone-900 dark:text-stone-100">
                   {session.fullName}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-stone-500">
                   {session.startupName ?? session.email}
                 </p>
               </div>
-              <Badge tone="bg-accent-500/15 text-accent-600 dark:text-accent-400">
+              <Badge tone="bg-brand-100 text-brand-800 dark:bg-brand-950 dark:text-brand-200">
                 {roleLabels[session.role]}
               </Badge>
               <Button variant="outline" onClick={logout}>
@@ -97,8 +98,9 @@ export default function AppShell() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-8">
-        <Outlet />
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        {/* `children` yalnızca rota ağacına girmeyen ekranlar için (404). */}
+        {children ?? <Outlet />}
       </main>
     </div>
   )

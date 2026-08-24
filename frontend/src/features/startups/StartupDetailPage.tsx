@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { formatDate, formatMoney } from '@/lib/format'
 import {
   participationStatusLabels,
@@ -10,6 +10,7 @@ import {
 } from '@/lib/labels'
 import {
   Badge,
+  Button,
   Card,
   DataRow,
   EmptyState,
@@ -18,12 +19,17 @@ import {
   Spinner,
 } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
+import { ApiError } from '@/lib/apiClient'
 import AchievementSection from '@/features/achievements/AchievementSection'
 import DocumentSection from '@/features/documents/DocumentSection'
 import StartupTimeline from './StartupTimeline'
+import StartupForm from './StartupForm'
+import TeamSection from './TeamSection'
+import ParticipationForm from './ParticipationForm'
 import StartupSummaryCard from '@/features/assistant/StartupSummaryCard'
-import { useStartupCard } from './queries'
-import type { CardParticipation, CardTeamMember, StartupCard } from '@/api/types'
+import { useStartupCard, useDeleteStartup } from './queries'
+import type { CardParticipation, StartupCard } from '@/api/types'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 type Tab = 'genel' | 'ekip' | 'programlar' | 'basarilar' | 'dokumanlar' | 'yolculuk'
 
@@ -41,6 +47,11 @@ export default function StartupDetailPage() {
   const { session } = useAuth()
   const card = useStartupCard(id)
   const [tab, setTab] = useState<Tab>('genel')
+  const [editingProfile, setEditingProfile] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  // Kanca koşulsuz çağrılıyor: kart yüklenene kadar başlık genel kalır.
+  useDocumentTitle(card.data?.name)
 
   // Girişim kullanıcısı kendi kartını da salt okunur görür: düzenleme portalda,
   // çünkü oradan giden her değişiklik onay isteğine dönüşüyor.
@@ -50,8 +61,15 @@ export default function StartupDetailPage() {
   if (card.error) {
     return (
       <div className="flex flex-col gap-4">
-        <ErrorState message={card.error.message} />
-        <Link to="/girisimler" className="text-sm text-brand-600 hover:underline">
+        {card.error instanceof ApiError && card.error.status === 404 ? (
+          <EmptyState
+            title="Girişim bulunamadı"
+            hint="Kayıt silinmiş, adres yanlış yazılmış ya da bu girişim kapsamınızda olmayabilir."
+          />
+        ) : (
+          <ErrorState message={card.error.message} />
+        )}
+        <Link to="/girisimler" className="text-sm text-brand-700 hover:underline">
           ← Girişim listesine dön
         </Link>
       </div>
@@ -63,14 +81,42 @@ export default function StartupDetailPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link to="/girisimler" className="text-sm text-brand-600 hover:underline">
+      <Link to="/girisimler" className="text-sm text-brand-700 hover:underline">
         ← Girişimler
       </Link>
 
-      <CardHeader startup={startup} />
+      <CardHeader
+        startup={startup}
+        canEdit={editMode === 'direct'}
+        canDelete={session?.role === 'SuperAdmin'}
+        editing={editingProfile}
+        onEdit={() => {
+          setEditingProfile(true)
+          setNotice(null)
+        }}
+      />
+
+      {notice ? (
+        <p className="rounded-lg bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+          {notice}
+        </p>
+      ) : null}
+
+      {editingProfile ? (
+        <StartupForm
+          mode="direct"
+          card={startup}
+          onDone={(message) => {
+            setEditingProfile(false)
+            setNotice(message)
+          }}
+          onCancel={() => setEditingProfile(false)}
+        />
+      ) : null}
+
       <FinancialSummary startup={startup} />
 
-      <div className="flex flex-wrap gap-1 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex flex-wrap gap-1 border-b border-stone-200 dark:border-stone-800">
         {tabs.map((item) => (
           <button
             key={item.key}
@@ -79,7 +125,7 @@ export default function StartupDetailPage() {
             className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
               tab === item.key
                 ? 'border-brand-500 text-brand-700 dark:text-brand-100'
-                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                : 'border-transparent text-stone-500 hover:border-brand-300 hover:text-brand-700 dark:hover:text-stone-200'
             }`}
           >
             {item.label}
@@ -94,8 +140,10 @@ export default function StartupDetailPage() {
       </div>
 
       {tab === 'genel' ? <GeneralTab startup={startup} /> : null}
-      {tab === 'ekip' ? <TeamTab startup={startup} /> : null}
-      {tab === 'programlar' ? <ProgramsTab participations={startup.programs} /> : null}
+      {tab === 'ekip' ? <TeamSection card={startup} mode={editMode} /> : null}
+      {tab === 'programlar' ? (
+        <ProgramsTab startup={startup} canEdit={editMode === 'direct'} />
+      ) : null}
       {tab === 'basarilar' ? <AchievementSection startupId={id} mode={editMode} /> : null}
       {tab === 'dokumanlar' ? <DocumentSection startupId={id} mode={editMode} /> : null}
       {tab === 'yolculuk' ? <StartupTimeline startupId={id} /> : null}
@@ -103,7 +151,19 @@ export default function StartupDetailPage() {
   )
 }
 
-function CardHeader({ startup }: { startup: StartupCard }) {
+function CardHeader({
+  startup,
+  canEdit,
+  canDelete,
+  editing,
+  onEdit,
+}: {
+  startup: StartupCard
+  canEdit: boolean
+  canDelete: boolean
+  editing: boolean
+  onEdit: () => void
+}) {
   const initials = startup.name
     .split(' ')
     .slice(0, 2)
@@ -112,23 +172,23 @@ function CardHeader({ startup }: { startup: StartupCard }) {
 
   return (
     <div className="flex flex-wrap items-start gap-5">
-      <span className="flex size-16 shrink-0 items-center justify-center rounded-xl bg-brand-900 text-xl font-bold text-white">
+      <span className="flex size-16 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-xl font-bold text-white">
         {initials}
       </span>
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-bold text-brand-900 dark:text-brand-100">{startup.name}</h1>
+          <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-50">{startup.name}</h1>
           <Badge tone={startupStatusTone[startup.status]}>
             {startupStatusLabels[startup.status]}
           </Badge>
         </div>
 
         {startup.legalName ? (
-          <p className="mt-0.5 text-sm text-slate-500">{startup.legalName}</p>
+          <p className="mt-0.5 text-sm text-stone-500">{startup.legalName}</p>
         ) : null}
 
-        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600 dark:text-slate-400">
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-stone-600 dark:text-stone-400">
           <span>{sectorLabels[startup.sector]}</span>
           {startup.city ? <span>{startup.city}</span> : null}
           {startup.foundedOn ? <span>Kuruluş: {formatDate(startup.foundedOn)}</span> : null}
@@ -137,14 +197,68 @@ function CardHeader({ startup }: { startup: StartupCard }) {
               href={startup.website}
               target="_blank"
               rel="noreferrer noopener"
-              className="text-brand-600 hover:underline dark:text-brand-100"
+              className="text-brand-700 hover:underline dark:text-brand-100"
             >
               {startup.website.replace(/^https?:\/\//, '')}
             </a>
           ) : null}
         </div>
       </div>
+
+      {/* Yazma yolu yalnızca `canManageStartups` doğruyken render ediliyor;
+          sunucu aynı kontrolü Policies.ManageStartups ile tekrar yapıyor. */}
+      {canEdit && !editing ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={onEdit}>
+            Düzenle
+          </Button>
+          {/* Silme yalnızca Süper Yönetici'de: politika ManageStartups Program
+              Yöneticisi'ni de kapsıyor ama bu işlemin kapsamı daha dar ve
+              sunucu handler'ı aynı kontrolü tekrar yapıyor. */}
+          {canDelete ? <DeleteStartupButton startup={startup} /> : null}
+        </div>
+      ) : null}
     </div>
+  )
+}
+
+/**
+ * Girişimi pasife alır. Silme geri alınamaz gibi göründüğü için iki adımlı;
+ * yanıt zincirin raporunu taşıyor (kaç ekip üyesi, kaç kayıt pasife alındı) ama
+ * kullanıcı listeye döndüğü için rapor yalnızca özet mesaja indiriliyor.
+ */
+function DeleteStartupButton({ startup }: { startup: StartupCard }) {
+  const navigate = useNavigate()
+  const remove = useDeleteStartup()
+  const [confirming, setConfirming] = useState(false)
+
+  if (!confirming) {
+    return (
+      <Button variant="ghost" onClick={() => setConfirming(true)}>
+        Kaydı pasife al
+      </Button>
+    )
+  }
+
+  return (
+    <span className="flex flex-wrap items-center gap-2 text-sm">
+      <span className="text-stone-500">Bağlı tüm kayıtlar pasife alınacak. Emin misiniz?</span>
+      <Button
+        variant="outline"
+        disabled={remove.isPending}
+        onClick={() =>
+          remove.mutate(startup.id, {
+            onSuccess: () => navigate('/girisimler', { replace: true }),
+          })
+        }
+      >
+        Evet, pasife al
+      </Button>
+      <Button variant="ghost" disabled={remove.isPending} onClick={() => setConfirming(false)}>
+        Vazgeç
+      </Button>
+      {remove.error ? <span className="text-red-600">{remove.error.message}</span> : null}
+    </span>
   )
 }
 
@@ -174,20 +288,20 @@ function FinancialSummary({ startup }: { startup: StartupCard }) {
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
       {cells.map((cell) => (
         <Card key={cell.label} className="p-4">
-          <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">{cell.label}</p>
-          <p className="mt-1.5 text-lg font-bold tabular-nums text-slate-900 dark:text-slate-100">
+          <p className="text-xs font-medium tracking-wide text-stone-500 uppercase">{cell.label}</p>
+          <p className="mt-1.5 text-lg font-bold tabular-nums text-stone-900 dark:text-stone-100">
             <Sensitive value={cell.value} authorized={visibility.exactAmounts} />
           </p>
-          {cell.hint ? <p className="mt-0.5 text-xs text-slate-500">{cell.hint}</p> : null}
+          {cell.hint ? <p className="mt-0.5 text-xs text-stone-500">{cell.hint}</p> : null}
         </Card>
       ))}
 
       <Card className="p-4">
-        <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">Ödül</p>
-        <p className="mt-1.5 text-lg font-bold tabular-nums text-slate-900 dark:text-slate-100">
+        <p className="text-xs font-medium tracking-wide text-stone-500 uppercase">Ödül</p>
+        <p className="mt-1.5 text-lg font-bold tabular-nums text-stone-900 dark:text-stone-100">
           {a.awardCount}
         </p>
-        <p className="mt-0.5 text-xs text-slate-500">{a.totalCount} başarı kaydı</p>
+        <p className="mt-0.5 text-xs text-stone-500">{a.totalCount} başarı kaydı</p>
       </Card>
     </div>
   )
@@ -199,15 +313,15 @@ function GeneralTab({ startup }: { startup: StartupCard }) {
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <Card className="p-5 lg:col-span-2">
-        <h2 className="font-semibold text-slate-900 dark:text-slate-100">Ürün ve teknoloji</h2>
-        <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+        <h2 className="font-semibold text-stone-900 dark:text-stone-100">Ürün ve teknoloji</h2>
+        <p className="mt-2 text-sm leading-relaxed text-stone-600 dark:text-stone-400">
           {startup.productDescription ?? 'Ürün açıklaması girilmemiş.'}
         </p>
 
         {startup.technologyAreas.length > 0 ? (
           <div className="mt-4 flex flex-wrap gap-1.5">
             {startup.technologyAreas.map((area) => (
-              <Badge key={area} tone="bg-brand-50 text-brand-900 dark:bg-brand-950 dark:text-brand-100">
+              <Badge key={area} tone="bg-brand-50 text-brand-800 dark:bg-brand-950 dark:text-brand-100">
                 {area}
               </Badge>
             ))}
@@ -220,8 +334,8 @@ function GeneralTab({ startup }: { startup: StartupCard }) {
       </div>
 
       <Card className="p-5">
-        <h2 className="font-semibold text-slate-900 dark:text-slate-100">Kurumsal bilgiler</h2>
-        <dl className="mt-2 divide-y divide-slate-100 dark:divide-slate-800">
+        <h2 className="font-semibold text-stone-900 dark:text-stone-100">Kurumsal bilgiler</h2>
+        <dl className="mt-2 divide-y divide-stone-100 dark:divide-stone-800">
           <DataRow label="Vergi kimlik no">
             <Sensitive value={startup.taxNumber} authorized={visibility.taxNumber} />
           </DataRow>
@@ -245,97 +359,101 @@ function GeneralTab({ startup }: { startup: StartupCard }) {
   )
 }
 
-function TeamTab({ startup }: { startup: StartupCard }) {
-  if (startup.team.length === 0) {
-    return <EmptyState title="Ekip üyesi eklenmemiş" />
-  }
+/**
+ * Program katılımları. Ekleme yolu buradan geçiyor çünkü kapsamı kuran işlem
+ * bu: Program Yöneticisi'nin girişim kapsamı "programlarımdan geçmiş
+ * girişimler" olarak tanımlı, dolayısıyla yeni girişim ancak bir döneme
+ * bağlandığında kapsama giriyor.
+ */
+function ProgramsTab({
+  startup,
+  canEdit,
+}: {
+  startup: StartupCard
+  canEdit: boolean
+}) {
+  const [adding, setAdding] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+  const participations = startup.programs
 
   return (
     <div className="flex flex-col gap-4">
-      {!startup.visibility.teamPersonalData ? (
-        <p className="rounded-lg bg-slate-100 px-4 py-2.5 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-          🔒 Ekip üyelerinin iletişim bilgileri kişisel veridir (KVKK) ve rolünüze
-          gösterilmez. İsim ve ünvan bilgisi görünür.
-        </p>
-      ) : null}
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {startup.team.map((member) => (
-          <TeamCard key={member.id} member={member} showPersonalData={startup.visibility.teamPersonalData} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function TeamCard({
-  member,
-  showPersonalData,
-}: {
-  member: CardTeamMember
-  showPersonalData: boolean
-}) {
-  return (
-    <Card className="p-5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate font-medium text-slate-900 dark:text-slate-100">{member.fullName}</p>
-          <p className="mt-0.5 text-sm text-slate-500">{member.title ?? '—'}</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-semibold text-stone-900 dark:text-stone-100">
+            Program katılımları ({participations.length})
+          </h2>
+          <p className="mt-0.5 text-sm text-stone-500">
+            Katılımlar gelişim yolculuğunda da kronolojik olarak görünür.
+          </p>
         </div>
-        {member.isFounder ? (
-          <Badge tone="bg-accent-500/15 text-accent-600 dark:text-accent-400">Kurucu</Badge>
+
+        {canEdit && !adding ? (
+          <Button
+            onClick={() => {
+              setAdding(true)
+              setNotice(null)
+            }}
+          >
+            Programa ekle
+          </Button>
         ) : null}
       </div>
 
-      <dl className="mt-3 divide-y divide-slate-100 text-sm dark:divide-slate-800">
-        <DataRow label="E-posta">
-          <Sensitive value={member.email} authorized={showPersonalData} />
-        </DataRow>
-        <DataRow label="Telefon">
-          <Sensitive value={member.phone} authorized={showPersonalData} />
-        </DataRow>
-        <DataRow label="Katılım">{formatDate(member.joinedOn) ?? '—'}</DataRow>
-      </dl>
-    </Card>
+      {notice ? (
+        <p className="rounded-lg bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+          {notice}
+        </p>
+      ) : null}
+
+      {adding ? (
+        <ParticipationForm
+          startupId={startup.id}
+          onDone={(message) => {
+            setAdding(false)
+            setNotice(message)
+          }}
+          onCancel={() => setAdding(false)}
+        />
+      ) : null}
+
+      {participations.length === 0 && !adding ? (
+        <EmptyState
+          title="Program katılımı yok"
+          hint="Girişim bir program dönemine bağlandığında burada ve gelişim yolculuğunda görünür."
+        />
+      ) : null}
+
+      {participations.map((participation) => (
+        <ParticipationRow key={participation.id} participation={participation} />
+      ))}
+    </div>
   )
 }
 
-function ProgramsTab({ participations }: { participations: CardParticipation[] }) {
-  if (participations.length === 0) {
-    return (
-      <EmptyState
-        title="Program katılımı yok"
-        hint="Girişim bir program dönemine bağlandığında burada ve gelişim yolculuğunda görünür."
-      />
-    )
-  }
-
+function ParticipationRow({ participation }: { participation: CardParticipation }) {
   return (
-    <div className="flex flex-col gap-3">
-      {participations.map((participation) => (
-        <Card key={participation.id} className="flex flex-wrap items-center gap-x-6 gap-y-2 p-4">
-          <div className="min-w-56 flex-1">
-            <p className="font-medium text-slate-900 dark:text-slate-100">
-              {participation.programName}
-            </p>
-            <p className="text-sm text-slate-500">
-              {participation.termName} · {programTypeLabels[participation.programType]}
-              {participation.coordinatorship ? ` · ${participation.coordinatorship}` : ''}
-            </p>
-          </div>
+    <Card className="flex flex-wrap items-center gap-x-6 gap-y-2 p-4">
+      <div className="min-w-56 flex-1">
+        <p className="font-medium text-stone-900 dark:text-stone-100">
+          {participation.programName}
+        </p>
+        <p className="text-sm text-stone-500">
+          {participation.termName} · {programTypeLabels[participation.programType]}
+          {participation.coordinatorship ? ` · ${participation.coordinatorship}` : ''}
+        </p>
+      </div>
 
-          <Badge>{participationStatusLabels[participation.status]}</Badge>
+      <Badge>{participationStatusLabels[participation.status]}</Badge>
 
-          <p className="text-sm tabular-nums text-slate-600 dark:text-slate-400">
-            {formatDate(participation.joinedOn)}
-            {participation.leftOn ? ` → ${formatDate(participation.leftOn)}` : ' → sürüyor'}
-          </p>
+      <p className="text-sm tabular-nums text-stone-600 dark:text-stone-400">
+        {formatDate(participation.joinedOn)}
+        {participation.leftOn ? ` → ${formatDate(participation.leftOn)}` : ' → sürüyor'}
+      </p>
 
-          {participation.notes ? (
-            <p className="w-full text-sm text-slate-600 dark:text-slate-400">{participation.notes}</p>
-          ) : null}
-        </Card>
-      ))}
-    </div>
+      {participation.notes ? (
+        <p className="w-full text-sm text-stone-600 dark:text-stone-400">{participation.notes}</p>
+      ) : null}
+    </Card>
   )
 }

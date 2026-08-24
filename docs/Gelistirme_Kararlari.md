@@ -223,6 +223,119 @@ düz N-tier Controller-Service-Repository, her türlü otomatik mapper.
 
 ---
 
+## 3d. Renk paleti kararları
+
+- **Palet uydurulmadı, T3KYS'ten alındı.** `t3kys.com` giriş sayfası ve
+  `cdn.t3kys.com/static/new/assets/css/color.css` indirilip kurumsal renkler
+  doğrudan okundu: `#E73A13` (birincil turuncu), `#D92C05` (üzerine gelme —
+  kızarıp koyulaşıyor), `#FFB900` (sarı vurgu), `#FFA996` (soluk somon zemin).
+  Arayüz ekosistemin geri kalanıyla aynı yerden geldiği izlenimini vermeli;
+  "turuncuya benzer bir şey" yeterli değil. Kurumsal lacivert `#0A406C`
+  bilinçli olarak alınmadı: beyaz/turuncu bir arayüzde tek başına duruyor.
+- **İki aile var:** turuncu (`brand-*`, `frontend/src/index.css` içindeki
+  `@theme` bloğu) ve sıcak nötr (Tailwind `stone`). Sarı ayrı bir jeton
+  (`gold-*`) ama yalnızca ikincil vurgu: grafik serisi ve ödül rozeti. Soğuk
+  gri (`slate`), mavi, mor, turkuaz arayüzde yok. Kalan tek yabancı ton
+  yeşil/kırmızı: onay–ret ve "doğrulandı" semantiği renkle taşınıyor.
+- **Ölçek "ton"a göre değil "iş"e göre.** `brand-300` (#FFA996) soluk zemin,
+  `brand-500` (#E73A13) düğme/rozet zemini **beyaz yazıyla**, `brand-600`
+  (#D92C05) üzerine gelme hâli, `brand-700` (#B52205) beyaz üstünde turuncu
+  yazı (bağlantı, aktif sekme).
+- **Beyaz yazı kontrastı: 4.2:1 — bilinerek kabul edildi.** `#E73A13`
+  üzerinde beyaz, WCAG AA'nın küçük yazı için istediği 4.5:1'in hemen altında
+  (üzerine gelince 4.9:1'e çıkıyor). Bir tık koyu bir turuncu (#DE3812) eşiği
+  geçiyordu ama T3KYS'in kendi düğmesi tam olarak bu renk; kurumsal kimlikle
+  birebir aynı olmak tercih edildi. Sarıda beyaz yazı **kullanılmıyor**
+  (1.7:1); `gold-500` üstüne koyu mürekkep geliyor (10.2:1).
+- **`dark:` yardımcıları işletim sistemi temasını dinlemiyor.** `index.css`
+  içinde `@custom-variant dark (&:where(.dark, .dark *))` tanımlı; yani karanlık
+  tema ancak kökte `.dark` sınıfı varsa açılıyor, ki hiçbir yerde eklenmiyor.
+  Sebep: kurumsal kimlik beyaz zemine kurulu, ama tarayıcısı koyu temada olan
+  kullanıcı siyah bir arayüz görüyordu. Sınıflar kodda bırakıldı — gerçek bir
+  tema düğmesi eklenirse `<html class="dark">` demek yetecek.
+- **Hover'ın rengi tek yerden gelir.** Birincil düğme turuncudan kırmızıya
+  koyulur (T3KYS'teki `.btn-orange:hover` davranışı); çerçeveli düğme turuncu
+  dolguya geçer; hayalet düğme, sekme ve menü bağlantısı soluk turuncu zemin +
+  `brand-700` yazıya döner. Nötr griye açılan tek bir hover kalmadı.
+- **Başlıklar kahverengi değil sıcak siyah.** Turuncu ölçeğinin koyu ucu
+  kaçınılmaz olarak kahveye düşüyor; başlık ve KPI rakamları `stone-900`.
+- **Grafik serileri komşusundan açıklıkla ayrışır.** Seriler kurumsal turuncu
+  ile kurumsal sarı arasında geziniyor, sonuna iki nötr ekleniyor. Sıralama
+  rastgele değil: halka grafikte bitişik iki dilim hep farklı açıklıkta.
+- **Varsayılan rozet gri değil soluk turuncu.** Teknoloji etiketleri sayfanın
+  en kalabalık öğesi; gri kaldıklarında palet turuncu değil gri okunuyordu.
+- **Durum rozetleri aynı aileden ama dolgu/çerçeve farkıyla ayrışır.**
+  "Mezun" soluk turuncu, "Çıkış yaptı" çerçeveli beyaz, "Satın alındı" koyu
+  nötr: renk körlüğünde de ayırt ediliyor.
+- **Palet kararı gözle verilir.** Kontrast oranı hesaplanabilir ama "turuncu
+  ağırlıklı mı" hesaplanamaz: her tur headless Chrome ekran görüntüsüyle
+  bakıldı. Birinci turda logo kutusu koyu kahveydi, ikinci turda grafikler
+  kahverengiydi, üçüncü turda tarayıcı koyu temada olduğu için sayfa siyahtı.
+  Ekran görüntüsü artık `Emulation.setEmulatedMedia` ile **koyu tema
+  taklit edilerek** alınıyor — beyaz zeminin her koşulda beyaz kaldığı
+  doğrulanabilsin.
+
+---
+
+## 3e. Denetim Dalga 0 kararları (ürün denetimi düzeltmeleri)
+
+Kaynak: [Denetim_Duzeltme_Plani.md](Denetim_Duzeltme_Plani.md) Dalga 0.
+
+- **Girişim yazma yolları arayüze portaldaki formlar yeniden kullanılarak açıldı.**
+  Uçlar (`POST/PUT/DELETE /api/startups`, `.../team`, `POST /api/participations`)
+  Faz 3'ten beri hazırdı ama hiçbir ekran çağırmıyordu: girişimi sisteme
+  yalnızca tohumlayıcı ekleyebiliyordu. Portalın `ProfileForm`/`MemberForm`
+  bileşenleri `frontend/src/features/startups/` altına taşındı ve
+  `AchievementSection`'daki **`mode` deseni** uygulandı: `proposal` →
+  `ChangeRequest`, `direct` → tabloya yazma. İkinci bir form yazmak, aynı 13 alan
+  için iki doğrulama ve iki hata mesajı demekti.
+- **`direct` kip yalnızca `canManageStartups` doğruyken render ediliyor**, ama bu
+  bir güvenlik önlemi değil: sunucu tarafı `Policies.ManageStartups` + handler
+  içindeki ikinci kontrol yerinde duruyor. Girişim kullanıcısı hâlâ hiçbir
+  tabloya doğrudan yazmıyor.
+- **Yeni girişim kaydettikten sonra kart açılmıyor, katılım adımı açılıyor.**
+  Program Yöneticisi'nin kapsamı "programlarımdan geçmiş girişimler" olarak
+  tanımlı (`StartupScope`), dolayısıyla yeni kayıt bir program dönemine
+  bağlanana kadar **kendi kapsamına girmiyor** — kartına gitmek 404 verirdi.
+  `StartupsPage` bu yüzden kaydetmenin ardından `ParticipationForm`'u açıp
+  kuralı ekranda yazıyor. Süper Yönetici'de bu adım yok, doğrudan karta gidiyor.
+  Alternatif (girişime `CreatedByUserId` ekleyip kapsamı gevşetmek) reddedildi:
+  kapsam tanımını veri modeliyle bulanıklaştırıyordu.
+- **Maskeleme yalnızca okuma süzgeci değil, yazma yolunda da tutulur.** Tam
+  değiştirmeli `PUT` maskeli alanı istemciye `null` gönderdiği için geri
+  yazarken **siliyordu**: vergi numarasını göremeyen Program Yöneticisi'nin
+  kaydettiği her düzenleme numarayı boşaltırdı ve denetim izi bunu "kullanıcı
+  sildi" diye kaydederdi. `StartupWriteModel.ApplyTo(startup, visibility)`
+  göremediği alanı koruyor; arayüz `direct` kipte o alanı hiç göstermiyor ve
+  gerekçesini yazıyor. Alanı forma koyup "değiştirme" demek yeterli değildi:
+  gövde yine null taşıyacaktı. Kural aynı yerde (`StartupVisibility`) duruyor,
+  RBAC'ın üç tek noktasına dördüncüsü eklenmedi.
+- **Girişim silme düğmesi yalnızca Süper Yönetici'de.** Politika
+  `ManageStartups` Program Yöneticisi'ni de kapsıyor, ama silmenin kapsamı daha
+  dar ve kontrol handler'da; arayüz bu daha dar kuralı yansıtıyor.
+- **Hız sınırı kovası IP + e-posta ile bölümlendi.** Bölüm anahtarsız tek kova,
+  bir hesaba yapılan 10 yanlış denemenin **tüm** kullanıcıların girişini 429'a
+  düşürmesi anlamına geliyordu. E-posta gövdeden okunuyor; hız sınırlayıcının
+  bölüm anahtarı üreten geri çağrısı **eşzamanlı** olduğu için gövde
+  sınırlayıcıdan önce ayrı bir ara katmanda (`AuthRateLimit.CaptureLoginEmail`)
+  tamponlanıp başa alınıyor. Yalnızca IP ile bölümlemek yetmezdi: demo ve tüm
+  betikler aynı makineden, yani tek IP'den giriş yapıyor. AI kovası kullanıcı
+  kimliğine göre bölümlü; reddedilen yanıt `Retry-After` taşıyor.
+- **AI anahtarı `Ai` bölümünden okunuyor** (`T3_Ai__ApiKey`). `.env` içindeki
+  ad `T3_Anthropic__ApiKey`'di, yani anahtar hiç okunmuyordu ve asistan sessizce
+  yerel plana düşüyordu. Sessiz yedek mekanizma bir daha yanıltmasın diye açılışta
+  log: anahtar yoksa `LogWarning`, varsa model adı `LogInformation`.
+- **Bilinmeyen adres panoya yönlendirilmiyor, 404 gösteriyor.** Yönlendirme,
+  paylaşılan bir bağlantıdaki yazım hatasını "pano zaten burası" gibi
+  gösteriyordu. Oturum açıkken kabuk içinde (menü elde kalsın), kapalıyken
+  çıplak render ediliyor. `/girisimler/99999` ile geçerli-ama-yok GUID artık
+  aynı ifadeyi veriyor: kullanıcı için ikisi aynı durum.
+- **Sekme başlığı sayfanın H1'iyle aynı** (`useDocumentTitle`). Üç girişim
+  kartını üç sekmede açan yönetici hangisinin hangisi olduğunu ayırt edemiyordu;
+  55 render'ın hepsinde başlık "frontend" yazıyordu.
+
+---
+
 ## 4. Ortam tuzakları — tekrar çarpılacak olanlar
 
 ### Faz 0
@@ -319,6 +432,34 @@ düz N-tier Controller-Service-Repository, her türlü otomatik mapper.
   yerine `EnumOf<T>`. Aynı dosyada `cond ? null : x.Prop` üçlüsü de tip
   çıkaramaz (CS0173) — hedef tip açıkça yazılmalı (`DateOnly? first = …`).
 
+### Dalga 0 (denetim düzeltmeleri)
+
+- **`min-w-0` olmadan grid/flex öğesi kendi min-content'i kadar yer ister.**
+  375 px'te `/pano` 394 px, `/girisimler` 386 px genişliğe taşıyordu. Suçlu
+  düğme ya da grafik değildi: pano grafikleri tek sütunlu bir grid'in *aynı*
+  izinde duruyor ve iz, en geniş öğenin min-content'i kadar büyüyor — "En çok
+  yatırım alan girişimler" listesindeki `truncate` bağlantı (nowrap olduğu için
+  min-content'i tüm metin genişliği) izi 378 px'e çıkarıyordu. Grid öğesine
+  `min-w-0` verilmeden `truncate` hiç kısalmıyor.
+- **`/onaylar` taşmasının sebebi ayrıydı:** öneri satırı hedef etiketinde doküman
+  adı taşıyor ve alt tire içeren uzun dosya adı bölünmüyordu → `break-words`.
+- **Taşan öğeyi gözle aramayın, ikiye bölerek bulun.** İşe yarayan teşhis:
+  öğeleri tek tek `display:none` yapıp `documentElement.scrollWidth`'in düştüğü
+  dalı izlemek; ve şüpheli öğeye geçici olarak `width:min-content` verip
+  `offsetWidth` okumak. `getBoundingClientRect().right > innerWidth` taraması
+  bu iki durumu da **bulamıyordu**, çünkü taşan öğe kendi kutusunun içinde
+  kalıyor.
+- **`cdp.Browser.goto(url, wait_for="")` her çağrıda 20 sn zaman aşımına düşer.**
+  Boş dize `None` değil: ilk koşul (`wait_for is None`) sağlanmaz, ikincisi
+  (`wait_for and …`) boş dizeyi hiç doğrulamaz. Beklenen metni verin ya da
+  `wait_for=None` yazın; 27 rotalı bir döngüde fark 18 dakika.
+- **`Input` bileşenine `className` geçmek işe yaramaz** — bileşen kendi
+  `className`'ini `{...props}`'tan sonra yazıyor, dışarıdan geleni eziyor.
+  Sütun genişliği gibi düzen kararları sarmalayıcı `div`'e yazılır.
+- **Çok satırlı `import { … } from` bloğu olan dosyaya "son import satırından
+  sonra ekle" mantığıyla satır enjekte etmeyin**: blok ortasına düşüyor ve
+  TS1003 veriyor.
+
 ### Kabuk / araç tuzakları
 
 - Bash aracı, ortam bloğu fish dese de **zsh** çalıştırır. `for … end` çalışmaz;
@@ -350,8 +491,11 @@ Faz 1–2'de işe yarayan ve tekrarlanması gereken sıra:
    bu adım yakalamıştı.
 
 Betikler repoda: [../scripts/](../scripts/) — faz başına bir uçtan uca, bir
-render betiği (`e2e_faz3/4/5.py`, `render_faz3/4/5.py`) ve ikincilerin
-kullandığı `cdp.py`. Çalıştırma sırası ve veritabanı sıfırlama kuralı
+render betiği (`e2e_faz3/4/5.py`, `render_faz3/4/5.py`), denetim Dalga 0
+düzeltmelerini kapsayan `render_faz6.py` ve hepsinin kullandığı `cdp.py`.
+`render_faz6.py` yeni yazma ekranlarını, sekme başlığını, 404'ü, üç genişlikte
+mobil taşmayı ve giriş hız sınırı bölümlemesini doğruluyor; veriyi
+**değiştirdiği** için en son turda çalışır. Çalıştırma sırası ve veritabanı sıfırlama kuralı
 [../scripts/README.md](../scripts/README.md) içinde; uçtan uca betikler veriyi
 değiştirdiği için her turdan önce sıfırlama şart.
 

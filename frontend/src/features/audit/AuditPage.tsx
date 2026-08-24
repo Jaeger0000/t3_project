@@ -4,6 +4,7 @@ import type { AuditLogRow, PagedResult } from '@/api/types'
 import { api } from '@/lib/apiClient'
 import { roleLabels } from '@/lib/labels'
 import { Badge, Card, EmptyState, ErrorState, Input, Select, Spinner } from '@/components/ui'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 const timestamp = new Intl.DateTimeFormat('tr-TR', {
   dateStyle: 'medium',
@@ -27,6 +28,7 @@ const actionGroups = [
  * biçimlendirme, alan atlama ya da yeniden adlandırma yapılmıyor.
  */
 export default function AuditPage() {
+  useDocumentTitle('Denetim izi')
   const [action, setAction] = useState('')
   const [entityId, setEntityId] = useState('')
   const [page, setPage] = useState(1)
@@ -47,10 +49,10 @@ export default function AuditPage() {
   return (
     <div className="flex flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+        <h1 className="text-2xl font-semibold text-stone-900 dark:text-stone-50">
           Denetim izi
         </h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-stone-500">
           Kim, ne zaman, neyi değiştirdi. Kayıtlar silinmez ve değiştirilemez; kullanıcı
           hesabı kapatılsa bile iz ayakta kalır.
         </p>
@@ -106,7 +108,7 @@ export default function AuditPage() {
           >
             ← Önceki
           </button>
-          <span className="text-slate-500">
+          <span className="text-stone-500">
             {query.data.page} / {query.data.totalPages} · {query.data.totalCount} kayıt
           </span>
           <button
@@ -130,23 +132,23 @@ function AuditRow({ row }: { row: AuditLogRow }) {
   return (
     <Card className="px-5 py-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <Badge tone="bg-brand-50 text-brand-900 dark:bg-brand-950 dark:text-brand-100">
+        <Badge tone="bg-brand-50 text-brand-800 dark:bg-brand-950 dark:text-brand-100">
           {row.action}
         </Badge>
         <div className="min-w-40 flex-1 text-sm">
-          <p className="text-slate-900 dark:text-slate-100">{row.actorName}</p>
-          <p className="text-slate-500">{roleLabels[row.actorRole]}</p>
+          <p className="text-stone-900 dark:text-stone-100">{row.actorName}</p>
+          <p className="text-stone-500">{roleLabels[row.actorRole]}</p>
         </div>
-        <span className="text-sm text-slate-500">{row.entityType}</span>
-        <span className="text-sm text-slate-500">
+        <span className="text-sm text-stone-500">{row.entityType}</span>
+        <span className="text-sm text-stone-500">
           {timestamp.format(new Date(row.occurredAt))}
         </span>
-        <span className="text-xs text-slate-400">{row.ipAddress ?? '—'}</span>
+        <span className="text-xs text-stone-400">{row.ipAddress ?? '—'}</span>
         {hasBody ? (
           <button
             type="button"
             onClick={() => setOpen(!open)}
-            className="text-sm text-brand-600 hover:underline dark:text-brand-300"
+            className="text-sm text-brand-700 hover:underline dark:text-brand-300"
           >
             {open ? 'Gövdeyi gizle' : 'Gövdeyi göster'}
           </button>
@@ -166,10 +168,10 @@ function AuditRow({ row }: { row: AuditLogRow }) {
 function JsonBlock({ title, json }: { title: string; json: string | null }) {
   return (
     <div>
-      <p className="mb-1 text-xs font-medium tracking-wide text-slate-500 uppercase">
+      <p className="mb-1 text-xs font-medium tracking-wide text-stone-500 uppercase">
         {title}
       </p>
-      <pre className="max-h-64 overflow-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+      <pre className="max-h-64 overflow-auto rounded-lg bg-stone-50 p-3 text-xs text-stone-700 dark:bg-stone-800/60 dark:text-stone-200">
         {json ? prettify(json) : '—'}
       </pre>
     </div>

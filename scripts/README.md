@@ -14,6 +14,7 @@ yakalamıştı.
 | `render_faz3.py` | Faz 3 ekranlarının headless Chrome'da render olması, rol bazlı menü ve maskelemenin **ekranda** doğrulanması (32 kontrol) |
 | `render_faz4.py` | Başarı ve doküman sekmeleri, portalın öneri yolu, yeni hedef türlerinin diff ekranı — tutarın Karar Verici'de ekranda **olmadığı** ve portaldan formla gönderilen önerinin kuyruğa düştüğü dâhil (41 kontrol) |
 | `e2e_faz5.py` | Ekosistem karnesi, karnede kapsam ve agregat/satır maskeleme ayrımı, CSV dışa aktarma, AI karar destek uçları, MCP sunucusu (JSON-RPC) ve MCP–REST sayı tutarlılığı (103 kontrol) |
+| `render_faz6.py` | Denetim Dalga 0 düzeltmeleri: girişim/ekip/katılım yazma yolları (arayüzden yeni girişim → program dönemine bağlama → kart düzenleme → ekip üyesi), sekme başlığı ve sayfa dili, 404 ekranı, üç genişlikte mobil yatay taşma, kapsam dışı program reddi, maskeli alanın yazma yolunda korunması ve giriş hız sınırı bölümlemesi (75 kontrol) |
 | `render_faz5.py` | Pano ve grafiklerin çizilmesi, Karar Verici'nin ekosistem toplamını görüp tekil tutar yerine kilit görmesi, tarayıcıdan CSV indirme, asistan paneli ve kart özeti — kaynak listesiyle birlikte (53 kontrol) |
 | `cdp.py` | Render betiklerinin kullandığı bağımlısız Chrome DevTools Protocol istemcisi |
 
@@ -44,7 +45,15 @@ python3 scripts/render_faz4.py
 # --- Tur 3: Faz 5 (veritabanını yeniden sıfırlayın) ---
 python3 scripts/e2e_faz5.py
 python3 scripts/render_faz5.py
+
+# --- Tur 4: Dalga 0 (aynı veritabanının üstünde çalışır, veriyi değiştirir) ---
+python3 scripts/render_faz6.py
 ```
+
+`render_faz6.py` en sona bırakılır: yeni bir girişim oluşturup program dönemine
+bağlıyor, kart alanlarını değiştiriyor ve sonunda `admin@` hesabının giriş
+kovasını bilinçli olarak dolduruyor (hız sınırı bölümlemesi kontrolü). Aynı
+turda ondan sonra çalışan bir betik 429 alır.
 
 `render_faz5.py` beklenen sayıları API'den okur (girişim sayısı, toplam yatırım,
 CSV satır sayısı), bu yüzden tohum verisi büyüdüğünde kendiliğinden güncel kalır.

@@ -36,10 +36,10 @@ export default function AchievementSection({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-semibold text-slate-900 dark:text-slate-100">
+          <h2 className="font-semibold text-stone-900 dark:text-stone-100">
             Başarı ve finans kayıtları
           </h2>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-stone-500">
             {items.length} kayıt
             {mode === 'proposal'
               ? ' · eklediğiniz kayıt onaydan sonra yayına girer'
@@ -55,7 +55,7 @@ export default function AchievementSection({
       </div>
 
       {!exactAmountsVisible ? (
-        <p className="rounded-lg bg-slate-100 px-4 py-2.5 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+        <p className="rounded-lg bg-stone-100 px-4 py-2.5 text-sm text-stone-600 dark:bg-stone-800 dark:text-stone-300">
           🔒 Rolünüz kayıtların varlığını görür, tutarları görmez. Finansal
           büyüklükler yalnızca ekosistem geneli raporlarda toplu olarak sunulur.
         </p>
@@ -162,9 +162,9 @@ function AchievementRow({
         <div className="min-w-56 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={achievementKindTone[item.kind]}>{item.kindLabel}</Badge>
-            <p className="font-medium text-slate-900 dark:text-slate-100">{item.title}</p>
+            <p className="font-medium text-stone-900 dark:text-stone-100">{item.title}</p>
             {item.isVerified ? (
-              <Badge tone="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+              <Badge tone="bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
                 ✓ Doğrulandı
               </Badge>
             ) : (
@@ -172,7 +172,7 @@ function AchievementRow({
             )}
           </div>
 
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-stone-500">
             {formatDate(item.occurredOn)}
             {item.periodLabel ? ` · ${item.periodLabel}` : ''}
             {item.programName ? ` · ${item.programName}` : ''}
@@ -180,19 +180,19 @@ function AchievementRow({
           </p>
 
           {item.investorNames.length > 0 ? (
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            <p className="mt-1 text-sm text-stone-600 dark:text-stone-400">
               Yatırımcılar: {item.investorNames.join(', ')}
             </p>
           ) : null}
 
           {item.targetCountries.length > 0 ? (
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            <p className="mt-1 text-sm text-stone-600 dark:text-stone-400">
               Ülkeler: {item.targetCountries.join(', ')}
             </p>
           ) : null}
 
           {item.note ? (
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{item.note}</p>
+            <p className="mt-1 text-sm text-stone-600 dark:text-stone-400">{item.note}</p>
           ) : null}
         </div>
 
@@ -200,7 +200,7 @@ function AchievementRow({
           {/* Tutar taşımayan kayıtta (ödül) hiçbir yer tutucu gösterilmiyor:
               maskeleme ile "alan yok" birbirine karışmasın. */}
           {item.amountMasked || item.amount !== null ? (
-            <p className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-100">
+            <p className="text-lg font-bold tabular-nums text-stone-900 dark:text-stone-100">
               <Sensitive
                 value={formatMoney(item.amount, item.currency ?? 'TRY')}
                 authorized={!item.amountMasked}
@@ -209,7 +209,7 @@ function AchievementRow({
           ) : null}
 
           {item.valuation !== null ? (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-stone-500">
               Değerleme: {formatMoney(item.valuation, item.currency ?? 'TRY')}
             </p>
           ) : null}
@@ -239,7 +239,7 @@ function AchievementRow({
         ) : null}
       </div>
 
-      {error ? <p className="mt-2 text-sm text-rose-600">{error.message}</p> : null}
+      {error ? <p className="mt-2 text-sm text-red-600">{error.message}</p> : null}
     </Card>
   )
 }

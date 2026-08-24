@@ -11,6 +11,7 @@ using T3.Api.Endpoints;
 using T3.Api.Http;
 using T3.Api.Identity;
 using T3.Api.Middleware;
+using T3.Api.RateLimiting;
 using T3.Application;
 using T3.Application.Common.Interfaces;
 using T3.Domain.Identity;
@@ -89,22 +90,14 @@ builder.Services.AddCors(options =>
         .AllowAnyHeader()
         .AllowAnyMethod()));
 
-// Login ve AI uçlarını kaba kuvvete karşı sınırlar.
+// Login ve AI uçlarını kaba kuvvete karşı sınırlar. Kovalar bölümlendirilmiş:
+// bir hesabın kilidi başka hesabı, bir kullanıcının AI kotası başkasını etkilemez.
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.AddFixedWindowLimiter("auth", limiter =>
-    {
-        limiter.Window = TimeSpan.FromMinutes(1);
-        limiter.PermitLimit = 10;
-        limiter.QueueLimit = 0;
-    });
-    options.AddFixedWindowLimiter("ai", limiter =>
-    {
-        limiter.Window = TimeSpan.FromMinutes(1);
-        limiter.PermitLimit = 20;
-        limiter.QueueLimit = 0;
-    });
+    options.OnRejected = AuthRateLimit.OnRejected;
+    options.AddPolicy(AuthRateLimit.AuthPolicy, AuthRateLimit.PartitionAuth);
+    options.AddPolicy(AuthRateLimit.AiPolicy, AuthRateLimit.PartitionAi);
 });
 
 builder.Services.AddEndpointsApiExplorer();
@@ -173,6 +166,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors(FrontendCors);
+
+// Hız sınırı bölüm anahtarı giriş gövdesindeki e-postayı kullanıyor; gövde
+// sınırlayıcıdan önce tamponlanmak zorunda.
+app.Use(AuthRateLimit.CaptureLoginEmail);
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -189,6 +186,17 @@ app.MapUserEndpoints();
 app.MapReportEndpoints();
 app.MapAssistantEndpoints();
 app.MapMcpEndpoints();
+
+// --- Açılış teşhisi ------------------------------------------------------
+// Sessiz yedek mekanizma bir daha kimseyi yanıltmasın: anahtar okunmadığında
+// asistan hata vermeden yerel plana düşüyor, bu da "AI çalışıyor" sanılıyordu.
+var chatModel = app.Services.GetRequiredService<IChatModel>();
+
+if (chatModel.IsAvailable)
+    app.Logger.LogInformation("Dil modeli hazır: {Model}", chatModel.Name);
+else
+    app.Logger.LogWarning(
+        "Ai:ApiKey boş — asistan yerel plana düşecek. .env içinde T3_Ai__ApiKey ayarlayın.");
 
 // --- Demo verisi ---------------------------------------------------------
 // Üretimde hiçbir koşulda çalışmaz: tohum kullanıcıların şifresi bilinen bir

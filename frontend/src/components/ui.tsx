@@ -14,7 +14,7 @@ export function Card({ children, className = '', ...rest }: HTMLAttributes<HTMLD
   return (
     <div
       {...rest}
-      className={`rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 ${className}`}
+      className={`rounded-xl border border-stone-200 bg-white shadow-sm dark:border-stone-800 dark:bg-stone-900 ${className}`}
     >
       {children}
     </div>
@@ -23,7 +23,7 @@ export function Card({ children, className = '', ...rest }: HTMLAttributes<HTMLD
 
 export function Badge({
   children,
-  tone = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+  tone = 'bg-brand-50 text-brand-800 dark:bg-brand-950 dark:text-brand-200',
 }: {
   children: ReactNode
   tone?: string
@@ -52,11 +52,16 @@ export function Button({
   disabled = false,
   className = '',
 }: ButtonProps) {
+  // T3KYS'teki `.btn-orange` davranışı: turuncu zemin + beyaz yazı, üzerine
+  // gelince kızarıp koyulaşıyor. İkincil düğmeler de nötr griye değil aynı
+  // turuncuya doğru açılıyor — hover'ın rengi tek yerden geliyor.
   const styles = {
-    primary: 'bg-brand-500 text-white hover:bg-brand-600 disabled:bg-slate-300 dark:disabled:bg-slate-700',
+    primary:
+      'bg-brand-500 text-white hover:bg-brand-600 disabled:bg-stone-200 disabled:text-stone-400 dark:disabled:bg-stone-800',
     outline:
-      'border border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800',
-    ghost: 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+      'border border-stone-300 text-stone-700 hover:border-brand-500 hover:bg-brand-500 hover:text-white dark:border-stone-700 dark:text-stone-200',
+    ghost:
+      'text-stone-600 hover:bg-brand-50 hover:text-brand-700 dark:text-stone-300 dark:hover:bg-stone-800',
   }[variant]
 
   return (
@@ -75,11 +80,11 @@ export function Input({ label, ...props }: { label?: string } & InputHTMLAttribu
   return (
     <label className="flex flex-col gap-1.5">
       {label ? (
-        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
+        <span className="text-sm font-medium text-stone-700 dark:text-stone-300">{label}</span>
       ) : null}
       <input
         {...props}
-        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+        className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none placeholder:text-stone-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100"
       />
     </label>
   )
@@ -93,11 +98,11 @@ export function Select({
   return (
     <label className="flex flex-col gap-1.5">
       {label ? (
-        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
+        <span className="text-sm font-medium text-stone-700 dark:text-stone-300">{label}</span>
       ) : null}
       <select
         {...props}
-        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+        className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100"
       >
         {children}
       </select>
@@ -107,8 +112,8 @@ export function Select({
 
 export function Spinner({ label }: { label?: string }) {
   return (
-    <div className="flex items-center gap-3 text-sm text-slate-500">
-      <span className="size-4 animate-spin rounded-full border-2 border-slate-300 border-t-brand-500" />
+    <div className="flex items-center gap-3 text-sm text-stone-500">
+      <span className="size-4 animate-spin rounded-full border-2 border-stone-300 border-t-brand-500" />
       {label ?? 'Yükleniyor…'}
     </div>
   )
@@ -116,9 +121,9 @@ export function Spinner({ label }: { label?: string }) {
 
 export function EmptyState({ title, hint }: { title: string; hint?: string }) {
   return (
-    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-slate-300 px-6 py-14 text-center dark:border-slate-700">
-      <p className="font-medium text-slate-700 dark:text-slate-200">{title}</p>
-      {hint ? <p className="max-w-md text-sm text-slate-500">{hint}</p> : null}
+    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-stone-300 px-6 py-14 text-center dark:border-stone-700">
+      <p className="font-medium text-stone-700 dark:text-stone-200">{title}</p>
+      {hint ? <p className="max-w-md text-sm text-stone-500">{hint}</p> : null}
     </div>
   )
 }
@@ -152,7 +157,7 @@ export function Sensitive({
     return (
       <span
         title="Bu alanı görme yetkiniz yok"
-        className={`inline-flex items-center gap-1 text-sm text-slate-400 ${className}`}
+        className={`inline-flex items-center gap-1 text-sm text-stone-400 ${className}`}
       >
         <span aria-hidden>🔒</span>
         <span className="italic">yetkiniz yok</span>
@@ -161,7 +166,7 @@ export function Sensitive({
   }
 
   if (value === null || value === undefined || value === '') {
-    return <span className={`text-sm text-slate-400 ${className}`}>—</span>
+    return <span className={`text-sm text-stone-400 ${className}`}>—</span>
   }
 
   return <span className={className}>{value}</span>
@@ -170,8 +175,8 @@ export function Sensitive({
 export function DataRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5 py-2">
-      <dt className="text-xs font-medium tracking-wide text-slate-500 uppercase">{label}</dt>
-      <dd className="text-sm text-slate-900 dark:text-slate-100">{children}</dd>
+      <dt className="text-xs font-medium tracking-wide text-stone-500 uppercase">{label}</dt>
+      <dd className="text-sm text-stone-900 dark:text-stone-100">{children}</dd>
     </div>
   )
 }

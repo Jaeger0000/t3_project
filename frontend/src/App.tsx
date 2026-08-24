@@ -12,6 +12,7 @@ import ApprovalDetailPage from '@/features/approvals/ApprovalDetailPage'
 import PortalPage from '@/features/portal/PortalPage'
 import UsersPage from '@/features/users/UsersPage'
 import AuditPage from '@/features/audit/AuditPage'
+import NotFoundPage from '@/features/errors/NotFoundPage'
 import type { SessionPermissions } from '@/api/types'
 
 export default function App() {
@@ -38,8 +39,39 @@ export default function App() {
         </Route>
       </Route>
       {/* Açılış panoya gider: karar destek ekranı ilk görülen ekran olmalı. */}
-      <Route path="*" element={<Navigate to="/pano" replace />} />
+      <Route path="/" element={<Navigate to="/pano" replace />} />
+      <Route path="*" element={<NotFoundRoute />} />
     </Routes>
+  )
+}
+
+/**
+ * Bilinmeyen adres. Oturum açıkken kabuk içinde gösteriliyor: kullanıcı menüyü
+ * kaybetmesin. Kapalıyken kabuk yok, çünkü kabuk oturum verisi bekliyor.
+ */
+function NotFoundRoute() {
+  const { session, isResolving } = useAuth()
+
+  if (isResolving) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Spinner label="Oturum doğrulanıyor…" />
+      </div>
+    )
+  }
+
+  if (!session) {
+    return (
+      <div className="min-h-screen px-6 py-16">
+        <NotFoundPage />
+      </div>
+    )
+  }
+
+  return (
+    <AppShell>
+      <NotFoundPage />
+    </AppShell>
   )
 }
 

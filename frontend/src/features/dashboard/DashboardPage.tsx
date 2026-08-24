@@ -10,6 +10,7 @@ import { BarChart, ChartCard, DonutChart } from './charts'
 import { defaultDashboardFilters, exportStartupsCsv, useEcosystemStats } from './queries'
 import type { DashboardFilters } from './queries'
 import type { EcosystemStats, Sector } from '@/api/types'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 /**
  * Ekosistem panosu (karar destek). Panodaki her sayı, girişim listesiyle aynı
@@ -17,6 +18,7 @@ import type { EcosystemStats, Sector } from '@/api/types'
  * programlarının karnesini görür, ayrı bir "rapor yetkisi" yok.
  */
 export default function DashboardPage() {
+  useDocumentTitle('Ekosistem panosu')
   const { session } = useAuth()
   const [filters, setFilters] = useState<DashboardFilters>(defaultDashboardFilters)
   const [exportError, setExportError] = useState<string | null>(null)
@@ -44,8 +46,8 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-brand-900 dark:text-brand-100">Ekosistem panosu</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-50">Ekosistem panosu</h1>
+          <p className="mt-1 text-sm text-stone-500">
             {session?.role === 'ProgramManager'
               ? 'Sorumlu olduğunuz programların karnesi.'
               : session?.role === 'StartupUser'
@@ -201,26 +203,26 @@ function StatsBody({ stats }: { stats: EcosystemStats }) {
 
         <ChartCard title="En çok yatırım alan girişimler" hint="Sıralama herkese açık, tutar role bağlı">
           {stats.topByInvestment.length === 0 ? (
-            <p className="py-6 text-center text-sm text-slate-500">
+            <p className="py-6 text-center text-sm text-stone-500">
               Kapsamınızda yatırım kaydı olan girişim yok.
             </p>
           ) : (
-            <ol className="flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+            <ol className="flex flex-col divide-y divide-stone-100 dark:divide-stone-800">
               {stats.topByInvestment.map((row, index) => (
                 <li key={row.startupId} className="flex items-center gap-3 py-2.5">
-                  <span className="w-5 text-sm font-semibold text-slate-400 tabular-nums">
+                  <span className="w-5 text-sm font-semibold text-stone-400 tabular-nums">
                     {index + 1}
                   </span>
                   <Link
                     to={`/girisimler/${row.startupId}`}
-                    className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900 hover:text-brand-600 dark:text-slate-100"
+                    className="min-w-0 flex-1 truncate text-sm font-medium text-stone-900 hover:text-brand-700 dark:text-stone-100"
                   >
                     {row.name}
-                    <span className="ml-2 text-xs font-normal text-slate-500">{row.sectorLabel}</span>
+                    <span className="ml-2 text-xs font-normal text-stone-500">{row.sectorLabel}</span>
                   </Link>
-                  <span className="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                  <span className="text-sm font-semibold tabular-nums text-stone-900 dark:text-stone-100">
                     {row.investment === null ? (
-                      <span className="text-slate-400" title="Tekil tutarı görme yetkiniz yok">
+                      <span className="text-stone-400" title="Tekil tutarı görme yetkiniz yok">
                         🔒
                       </span>
                     ) : (
@@ -250,11 +252,11 @@ function money(amount: number | null, stats: EcosystemStats): string {
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <Card className="p-5">
-      <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">{label}</p>
-      <p className="mt-1 text-2xl font-bold tabular-nums text-brand-900 dark:text-brand-100">
+      <p className="text-xs font-medium tracking-wide text-stone-500 uppercase">{label}</p>
+      <p className="mt-1 text-2xl font-bold tabular-nums text-stone-900 dark:text-stone-50">
         {value}
       </p>
-      {hint ? <p className="mt-1 text-xs text-slate-500">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-xs text-stone-500">{hint}</p> : null}
     </Card>
   )
 }

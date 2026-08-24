@@ -6,6 +6,7 @@ import { formatDate } from '@/lib/format'
 import { Badge, Button, Card, ErrorState, Spinner } from '@/components/ui'
 import { useChangeRequest, useReviewChangeRequest } from './queries'
 import { changeStatusLabels, changeStatusTone } from './labels'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 /**
  * Before/after diff ekranı — MVP #3'ün jüriye gösterilen yüzü.
@@ -18,6 +19,7 @@ export default function ApprovalDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { data, isPending, error } = useChangeRequest(id)
+  useDocumentTitle(data ? `${data.startupName} önerisi` : 'Öneri')
 
   if (isPending) return <Spinner label="Öneri yükleniyor…" />
   if (error) {
@@ -41,7 +43,7 @@ export default function ApprovalDetailPage() {
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="text-sm text-slate-500 hover:text-brand-600"
+          className="text-sm text-stone-500 hover:text-brand-700"
         >
           ← Kuyruğa dön
         </button>
@@ -51,23 +53,23 @@ export default function ApprovalDetailPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
+              <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-50">
                 {data.startupName}
               </h1>
               <Badge tone={changeStatusTone[data.status]}>
                 {changeStatusLabels[data.status]}
               </Badge>
             </div>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-stone-500">
               {data.targetLabel} · {data.operationLabel} · {data.changedFieldCount} alan
               değişiyor
             </p>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+            <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">
               <span className="font-medium">{data.submittedByName}</span> gönderdi ·{' '}
               {formatDate(data.submittedAt)}
             </p>
             {decided ? (
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">
                 <span className="font-medium">{data.reviewedByName ?? '—'}</span> karar
                 verdi · {formatDate(data.reviewedAt)}
               </p>
@@ -76,14 +78,14 @@ export default function ApprovalDetailPage() {
 
           <Link
             to={`/girisimler/${data.startupId}`}
-            className="text-sm text-brand-600 hover:underline dark:text-brand-300"
+            className="text-sm text-brand-700 hover:underline dark:text-brand-300"
           >
             Girişim kartını aç →
           </Link>
         </div>
 
         {data.reviewNote ? (
-          <p className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+          <p className="mt-4 rounded-lg bg-stone-50 px-4 py-3 text-sm text-stone-700 dark:bg-stone-800/60 dark:text-stone-200">
             <span className="font-medium">Karar notu:</span> {data.reviewNote}
           </p>
         ) : null}
@@ -109,14 +111,14 @@ function DiffTable({ fields }: { fields: DiffField[] }) {
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex items-center justify-between border-b border-slate-200 px-6 py-3 dark:border-slate-800">
-        <h2 className="font-medium text-slate-900 dark:text-slate-100">
+      <div className="flex items-center justify-between border-b border-stone-200 px-6 py-3 dark:border-stone-800">
+        <h2 className="font-medium text-stone-900 dark:text-stone-100">
           Değişiklik karşılaştırması
         </h2>
         <button
           type="button"
           onClick={() => setShowAll(!showAll)}
-          className="text-sm text-brand-600 hover:underline dark:text-brand-300"
+          className="text-sm text-brand-700 hover:underline dark:text-brand-300"
         >
           {showAll ? 'Yalnızca değişenler' : `Tüm alanlar (${fields.length})`}
         </button>
@@ -124,7 +126,7 @@ function DiffTable({ fields }: { fields: DiffField[] }) {
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs tracking-wide text-slate-500 uppercase dark:bg-slate-800/60">
+          <thead className="bg-stone-50 text-left text-xs tracking-wide text-stone-500 uppercase dark:bg-stone-800/60">
             <tr>
               <th className="px-6 py-2 font-medium">Alan</th>
               <th className="px-6 py-2 font-medium">Mevcut</th>
@@ -135,16 +137,16 @@ function DiffTable({ fields }: { fields: DiffField[] }) {
             {visible.map((field) => (
               <tr
                 key={field.field}
-                className={`border-t border-slate-100 dark:border-slate-800 ${
-                  field.changed ? 'bg-amber-50/40 dark:bg-amber-950/10' : ''
+                className={`border-t border-stone-100 dark:border-stone-800 ${
+                  field.changed ? 'bg-brand-50 dark:bg-brand-950/20' : ''
                 }`}
               >
-                <td className="px-6 py-3 align-top font-medium text-slate-700 dark:text-slate-200">
+                <td className="px-6 py-3 align-top font-medium text-stone-700 dark:text-stone-200">
                   {field.label}
                   {field.masked ? (
                     <span
                       title="Bu alanı görme yetkiniz yok"
-                      className="ml-2 text-slate-400"
+                      className="ml-2 text-stone-400"
                       aria-hidden
                     >
                       🔒
@@ -160,7 +162,7 @@ function DiffTable({ fields }: { fields: DiffField[] }) {
       </div>
 
       {visible.length === 0 ? (
-        <p className="px-6 py-8 text-center text-sm text-slate-500">
+        <p className="px-6 py-8 text-center text-sm text-stone-500">
           Bu öneri hiçbir alanı değiştirmiyor.
         </p>
       ) : null}
@@ -185,12 +187,12 @@ function DiffCell({
     field.changed && kind === 'after'
       ? 'font-medium text-emerald-700 dark:text-emerald-300'
       : field.changed && kind === 'before'
-        ? 'text-slate-500 line-through decoration-slate-400'
-        : 'text-slate-600 dark:text-slate-300'
+        ? 'text-stone-500 line-through decoration-stone-400'
+        : 'text-stone-600 dark:text-stone-300'
 
   if (field.masked) {
     return (
-      <td className="px-6 py-3 align-top text-sm text-slate-400 italic">
+      <td className="px-6 py-3 align-top text-sm text-stone-400 italic">
         yetkiniz yok
       </td>
     )
@@ -198,7 +200,7 @@ function DiffCell({
 
   return (
     <td className={`px-6 py-3 align-top break-words ${emphasis}`}>
-      {value === null || value === '' ? <span className="text-slate-400">—</span> : value}
+      {value === null || value === '' ? <span className="text-stone-400">—</span> : value}
     </td>
   )
 }
@@ -220,14 +222,14 @@ function ReviewPanel({ id }: { id: string }) {
 
   return (
     <Card className="px-6 py-5">
-      <h2 className="font-medium text-slate-900 dark:text-slate-100">Karar</h2>
-      <p className="mt-1 text-sm text-slate-500">
+      <h2 className="font-medium text-stone-900 dark:text-stone-100">Karar</h2>
+      <p className="mt-1 text-sm text-stone-500">
         Onayladığınızda değişiklik girişim kartına anında işlenir ve denetim izine
         yazılır.
       </p>
 
       <label className="mt-4 flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+        <span className="text-sm font-medium text-stone-700 dark:text-stone-300">
           Not / gerekçe
         </span>
         <textarea
@@ -236,7 +238,7 @@ function ReviewPanel({ id }: { id: string }) {
           rows={3}
           maxLength={2000}
           placeholder="Onayda isteğe bağlı; ret için en az 10 karakter gerekçe zorunlu."
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+          className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none placeholder:text-stone-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100"
         />
       </label>
 
@@ -257,7 +259,7 @@ function ReviewPanel({ id }: { id: string }) {
           Reddet
         </Button>
         {note.trim().length < 10 ? (
-          <p className="self-center text-xs text-slate-500">
+          <p className="self-center text-xs text-stone-500">
             Reddetmek için gerekçe yazın.
           </p>
         ) : null}

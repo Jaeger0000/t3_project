@@ -23,6 +23,7 @@ import {
   useUpdateUser,
   useUsers,
 } from './queries'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 const roles: UserRole[] = ['SuperAdmin', 'ProgramManager', 'StartupUser', 'DecisionMaker']
 
@@ -35,6 +36,7 @@ const roles: UserRole[] = ['SuperAdmin', 'ProgramManager', 'StartupUser', 'Decis
  * kopyalanmıyor, hata mesajı sunucudan geliyor.
  */
 export default function UsersPage() {
+  useDocumentTitle('Kullanıcılar')
   const [filters, setFilters] = useState(defaultUserFilters)
   const { data, isPending, error } = useUsers(filters)
   const [creating, setCreating] = useState(false)
@@ -43,10 +45,10 @@ export default function UsersPage() {
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+          <h1 className="text-2xl font-semibold text-stone-900 dark:text-stone-50">
             Kullanıcılar
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-stone-500">
             Hesaplar, roller ve kapsam atamaları. Hesaplar silinmez, pasife alınır —
             denetim izindeki aktör bilgisi korunur.
           </p>
@@ -125,16 +127,16 @@ function UserCard({ user }: { user: UserRow }) {
     <Card className="px-5 py-4">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="min-w-48 flex-1">
-          <p className="font-medium text-slate-900 dark:text-slate-100">
+          <p className="font-medium text-stone-900 dark:text-stone-100">
             {user.fullName}
-            {isSelf ? <span className="ml-2 text-xs text-slate-400">(siz)</span> : null}
+            {isSelf ? <span className="ml-2 text-xs text-stone-400">(siz)</span> : null}
           </p>
-          <p className="text-sm text-slate-500">{user.email}</p>
+          <p className="text-sm text-stone-500">{user.email}</p>
         </div>
 
         <Badge>{user.roleLabel}</Badge>
 
-        <div className="text-sm text-slate-600 dark:text-slate-300">
+        <div className="text-sm text-stone-600 dark:text-stone-300">
           {user.startupName ??
             (user.programs.length > 0
               ? user.programs.map((p) => p.name).join(', ')
@@ -144,14 +146,14 @@ function UserCard({ user }: { user: UserRow }) {
         <Badge
           tone={
             user.isActive
-              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-              : 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+              : 'bg-stone-200 text-stone-600 dark:bg-stone-800 dark:text-stone-300'
           }
         >
           {user.isActive ? 'Aktif' : 'Pasif'}
         </Badge>
 
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-stone-500">
           {user.lastLoginAt ? `son giriş ${formatDate(user.lastLoginAt)}` : 'hiç giriş yapmadı'}
         </span>
 
@@ -228,7 +230,7 @@ function ScopeFields({
   if (role === 'ProgramManager') {
     return (
       <fieldset className="flex flex-col gap-1.5">
-        <legend className="text-sm font-medium text-slate-700 dark:text-slate-300">
+        <legend className="text-sm font-medium text-stone-700 dark:text-stone-300">
           Programlar
         </legend>
         <div className="flex flex-wrap gap-3">
@@ -254,7 +256,7 @@ function ScopeFields({
   }
 
   return (
-    <p className="self-end text-sm text-slate-500">
+    <p className="self-end text-sm text-stone-500">
       Bu rol tüm ekosistemi görür; ayrı kapsam ataması yapılmaz.
     </p>
   )
@@ -271,7 +273,7 @@ function CreateUserForm({ onDone }: { onDone: () => void }) {
 
   return (
     <Card className="px-6 py-5">
-      <h2 className="font-medium text-slate-900 dark:text-slate-100">Yeni kullanıcı</h2>
+      <h2 className="font-medium text-stone-900 dark:text-stone-100">Yeni kullanıcı</h2>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <Input label="E-posta" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -353,7 +355,7 @@ function EditUserForm({ user, onDone }: { user: UserRow; onDone: () => void }) {
   const [programIds, setProgramIds] = useState(user.programs.map((p) => p.id))
 
   return (
-    <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+    <div className="mt-4 border-t border-stone-100 pt-4 dark:border-stone-800">
       <div className="grid gap-4 sm:grid-cols-2">
         <Input
           label="Ad soyad"
@@ -382,7 +384,7 @@ function EditUserForm({ user, onDone }: { user: UserRow; onDone: () => void }) {
           onStartup={setStartupId}
           onPrograms={setProgramIds}
         />
-        <label className="flex items-center gap-2 self-end text-sm text-slate-700 dark:text-slate-300">
+        <label className="flex items-center gap-2 self-end text-sm text-stone-700 dark:text-stone-300">
           <input
             type="checkbox"
             checked={isActive}
@@ -392,7 +394,7 @@ function EditUserForm({ user, onDone }: { user: UserRow; onDone: () => void }) {
         </label>
       </div>
 
-      <p className="mt-3 text-xs text-slate-500">
+      <p className="mt-3 text-xs text-stone-500">
         E-posta değiştirilemez: denetim izinde aktörün karşılığı olduğu için taşınması
         geçmişi bulanıklaştırır.
       </p>
@@ -434,7 +436,7 @@ function PasswordForm({ user, onDone }: { user: UserRow; onDone: () => void }) {
   const [value, setValue] = useState('')
 
   return (
-    <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+    <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-stone-100 pt-4 dark:border-stone-800">
       <Input
         label="Yeni şifre"
         type="password"

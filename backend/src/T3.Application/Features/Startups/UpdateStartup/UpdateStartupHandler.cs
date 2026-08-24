@@ -12,6 +12,7 @@ public sealed record UpdateStartupResponse(Guid Id, string Name, DateTimeOffset?
 public sealed class UpdateStartupHandler(
     IAppDbContext db,
     IStartupScope scope,
+    ICurrentUser currentUser,
     IAuditWriter audit)
 {
     public async Task<Result<UpdateStartupResponse>> Handle(
@@ -40,7 +41,8 @@ public sealed class UpdateStartupHandler(
 
         var before = StartupAuditSnapshot.Of(startup);
 
-        model.ApplyTo(startup);
+        // Maskeli alanlar korunur: göremediği alanı boşaltmak yetkinin dışında.
+        model.ApplyTo(startup, StartupVisibility.For(currentUser, startup.Id));
         await db.SaveChangesAsync(ct);
 
         await audit.WriteAsync(

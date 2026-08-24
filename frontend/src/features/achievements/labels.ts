@@ -37,11 +37,11 @@ export const grantInstitutionLabels: Record<GrantInstitution, string> = {
 
 /** Kayıt türüne göre rozet rengi: kartta finansal ve finansal olmayan ayrışsın. */
 export const achievementKindTone: Record<AchievementKind, string> = {
-  Investment: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200',
-  Grant: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200',
-  Revenue: 'bg-brand-50 text-brand-900 dark:bg-brand-950 dark:text-brand-100',
-  Export: 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200',
-  Award: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
+  Investment: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200',
+  Grant: 'bg-brand-100 text-brand-800 dark:bg-brand-950 dark:text-brand-200',
+  Revenue: 'bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300',
+  Export: 'bg-brand-200 text-brand-800 dark:bg-brand-900 dark:text-brand-100',
+  Award: 'bg-gold-100 text-stone-800 dark:bg-gold-500 dark:text-stone-900',
 }
 
 /** Hangi türde hangi alanların anlamlı olduğu — form da doğrulayıcı da aynı bağı kurar. */

@@ -1,0 +1,464 @@
+# Denetim Düzeltme Planı
+
+Ürün denetimi raporunda çıkan 7 bloklayıcı ve 12 yüksek/orta bulgunun
+uygulama planı. Her madde: **ne değişecek · hangi dosya · kabul kriteri · efor**.
+
+Denetim yöntemi ve bulguların kanıtları için bkz.
+[Urun_Denetcisi_Ajan_Promptu.md](Urun_Denetcisi_Ajan_Promptu.md).
+
+---
+
+## 0. Takvim gerçeği — sıralamayı bu belirliyor
+
+| Tarih | Ne teslim ediliyor |
+|---|---|
+| **26 Ağustos 10.00** | İş modeli kanvası + **prototip videosu** + sunum |
+| **5–6 Eylül** | Creathon + Demo Day (5 dk pitch + 5 dk jüri sorusu) |
+
+Bugün **24 Ağustos**. Video teslimine **2 gün** var. Bu yüzden plan üç dalgaya
+bölündü ve dalgalar önem sırasına göre değil, **hangi tarihte kime ne
+göstereceğine** göre dizildi:
+
+- **Dalga 0 (bugün–yarın):** videoda ve jüri sorusunda görünen eksikler.
+  Toplam ~1 gün; dördü tek dosyalık düzeltme.
+- **Dalga 1 (26 Ağustos–5 Eylül):** MVP ve KVKK bütünlüğü. Demo Day'de
+  "bu ürün gerçekten kurumsal mı" sorusunun cevabı burada.
+- **Dalga 2 (Demo Day sonrası):** gerçek canlıya çıkış altyapısı.
+
+> Bir dalgayı yarım bırakıp sonrakine geçmeyin: Dalga 0'ın tamamı Dalga 1'in
+> ilk maddesinden daha değerli.
+
+---
+
+## Dalga 0 — Videodan önce (hedef: 25 Ağustos akşamı)
+
+> **Durum: tamamlandı (24 Ağustos).** Altı maddenin hepsi kapandı; doğrulama
+> 156 birim testi, 307 uçtan uca kontrol, 201 render kontrolü — sonuncusu
+> `scripts/render_faz6.py` (yeni, 75 kontrol) dâhil. Kalan tek kayıt:
+> **0.1'in kabul kriteri ortam eksiği yüzünden doğrulanamıyor** — `.env`
+> içindeki `T3_Ai__ApiKey` **boş**, yani Creathon anahtarı hiç girilmemiş.
+> Bölüm adı düzeltildi ve açılışta uyarı log'u eklendi; anahtar yazıldığı anda
+> rozet "Model: claude-…" olacak. Aşağıdaki her maddenin altında ne yapıldığı
+> ve nerede doğrulandığı yazıyor.
+
+### 0.1 · AI anahtarı adını düzelt — **5 dakika** `[Y-04]`
+> **Yapıldı.** `.env` anahtarı `T3_Ai__ApiKey` oldu; `Program.cs` açılışta
+> modeli sorguluyor — anahtar boşsa `LogWarning`, varsa `LogInformation` ile
+> model adı. **Anahtarın değeri hâlâ boş**: rozet ancak değer girildikten sonra
+> "Model: …" yazar.
+
+
+`.env` içindeki `T3_Anthropic__ApiKey` hiçbir yerde okunmuyor; kod
+`Ai` bölümünü bağlıyor ([AiOptions.cs:5](../backend/src/T3.Infrastructure/Ai/AiOptions.cs#L5)).
+Anahtar tanımlı olmasına rağmen AI katmanı **her zaman** yerel plana düşüyor.
+
+- `.env`: `T3_Anthropic__ApiKey=` → **`T3_Ai__ApiKey=`** (değeri koru).
+- `.env.example` zaten doğru — dokunma.
+- [DependencyInjection.cs:55](../backend/src/T3.Infrastructure/DependencyInjection.cs#L55)
+  civarına açılış logu ekle: anahtar boşsa `LogWarning("Ai:ApiKey boş — asistan yerel plana düşecek.")`.
+  Sessiz yedek mekanizma bir daha kimseyi yanıltmasın.
+
+**Kabul:** Backend yeniden başlatılır, `/pano` → "Ekosisteme soru sor" panelinde
+rozet **"Model: claude-…"** yazar (bugün "Yerel plan" yazıyor).
+
+### 0.2 · Giriş hız sınırını bölümlendir — **15 dakika** `[B-04]`
+> **Yapıldı.** `T3.Api/RateLimiting/AuthRateLimit.cs`: giriş kovası IP +
+> e-posta, AI kovası kullanıcı kimliği başına; `OnRejected` `Retry-After`
+> yazıyor. E-posta gövdeden okunuyor — bölüm anahtarı geri çağrısı eşzamanlı
+> olduğu için gövde sınırlayıcıdan önce `CaptureLoginEmail` ara katmanında
+> tamponlanıyor. Yalnızca IP ile bölümlemek yetmezdi: demo ve betikler aynı
+> makineden giriyor. Doğrulama: `render_faz6.py` → A hesabı 429 alırken B
+> hesabı sorunsuz giriyor.
+
+
+[Program.cs:96](../backend/src/T3.Api/Program.cs#L96) — `AddFixedWindowLimiter("auth")`
+bölüm anahtarsız: dakikada 10 izin **tüm uygulama için tek kova**. Doğrulandı:
+`admin@` 10 kez yanlış şifre girdikten sonra `karar.verici@` doğru şifreyle
+429 alıyor.
+
+```csharp
+options.AddPolicy("auth", context =>
+    RateLimitPartition.GetFixedWindowLimiter(
+        // IP + e-posta: bir hesabın kilidi başka hesabı etkilemesin.
+        partitionKey: $"{context.Connection.RemoteIpAddress}|{context.Request.Query["email"]}",
+        _ => new FixedWindowRateLimiterOptions { Window = TimeSpan.FromMinutes(1), PermitLimit = 10, QueueLimit = 0 }));
+```
+
+> Gövdedeki e-postayı bölüm anahtarına almak istiyorsan istek gövdesi
+> tamponlanmalı; en basiti IP ile bölümlendirmek, e-posta bazlı kilitlemeyi
+> **1.4**'teki denetim kaydının üstüne kurmak.
+
+`"ai"` limiti de aynı şekilde kullanıcı kimliğine göre bölümlendirilmeli.
+Ayrıca reddedilen yanıta `Retry-After` başlığı ekle (`OnRejected`).
+
+**Kabul:** A kullanıcısı 10 yanlış denemeyle 429 alırken B kullanıcısı aynı
+anda sorunsuz giriş yapar. `python3 scripts/e2e_faz3.py` temiz geçer.
+
+### 0.3 · Sekme başlığı, `lang` ve meta — **20 dakika** `[Y-02]`
+> **Yapıldı.** `index.html` (`lang="tr"`, başlık, description, Open Graph) +
+> `lib/useDocumentTitle.ts`; on ekranda ve girişim kartında (girişim adı)
+> kullanılıyor. Doğrulama: `render_faz6.py` dört ekranın başlığının farklı
+> olduğunu ve kart başlığının girişim adını taşıdığını kontrol ediyor.
+
+
+55 render'ın 55'inde sekme başlığı `frontend` yazıyor; sayfa dili `en`.
+
+- [index.html](../frontend/index.html): `<html lang="tr">`,
+  `<title>T3 Girişim Ekosistemi Yönetim Sistemi</title>`, `meta description`,
+  Open Graph (`og:title`, `og:description`, `og:image`).
+- Yeni `frontend/src/lib/useDocumentTitle.ts` — tek satırlık kanca:
+
+```ts
+export function useDocumentTitle(title: string) {
+  useEffect(() => { document.title = `${title} · T3 Girişim Ekosistemi` }, [title])
+}
+```
+
+- Her sayfa bileşeninde H1 ile aynı metni geçir. Girişim kartında girişim adı
+  (`useDocumentTitle(startup.name)`).
+
+**Kabul:** Üç girişim kartı üç sekmede açıldığında sekmeler ayırt edilir;
+`document.documentElement.lang === 'tr'`.
+
+### 0.4 · 404 sayfası — **30 dakika** `[Y-03]`
+> **Yapıldı.** `features/errors/NotFoundPage.tsx`; oturum açıkken kabuk içinde,
+> kapalıyken çıplak. `/` hâlâ panoya yönleniyor, bilinmeyen adres 404 gösteriyor
+> ve adres çubuğu değişmiyor. `/girisimler/99999` ile var-olmayan GUID artık
+> aynı ifadeyi veriyor.
+
+
+[App.tsx:41](../frontend/src/App.tsx#L41) bilinmeyen her adresi sessizce
+`/pano`'ya yolluyor.
+
+- `frontend/src/features/errors/NotFoundPage.tsx` ekle: başlık
+  "Aradığınız sayfa bulunamadı", adresin yanlış yazılmış olabileceği
+  açıklaması, panoya ve girişimlere dönüş bağlantıları.
+- `<Route path="*" element={<Navigate to="/pano" replace />} />` →
+  `<Route path="*" element={<NotFoundPage />} />`. Oturum açıksa `AppShell`
+  içinde, kapalıysa çıplak render edilsin.
+- Aynı geçişte iki farklı "bulunamadı" metnini tek ifadeye indir:
+  `/girisimler/99999` → "İstenen kaynak bulunamadı.", geçerli GUID →
+  "Girişim bulunamadı." Kullanıcı için ikisi aynı durum.
+
+**Kabul:** `/olmayan-sayfa` 404 ekranı gösterir, adres çubuğu değişmez.
+
+### 0.5 · Girişim/ekip/katılım yazma yollarını arayüze aç — **~6 saat** `[B-01]`
+> **Yapıldı.** Yeni dosyalar: `features/startups/StartupForm.tsx` (portaldan
+> taşınan `ProfileForm`, `mode: proposal | direct`),
+> `features/startups/TeamSection.tsx` (`MemberForm` + silme onayı, aynı `mode`
+> ayrımı), `features/startups/ParticipationForm.tsx`. `queries.ts` yedi yazma
+> kancasıyla genişledi. `StartupsPage`'e **Yeni girişim**, karta **Düzenle** ve
+> **Kaydı pasife al** (yalnızca Süper Yönetici), ekip sekmesine ekle/düzenle/
+> çıkar, programlar sekmesine **Programa ekle** geldi. Portal aynı bileşenleri
+> `mode="proposal"` ile kullanıyor.
+>
+> **Planda olmayan bulgu — maskeleme yazma yolunda tutulmuyordu.** Tam
+> değiştirmeli `PUT /api/startups/{id}` maskeli alanı istemciye `null`
+> gönderdiği için geri yazarken **siliyordu**: vergi numarasını göremeyen
+> Program Yöneticisi'nin kaydettiği her düzenleme numarayı boşaltırdı ve iz
+> bunu "kullanıcı sildi" diye kaydederdi. Düzeltme:
+> `StartupWriteModel.ApplyTo(startup, visibility)` göremediği alanı koruyor
+> (üç birim testi), `StartupForm` `direct` kipte o alanı hiç göstermiyor ve
+> gerekçesini yazıyor, `proposal` kipte form yine hiç açılmıyor.
+>
+> **Planda olmayan ek adım:** Program Yöneticisi yeni girişimi kaydettikten
+> sonra kartına gitmek 404 veriyordu — kapsamı "programlarımdan geçmiş
+> girişimler" olduğu için kayıt bir döneme bağlanana kadar kapsamına girmiyor.
+> `StartupsPage` bu yüzden kaydetmenin ardından katılım formunu açıp kuralı
+> ekranda yazıyor; Süper Yönetici doğrudan karta gidiyor.
+
+
+**Bu, Dalga 0'ın gövdesi ve jürinin soracağı sorunun cevabı:**
+"girişimi sisteme kim ekliyor?"
+
+Backend **tamamen hazır** — eksik olan yalnızca ekran:
+
+| Uç | Durum |
+|---|---|
+| `POST/PUT/DELETE /api/startups` | ✅ var ([StartupEndpoints.cs:74,84,97](../backend/src/T3.Api/Endpoints/StartupEndpoints.cs#L74)) |
+| `POST/PUT/DELETE /api/startups/{id}/team` | ✅ var ([satır 106,117,128](../backend/src/T3.Api/Endpoints/StartupEndpoints.cs#L106)) |
+| `POST /api/participations` | ✅ var ([ProgramEndpoints.cs:20](../backend/src/T3.Api/Endpoints/ProgramEndpoints.cs#L20)) |
+| Bunları çağıran arayüz | ❌ **hiçbiri** |
+
+**Yeniden kullanım — sıfırdan form yazma.** Portalda bu formların ikisi
+zaten var, yalnızca öneri kipinde çalışıyor:
+[PortalPage.tsx:77 `ProfileForm`](../frontend/src/features/portal/PortalPage.tsx#L77)
+(StartupWriteModel'in tüm alanları) ve
+[PortalPage.tsx:313 `MemberForm`](../frontend/src/features/portal/PortalPage.tsx#L313).
+`AchievementSection`/`DocumentSection` bileşenlerinde kurulmuş
+**`mode` deseni** aynen buraya uygulanacak:
+
+1. `ProfileForm` → `frontend/src/features/startups/StartupForm.tsx`'e taşı,
+   `mode: 'proposal' | 'direct'` propu ekle.
+   - `proposal` → bugünkü davranış: `POST /api/change-requests`.
+   - `direct` → `POST /api/startups` veya `PUT /api/startups/{id}`.
+2. `MemberForm` + `DeleteProposal` → `frontend/src/features/startups/TeamSection.tsx`,
+   aynı `mode` ayrımıyla.
+3. `frontend/src/features/startups/queries.ts` bugün **yalnızca `useQuery`**
+   içeriyor. Ekle: `useCreateStartup`, `useUpdateStartup`, `useDeleteStartup`,
+   `useAddTeamMember`, `useUpdateTeamMember`, `useRemoveTeamMember`,
+   `useAddParticipation`.
+4. `StartupsPage.tsx`: **"Yeni girişim"** düğmesi, `session.permissions.canManageStartups`
+   ile koşullu.
+5. `StartupDetailPage.tsx`: başlıkta **"Düzenle"**; ekip sekmesinde ekle/düzenle/kaldır;
+   programlar sekmesinde **"Programa ekle"** (program + dönem + durum + katılım tarihi).
+   Dönem listesi `GET /api/programs` yanıtındaki `Terms` dizisinden geliyor —
+   ek uç gerekmiyor.
+6. `PortalPage.tsx` taşınan bileşenleri `mode="proposal"` ile içeri alsın;
+   davranışı **değişmemeli**.
+
+**Kurallar (bozulmayacak):** Girişim kullanıcısı hiçbir tabloya doğrudan
+yazmaz — `direct` kipi yalnızca `canManageStartups` doğruyken render edilir,
+sunucu tarafı zaten `Policies.ManageStartups` ile ikinci kez kontrol ediyor.
+Silme onayı ve çift gönderim koruması için `AchievementSection`'daki
+iki adımlı `confirming` + `disabled={busy}` desenini birebir kopyala.
+
+**Kabul:**
+- Program yöneticisi arayüzden yeni girişim oluşturur, kartını düzenler,
+  iki ekip üyesi ekler, girişimi kendi programının 2026 dönemine bağlar.
+- Yeni kayıt listede, kartta ve **kronolojide** görünür.
+- Kapsamı dışındaki programa bağlamayı denerse "Bu program sizin
+  sorumluluğunuzda değil." hatası alır.
+- Girişim kullanıcısı aynı ekranlarda hâlâ yalnızca öneri gönderir.
+- `python3 scripts/e2e_faz3.py` + yeni bir `render` kontrolü temiz geçer.
+
+### 0.6 · Mobil yatay taşmayı kapat — **20 dakika** `[O-02]`
+> **Yapıldı — sebep tahminden farklıydı.** Filtre satırı ya da grafik kabı değil,
+> **grid öğesinin örtük min-content genişliği**: pano grafikleri tek sütunlu bir
+> grid'in aynı izinde duruyor ve iz en geniş öğenin min-content'i kadar
+> büyüyordu — "En çok yatırım alan girişimler" listesindeki `truncate` bağlantı
+> (nowrap olduğu için min-content'i tüm metin genişliği) izi 378 px'e çıkarıyordu.
+> Düzeltme: `ChartCard` ve girişim döşemesine `min-w-0`, dar ekranda daha küçük
+> punto/kenar boşluğu, grafik etiket sütunu `6rem`. `/onaylar` taşmasının sebebi
+> ayrıydı: öneri satırındaki uzun doküman adı bölünmüyordu → `break-words`.
+> Doğrulama: `render_faz6.py` dokuz rotayı 360/375/414 px'te ölçüyor.
+
+
+375 px'te `/girisimler` 394 px, `/pano` 402 px genişliğe taşıyor; taşan öğe
+kök `div.min-h-screen` ([AppShell.tsx](../frontend/src/components/AppShell.tsx)).
+Muhtemel neden: sabit genişlikli filtre satırı veya grafik kabı.
+Videoda telefon görüntüsü kullanılacaksa bu görünür.
+
+**Kabul:** 360/375/414 px'te `scrollWidth === clientWidth`.
+
+---
+
+## Dalga 1 — Creathon haftasına kadar (26 Ağustos – 5 Eylül)
+
+### 1.1 · Program ve dönem yönetimi — **~1 gün** `[B-02]`
+
+Programlar bugün yalnızca `DevDataSeeder` ile, yani doğrudan veritabanına
+yazılarak var oluyor. `EcosystemProgram` → `ProgramTerm` →
+`ProgramParticipation` zincirinin ilk iki halkasının yazma yolu **hiç yok**.
+
+Yeni dikey dilimler (`T3.Application/Features/Programs/` altında,
+mevcut `AddParticipation` dilimi şablon):
+
+```
+Programs/CreateProgram/      ProgramWriteModel + Handler
+Programs/UpdateProgram/
+Programs/DeleteProgram/      soft delete — zinciri elle yürüt
+Programs/Terms/AddTerm/      ProgramTermWriteModel + Handler
+Programs/Terms/UpdateTerm/
+Programs/Terms/DeleteTerm/
+Programs/UpdateParticipation/   yanlış eklenen katılım düzeltilebilsin
+Programs/RemoveParticipation/
+```
+
+- Handler'lar isim kuralıyla otomatik DI'ya giriyor
+  ([DependencyInjection.cs:50](../backend/src/T3.Application/DependencyInjection.cs#L50)) —
+  elle kayıt gerekmez.
+- Yeni politika sabiti: `Policies.ManagePrograms` — **yalnızca SuperAdmin**.
+  Dönem ekleme Program Yöneticisi'ne de açılabilir ama yalnızca kendi programına;
+  bu kontrol `AddParticipationHandler`'daki `AssignedProgramIds` kalıbını izlesin.
+- `ProgramWriteModel` için tek doğrulayıcı, `.WithValidation<T>()` ile
+  uç filtresinde.
+- Silme: program silinirken bağlı dönem ve katılımlar elle pasife alınacak —
+  soft delete süzgeçleri yalnızca okumayı daraltır.
+- Arayüz: [ProgramsPage.tsx](../frontend/src/features/programs/ProgramsPage.tsx)
+  bugün tamamen salt okunur (tek `Button` yok). "Yeni program", program
+  düzenleme ve dönem ekleme eklenecek.
+
+**Kabul:** Süper Yönetici yeni program + 2026 dönemi oluşturur, bir program
+yöneticisine kapsam olarak atar; o yönetici giriş yaptığında yeni programı ve
+ona bağlı girişimleri görür; program yöneticisi program oluşturmayı denerse 403.
+
+### 1.2 · Şifre kurtarma ve şifre değiştirme — **~1 gün** `[B-03]`
+
+Bugün: `forgot-password`, `reset-password`, `change-password` → **hepsi 404**.
+Tek yol yöneticinin şifre ataması, yani **yönetici her hesabın şifresini biliyor**.
+
+Yeni dilimler `T3.Application/Features/Auth/` altında:
+
+```
+Auth/RequestPasswordReset/   e-posta al, süreli tek kullanımlık jeton üret
+Auth/ResetPassword/          jeton + yeni şifre
+Auth/ChangePassword/         mevcut şifre doğrulamalı, oturum içi
+```
+
+- Yeni tablo/kolon: `PasswordResetToken` (hash, `ExpiresAt`, `UsedAt`,
+  `UserId`) → migration gerekir. Jetonun **kendisi değil hash'i** saklanır.
+- `User` üzerine `MustChangePassword` bayrağı: yönetici şifre atadığında
+  `true`, kullanıcı değiştirince `false`.
+- **Kullanıcı numaralandırmasına dikkat:** `forgot-password` e-posta kayıtlı
+  olsun olmasın **aynı** yanıtı dönmeli.
+- E-posta gönderimi: Creathon kapsamında gerçek SMTP kurulamıyorsa
+  `IEmailSender` arayüzünün arkasına geliştirme ortamında log'a yazan bir
+  uygulama koy — arayüz dursun, sağlayıcı sonra gelsin.
+- Arayüz: `/sifremi-unuttum`, `/sifre-sifirla/:token`, ve oturum içi
+  "Şifre değiştir". Giriş ekranına bağlantı
+  ([LoginPage.tsx](../frontend/src/features/auth/LoginPage.tsx)).
+
+**Kabul:** Kullanıcı e-postasını girer, bağlantıyı alır, yeni şifreyle giriş
+yapar; bağlantı ikinci kullanımda ve süresi dolduğunda reddedilir; yönetici
+şifre atadığında kullanıcı ilk girişte değiştirmeden başka ekrana geçemez.
+
+### 1.3 · Oturum ömrü ve ağ hatası ayrımı — **~4 saat** `[Y-01]`
+
+Üç ayrı sorun, tek kök: oturum durumu tek noktada yönetilmiyor.
+
+1. **15 dakikalık jeton, yenileme yok**
+   ([JwtOptions.cs:14](../backend/src/T3.Infrastructure/Identity/JwtOptions.cs#L14)).
+   Yenileme jetonu ekle (HttpOnly çerezde, `1.5` ile birlikte yapılabilir) ya
+   da kısa yolu seç: `AccessTokenMinutes = 480` + süre dolmadan önce uyarı.
+2. **Sessiz atılma.** [apiClient.ts:38](../frontend/src/lib/apiClient.ts#L38)
+   "Oturum süresi doldu" mesajını üretiyor ama
+   [AuthProvider.tsx](../frontend/src/lib/AuthProvider.tsx) onu yutuyor.
+   Sebebi state'te taşı, giriş ekranında göster; giriş sonrası kullanıcıyı
+   kaldığı rotaya döndür.
+3. **Ağ hatası oturumu düşürüyor ve İngilizce mesaj basıyor.** API kapalıyken
+   ekranda ham **"Failed to fetch"** yazıyor. `apiClient`'ta `fetch`'i
+   `try/catch`'e al, ağ hatasını `ApiError(0, 'Sunucuya ulaşılamıyor…')`
+   olarak normalleştir; `AuthProvider` yalnızca **401'de** oturumu düşürsün,
+   ağ hatasında düşürmesin.
+
+**Kabul:** API kapalıyken kullanıcı oturumda kalır, Türkçe "sunucuya
+ulaşılamıyor" durumu ve "yeniden dene" düğmesi görür; jeton dolduğunda giriş
+ekranında gerekçeyi okur ve giriş sonrası kaldığı sayfaya döner.
+
+### 1.4 · Giriş olaylarını denetim izine yaz — **~2 saat** `[B-05]`
+
+15 başarısız giriş denemesinden sonra denetim izinde **sıfır** kayıt var;
+eylem türleri yalnızca `Report.Export`, `Assistant.Ask`, `Document.Download`,
+`ChangeRequest.Submit`, `User.Update`.
+
+- [LoginHandler.cs](../backend/src/T3.Application/Features/Auth/Login/LoginHandler.cs)
+  içine `IAuditWriter` enjekte et: `Auth.LoginSucceeded`, `Auth.LoginFailed`,
+  `Auth.RateLimited`.
+- IP ve kullanıcı ajanı kaydedilsin. Başarısız denemede e-posta ham
+  saklanmasın (hash/maskeli) — kayıt kendisi bir kişisel veri yığınına
+  dönüşmesin.
+- `/denetim` ekranına eylem türü filtresi ekle.
+
+**Kabul:** Bir başarılı + bir başarısız giriş sonrası denetim izinde iki yeni
+satır; satırlar IP ve zaman damgası taşır; girişim kullanıcısı göremez.
+
+### 1.5 · KVKK metinleri ve başvuru yolu — **~3 saat (teknik)** `[B-06]`
+
+Sistemde aydınlatma metni, çerez bildirimi, kullanım şartları ve KVKK başvuru
+yolu **hiç yok** — 55 render'ın hiçbirinde geçmiyor.
+
+- Yeni rotalar: `/kvkk-aydinlatma`, `/kullanim-sartlari` — **`.AllowAnonymous`
+  karşılığı**, yani giriş yapmadan açılabilmeli (`RequireAuth` dışında).
+- Giriş ekranına ve `AppShell` alt bilgisine bağlantı; alt bilgide ayrıca
+  sürüm ve iletişim/destek bağlantısı (`[O-06]` ile aynı dokunuş).
+- Portalda ekip üyesi formuna kısa bilgilendirme: "Girdiğiniz iletişim
+  bilgileri kişisel veridir; yalnızca yetkili roller görür."
+- Metinlerin **hukuki içeriği ekip dışından onay ister** — teknik iş küçük,
+  içeriği erken başlat.
+
+**Kabul:** İki rota giriş yapılmadan açılır, giriş ekranından ve her sayfanın
+alt bilgisinden erişilir; portal formunda kişisel veri uyarısı görünür.
+
+### 1.6 · Karar Verici'nin `/onaylar` ekranı — **15 dakika** `[O-03]`
+
+Karar Verici doğrudan URL ile `/onaylar`'a girdiğinde sonsuza dek boş kalacak
+"Önerilerim" ekranını görüyor; bu rolde `mustSubmitForApproval` ve
+`canReviewApprovals` ikisi de `false`.
+
+[App.tsx](../frontend/src/App.tsx) içinde rotayı, ikisinden **en az biri**
+doğru olmayan role `/portal` ile aynı "Bu ekranı görme yetkiniz yok"
+ekranını gösterecek biçimde koru.
+
+**Kabul:** Karar Verici `/onaylar`'ı açtığında yetki açıklaması görür; diğer
+üç rolün davranışı değişmez.
+
+---
+
+## Dalga 2 — Gerçek canlıya çıkış (Demo Day sonrası)
+
+### 2.1 · Üretim dağıtım yolu — **~1 gün** `[B-07]`
+
+Frontend tüm isteklerini göreli `/api/...` yoluna atıyor; bu yolu backend'e
+taşıyan tek şey [vite.config.ts](../frontend/vite.config.ts) içindeki
+**dev sunucusu proxy'si**. `import.meta.env` hiç kullanılmıyor, depoda
+`Dockerfile`/`nginx.conf` yok, compose yalnızca `postgres` + `pgadmin`
+tanımlıyor. Yani `npm run build` çıktısı hiçbir API'ye ulaşamaz.
+
+- Tercih edilen yol: **API statik dosyaları kendisi sunsun**
+  (`app.UseStaticFiles()` + SPA fallback). Tek origin, CORS yok, proxy yok.
+- Alternatif: nginx ters vekil + ayrı konteyner.
+- `docker-compose.prod.yml`: `postgres` + `api` (+ gerekiyorsa `web`).
+- HTTPS sonlandırma, HTTP→HTTPS yönlendirme, üretim CORS alan adı.
+- `T3_Seed__Enabled=false` üretimde açıkça doğrulansın.
+
+**Kabul:** Tek komutla kalkan üretim benzeri yığında derlenmiş arayüzden
+giriş yapılır ve girişim listesi görülür; karışık içerik uyarısı çıkmaz.
+
+### 2.2 · Jetonu çerezine taşı ve CSP ekle — **~1 gün** `[Y-05]`
+
+Erişim jetonu `localStorage`'da ([apiClient.ts:21](../frontend/src/lib/apiClient.ts#L21));
+CSP başlığı yok. Süper Yönetici jetonu çalınırsa 32 girişimin vergi numarası,
+iletişim bilgisi ve finansalları dışarı taşınır.
+
+- Jeton → `HttpOnly` + `Secure` + `SameSite=Strict` çerez; yenileme jetonu
+  ayrı çerezde (`1.3` ile birlikte yapmak en verimlisi).
+- CSRF önlemi (SameSite yeterli değilse çift gönderim deseni).
+- Yanıtlara sıkı `Content-Security-Policy`.
+- **Not:** Bu değişiklik `2.1`'deki tek origin kararına bağlı — sırayı bozma.
+
+### 2.3 · Kalan orta öncelikli maddeler
+
+| # | İş | Efor |
+|---|---|---|
+| `[O-01]` | Filtre/sıralama/sayfa durumunu URL'ye yaz (`setSearchParams`); geri tuşu ve paylaşılan bağlantı çalışsın | Düşük |
+| `[O-04]` | `SearchText.Normalize` aksanları katlasın (ç→c, ğ→g, ı/İ→i, ö→o, ş→s, ü→u); "saglik" → "Sağlık" bulsun. Gösterim etiketleri değişmez | Düşük |
+| `[O-05]` | Kirli formdan çıkışta uyarı (`useBlocker`); `storage` olayıyla sekmeler arası oturum senkronu | Orta |
+| `[O-06]` | Hata izleme (Sentry), rota bazlı `lazy` kod bölme (bugün tek parça 362 kB), indirme yanıtına `Cache-Control: no-store` | Orta |
+| `[D-01]` | Girdi odak halkası `brand-500/20` → en az `/60`; gövde başına "İçeriğe atla" bağlantısı | Düşük |
+
+---
+
+## Her madde için doğrulama alışkanlığı
+
+Sırayı bozma — bu proje bugüne kadarki hataların çoğunu son adımda yakaladı:
+
+```bash
+cd backend && dotnet build && dotnet test
+python3 scripts/e2e_faz3.py && python3 scripts/e2e_faz4.py && python3 scripts/e2e_faz5.py
+python3 scripts/render_faz3.py && python3 scripts/render_faz4.py && python3 scripts/render_faz5.py
+```
+
+`index.html`'in 200 dönmesi uygulamanın açıldığını göstermez. **Dalga 0.5 ve
+Dalga 1.1 için yeni render kontrolleri yazılmalı** — yeni yazma ekranları
+mevcut betiklerin kapsamında değil.
+
+Denetimde kullanılan rol × rota matrisi ve mutlu yol dışı senaryolar
+(ağ kesintisi, jeton silme, bozuk jeton, mobil taşma, klavye turu)
+tekrarlanabilir; her dalga sonunda yeniden koşulmalı.
+
+---
+
+## Kapsam dışı bırakılanlar
+
+Denetimde **sorunsuz** çıkan ve bu planda işi olmayan alanlar — yanlışlıkla
+"iyileştirme" adına bozulmasın:
+
+satır düzeyi kapsam · alan düzeyi KVKK maskelemesi (ham API yanıtlarında
+sızıntı yok) · kapsam dışı kayıtta 404 (varlık sızdırmıyor) · doküman
+indirmede IDOR yok · yükleme doğrulaması (uzantı, çift uzantı, boş dosya) ·
+CSV maskelemesi ve formül enjeksiyonu öneki · onay diff'indeki `masked`
+bayrağı · sayfalama sınırı kırpması · tohumlayıcının `IsDevelopment()`
+koruması · alan bazlı Türkçe doğrulama mesajları · çift gönderim ve silme
+onayı · denetim izinin indirme/aktarma/AI kapsamı · temiz `npm run build` ·
+55 render'da sıfır konsol hatası.

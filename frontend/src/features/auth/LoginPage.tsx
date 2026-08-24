@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import { Button, Card, ErrorState, Input } from '@/components/ui'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 export default function LoginPage() {
+  useDocumentTitle('Giriş')
   const { session, login, loginError, isLoggingIn } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -14,13 +16,13 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center px-6 py-12">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <span className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-brand-900 font-bold text-white">
+          <span className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-brand-500 font-bold text-white">
             T3
           </span>
-          <h1 className="text-2xl font-bold text-brand-900 dark:text-brand-100">
+          <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-50">
             Girişim Ekosistemi Yönetim Sistemi
           </h1>
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm text-stone-500">
             Programdan yatırıma, ekosistemin tek kurumsal hafızası.
           </p>
         </div>
@@ -59,7 +61,7 @@ export default function LoginPage() {
           </form>
         </Card>
 
-        <p className="mt-6 text-center text-xs text-slate-500">
+        <p className="mt-6 text-center text-xs text-stone-500">
           T3 Vakfı Bursiyer Yapay Zekâ Creathonu · Problem 7
         </p>
       </div>

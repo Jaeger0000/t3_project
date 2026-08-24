@@ -1,29 +1,54 @@
 @import 'tailwindcss';
 
-/* T3 kurumsal paleti — problem kitapçığındaki lacivert/turuncu tonları */
+/*
+ * Palet doğrudan T3KYS'ten (t3kys.com) alındı: kurumsal kırmızı-turuncu
+ * #E73A13, üzerine gelince koyulaşan #D92C05 ve sarı vurgu #FFB900. Rakamlar
+ * tahmin değil, sitenin kendi `color.css` dosyasından okundu — arayüzün
+ * ekosistemin geri kalanıyla aynı yerden geldiği ilk bakışta anlaşılsın.
+ *
+ * İki aile var: turuncu (`brand-*`) ve sıcak nötr (Tailwind `stone`). Soğuk
+ * gri, lacivert ve mavi arayüzden çıkarıldı.
+ *
+ * Ölçek "hangi ton" değil "hangi iş" diye seçildi:
+ *   300 → soluk somon zemin (#FFA996, T3KYS'in sekme şeridi rengi).
+ *   500 → düğme/rozet zemini, beyaz yazıyla (4.2:1).
+ *   600 → üzerine gelme hâli; T3KYS gibi kızarıp koyulaşıyor (4.9:1).
+ *   700 → beyaz üstünde turuncu yazı (bağlantı, aktif sekme) — 6.6:1, WCAG AA.
+ */
 @theme {
-  --color-brand-50: #eef2ff;
-  --color-brand-100: #e0e7ff;
-  --color-brand-500: #4f5bd5;
-  --color-brand-600: #3b46b8;
-  --color-brand-900: #1b2a4a;
-  --color-brand-950: #14203a;
+  --color-brand-50: #fff5f2;
+  --color-brand-100: #ffe5de;
+  --color-brand-200: #ffc9bb;
+  --color-brand-300: #ffa996;
+  --color-brand-400: #f76f4b;
+  --color-brand-500: #e73a13;
+  --color-brand-600: #d92c05;
+  --color-brand-700: #b52205;
+  --color-brand-800: #8f1c07;
+  --color-brand-900: #6b1706;
+  --color-brand-950: #3d0c03;
 
-  --color-accent-400: #fbaa5c;
-  --color-accent-500: #f79239;
-  --color-accent-600: #e07a22;
+  /* T3KYS'in sarısı: yalnızca ikincil vurgu (grafik serisi, ödül rozeti).
+     Üzerine beyaz yazı gelmez — sarıda beyaz 1.7:1. */
+  --color-gold-100: #fff3d1;
+  --color-gold-400: #ffc93d;
+  --color-gold-500: #ffb900;
+  --color-gold-600: #e2a400;
 }
 
+/*
+ * `dark:` yardımcıları artık işletim sisteminin temasını değil, kökteki `.dark`
+ * sınıfını dinliyor. Sebep: kurumsal kimlik beyaz zemin üzerine kurulu, ama
+ * tarayıcısı koyu temada olan kullanıcı siyah bir arayüz görüyordu. Sınıflar
+ * kodda duruyor; ileride gerçek bir tema düğmesi eklenirse `<html class="dark">`
+ * demek yetecek.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
-}
-
-@media (prefers-color-scheme: dark) {
-  body {
-    @apply bg-slate-950 text-slate-100;
-  }
+  @apply bg-white text-stone-900 antialiased;
 }

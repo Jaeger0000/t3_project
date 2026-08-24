@@ -218,6 +218,16 @@ export type StartupWriteModel = {
   status?: StartupStatus | null
 }
 
+/** Katılım gövdesi; dönem kimliği `Program.terms` içinden seçiliyor. */
+export type AddParticipationBody = {
+  startupId: string
+  programTermId: string
+  status: ParticipationStatus
+  joinedOn: string
+  leftOn?: string | null
+  notes?: string | null
+}
+
 export type TeamMemberWriteModel = {
   fullName: string
   title?: string | null

@@ -29,17 +29,17 @@ export default function StartupTimeline({ startupId }: { startupId: string }) {
   return (
     <div className="flex flex-col gap-8">
       {!timeline.data.exactAmountsVisible ? (
-        <p className="rounded-lg bg-slate-100 px-4 py-2.5 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+        <p className="rounded-lg bg-stone-100 px-4 py-2.5 text-sm text-stone-600 dark:bg-stone-800 dark:text-stone-300">
           🔒 Finansal tutarlar rolünüze göre maskelenmiştir; kayıtların varlığı ve türü görünür.
         </p>
       ) : null}
 
       {groups.map(([year, entries]) => (
         <section key={year}>
-          <h3 className="mb-3 text-sm font-bold tracking-widest text-brand-600 dark:text-brand-100">
+          <h3 className="mb-3 text-sm font-bold tracking-widest text-brand-700 dark:text-brand-100">
             {year}
           </h3>
-          <ol className="relative flex flex-col gap-4 border-l border-slate-200 pl-6 dark:border-slate-800">
+          <ol className="relative flex flex-col gap-4 border-l border-stone-200 pl-6 dark:border-stone-800">
             {entries.map((entry, index) => (
               <TimelineRow key={`${entry.kind}-${entry.sourceId ?? index}-${entry.occurredOn}`} entry={entry} />
             ))}
@@ -64,7 +64,7 @@ function TimelineRow({ entry }: { entry: TimelineEntry }) {
       </span>
 
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <p className="font-medium text-slate-900 dark:text-slate-100">{entry.title}</p>
+        <p className="font-medium text-stone-900 dark:text-stone-100">{entry.title}</p>
         {entry.badge ? <Badge>{entry.badge}</Badge> : null}
         {amount ? (
           <span className="text-sm font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
@@ -72,16 +72,16 @@ function TimelineRow({ entry }: { entry: TimelineEntry }) {
           </span>
         ) : null}
         {!entry.isVerified ? (
-          <Badge tone="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+          <Badge tone="bg-brand-100 text-brand-800 dark:bg-brand-950 dark:text-brand-200">
             doğrulanmadı
           </Badge>
         ) : null}
       </div>
 
-      <p className="mt-0.5 text-xs text-slate-500">{formatMonthYear(entry.occurredOn)}</p>
+      <p className="mt-0.5 text-xs text-stone-500">{formatMonthYear(entry.occurredOn)}</p>
 
       {entry.description ? (
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{entry.description}</p>
+        <p className="mt-1 text-sm text-stone-600 dark:text-stone-400">{entry.description}</p>
       ) : null}
     </li>
   )
