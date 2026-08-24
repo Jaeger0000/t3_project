@@ -11,7 +11,12 @@ public sealed record TeamMemberWriteModel(
     string? Phone,
     string? LinkedInUrl,
     bool IsFounder,
-    DateOnly? JoinedOn);
+    DateOnly? JoinedOn)
+{
+    /// <summary>Onay akışının "önce" anlık görüntüsü için mevcut hâli aynı şekle çevirir.</summary>
+    public static TeamMemberWriteModel From(TeamMember m) => new(
+        m.FullName, m.Title, m.Email, m.Phone, m.LinkedInUrl, m.IsFounder, m.JoinedOn);
+}
 
 public sealed class TeamMemberWriteModelValidator : AbstractValidator<TeamMemberWriteModel>
 {

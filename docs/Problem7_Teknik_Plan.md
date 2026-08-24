@@ -379,8 +379,14 @@ Application Handlers┤   (TEK veri yolu)
 | `search_startups` | `SearchStartupsHandler` | Sektör, program, durum, yatırım filtreli arama |
 | `get_startup_card` | `GetStartupCardHandler` | Tek girişimin kartı (maskeli) |
 | `get_program_history` | `GetStartupTimelineHandler` | Kronolojik gelişim yolculuğu |
+| `list_achievements` | `ListAchievementsHandler` | Başarı/finans kayıtları (tutarlar maskeli) |
 | `ecosystem_stats` | `EcosystemStatsHandler` | Agregat göstergeler, gruplama |
-| `list_pending_approvals` | `ListPendingRequestsHandler` | Bekleyen onaylar (yalnız admin) |
+| `list_pending_approvals` | `ListChangeRequestsHandler` | Bekleyen onaylar (kuyruk kapsamıyla) |
+
+Uygulanan hâli: `AssistantToolbox.Catalog` (Application katmanı) hem
+`POST /api/ai/ask` hem `POST /mcp` tarafından kullanılıyor — tek katalog, tek
+veri yolu. MCP ucu da kimlik ister; araçlar isteği yapan jetonun rolüyle
+çalışır, ayrıcalıklı bir "ajan kullanıcısı" yok.
 
 ### Kullanıcıya görünen AI özelliği
 
@@ -418,9 +424,9 @@ Bugün **20 Ağustos**. İlk teslim **26 Ağustos 10.00** (iş modeli canvası +
 | **0 — İskelet** ✅ | 20 Ağu | Solution + 4 proje, Docker Compose Postgres, EF Core ilk migration, health check endpoint, Vite+React iskeleti, Swagger açık | — |
 | **1 — Kimlik & RBAC** ✅ | 20 Ağu | login + JWT, `/api/me`, kapsam filtresi, rol politikaları, frontend login + route guard. *Kullanıcı yönetimi CRUD'u Faz 3'e ertelendi — girişim kartı ona ihtiyaç duymuyor.* | roller |
 | **2 — Girişim kartı** ✅ | 20 Ağu | Startup + TeamMember CRUD, girişim kartı ekranı, arama/filtre/sıralama/sayfalama, program geçmişi timeline, demo verisi, RBAC + maskeleme birim testleri | **#1, #2** |
-| **3 — Onay akışı** | 23 Ağu | ChangeRequest, startup portalı, onay kuyruğu + diff görünümü, AuditLog | **#3** |
-| **4 — Finansal & doküman** | 24 Ağu | Achievement TPH (5 tip), doküman yükleme/indirme, maskeleme kuralları | **#4** |
-| **5 — Dashboard & AI** | 25 Ağu | EcosystemStats, grafikler, CSV dışa aktarma, MCP tool'ları, AI sohbet paneli, gerçekçi seed veri | karar destek |
+| **3 — Onay akışı** ✅ | 23 Ağu | ChangeRequest, startup portalı, onay kuyruğu + diff görünümü, AuditLog | **#3** |
+| **4 — Finansal & doküman** ✅ | 24 Ağu | Achievement TPH (5 tip), doküman yükleme/indirme, maskeleme kuralları | **#4** |
+| **5 — Dashboard & AI** ✅ | 24 Ağu | EcosystemStats + ekosistem panosu, el yazımı SVG grafikler, CSV dışa aktarma (maskeli hücreler dâhil), JSON-RPC MCP sunucusu, AI karar destek paneli ve yönetici özeti (model yoksa yerel planlayıcı), 32 girişimlik gerçekçi tohum verisi | karar destek |
 | **Teslim** | 26 Ağu | Canvas + prototip videosu + sunum | — |
 | **Creathon** | 5-6 Eyl | Cilalama, AI genişletme, testler, Demo Day sunumu | — |
 

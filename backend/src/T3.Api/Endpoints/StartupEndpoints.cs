@@ -3,6 +3,7 @@ using T3.Api.Filters;
 using T3.Api.Http;
 using T3.Application.Features.Startups;
 using T3.Application.Features.Startups.CreateStartup;
+using T3.Application.Features.Startups.DeleteStartup;
 using T3.Application.Features.Startups.GetStartupCard;
 using T3.Application.Features.Startups.GetStartupTimeline;
 using T3.Application.Features.Startups.SearchStartups;
@@ -89,6 +90,17 @@ public static class StartupEndpoints
             .RequireAuthorization(Policies.ManageStartups)
             .WithValidation<StartupWriteModel>()
             .WithSummary("Girişim kaydını günceller.");
+
+        // Silme yalnızca SuperAdmin'e açık; kontrol handler'da, çünkü politika
+        // ManageStartups Program Yöneticisi'ni de kapsıyor ve bu uç için
+        // kapsamı daha dar.
+        group.MapDelete("/{id:guid}", async (
+                Guid id,
+                DeleteStartupHandler handler,
+                CancellationToken ct) =>
+            (await handler.Handle(id, ct)).ToHttp())
+            .RequireAuthorization(Policies.ManageStartups)
+            .WithSummary("Girişimi ve bağlı tüm kayıtlarını pasife alır.");
 
         // --- Ekip ----------------------------------------------------------
         group.MapPost("/{id:guid}/team", async (

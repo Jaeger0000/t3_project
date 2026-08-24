@@ -1,8 +1,19 @@
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react'
+import type {
+  HTMLAttributes,
+  InputHTMLAttributes,
+  ReactNode,
+  SelectHTMLAttributes,
+} from 'react'
 
-export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
+/**
+ * Kart kabı. Kalan öznitelikler `div`'e geçiriliyor: `data-testid` gibi
+ * alanlar sessizce düşerse render doğrulaması kartı hiç bulamıyor — bu
+ * hatayı Faz 5'te headless render yakaladı.
+ */
+export function Card({ children, className = '', ...rest }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
+      {...rest}
       className={`rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 ${className}`}
     >
       {children}

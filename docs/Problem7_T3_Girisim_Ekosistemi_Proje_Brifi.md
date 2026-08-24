@@ -137,4 +137,7 @@ Bir girişimin T3 ile ilk temasından güncel satış ve yatırım durumuna kada
 
 ---
 
-*Kaynak belgeler: [T3_Vakfi_Bursiyer_Yapay_Zeka_Creathon_Sartnamesi.md](T3_Vakfi_Bursiyer_Yapay_Zeka_Creathon_Sartnamesi.md), [T3_Vakfi_Bursiyer_Yapay_Zeka_Creathon_Problemler_Kitapcigi.md](T3_Vakfi_Bursiyer_Yapay_Zeka_Creathon_Problemler_Kitapcigi.md)*
+*Kaynak belgeler: T3 Vakfı Bursiyer Yapay Zekâ Creathonu şartnamesi ve
+problemler kitapçığı. Bu brif ikisinin Problem 7'yi ilgilendiren
+bölümlerinin birleştirilmiş hâlidir ve depodaki tek doğruluk kaynağıdır;
+özgün PDF'ler ve ara transkript dosyaları bilinçli olarak silinmiştir.*

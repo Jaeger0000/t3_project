@@ -10,13 +10,16 @@ T3 Vakfı Bursiyer Yapay Zekâ Creathonu — **Problem 7** çözümü.
 |---|---|
 | [docs/Problem7_T3_Girisim_Ekosistemi_Proje_Brifi.md](docs/Problem7_T3_Girisim_Ekosistemi_Proje_Brifi.md) | Ürün gereksinimleri, roller, zorunlu MVP maddeleri, program kuralları |
 | [docs/Problem7_Teknik_Plan.md](docs/Problem7_Teknik_Plan.md) | Mimari, veri modeli, yetki matrisi, API yüzeyi, faz planı |
+| [docs/Gelistirme_Kararlari.md](docs/Gelistirme_Kararlari.md) | Yerleşik teknik kararlar, reddedilen alternatifler, ortam tuzakları |
+| [CLAUDE.md](CLAUDE.md) | Yapay zekâ asistanı için kısa proje sözleşmesi — kurallar ve belge dizini |
+| [scripts/README.md](scripts/README.md) | Uçtan uca ve render doğrulama betikleri, çalıştırma sırası |
 
 ## Teknoloji
 
 - **Backend:** .NET 8 · Clean Architecture + dikey dilim · Minimal API · EF Core 8
 - **Frontend:** React 19 · TypeScript · Vite · Tailwind CSS 4 · TanStack Query
 - **Veritabanı:** PostgreSQL 16 (Docker)
-- **AI:** MCP sunucusu (.NET içinde) + Claude API — *Faz 5*
+- **AI:** MCP sunucusu (.NET içinde) + Claude API — anahtar **opsiyonel**, yoksa sorular yerel planlayıcıyla yanıtlanır
 
 ## Kurulum
 
@@ -30,7 +33,8 @@ T3 Vakfı Bursiyer Yapay Zekâ Creathonu — **Problem 7** çözümü.
 cp .env.example .env
 ```
 
-`.env` içindeki iki değeri mutlaka doldurun:
+`.env` içindeki iki değeri mutlaka doldurun (üçüncüsü, `T3_Ai__ApiKey`,
+opsiyonel — bkz. [AI katmanı](#ai-katmanı)):
 
 ```bash
 # Rastgele parola
@@ -90,16 +94,20 @@ Arayüz: http://localhost:5173 — `/api` ve `/health` istekleri Vite proxy'si
 ## Demo hesapları
 
 Backend `Development` ortamında ilk açılışta **demo verisini kendisi yükler**
-(5 program, 12 girişim, ekipler, yatırım/hibe/ödül kayıtları, kilometre
-taşları). Tüm hesapların şifresi aynıdır: `T3.Creathon!2026`
+(5 program, 32 girişim, 41 program katılımı, 97 yatırım/hibe/ciro/ihracat/ödül
+kaydı, kilometre taşları, 5 doküman ve 11 onay isteği). Tüm hesapların şifresi
+aynıdır: `T3.Creathon!2026`
 
 | E-posta | Rol | Ne görür |
 |---|---|---|
-| `admin@t3ekosistem.test` | Süper Yönetici | 12 girişimin tamamı, tüm hassas alanlar |
-| `kulucka.yoneticisi@t3ekosistem.test` | Program Yöneticisi | Yalnızca Ön Kuluçka + Kuluçka'daki 6 girişim; vergi no **göremez** |
-| `teknofest.yoneticisi@t3ekosistem.test` | Program Yöneticisi | Yalnızca TEKNOFEST/DENEYAP/Hızlandırma'daki 6 girişim |
-| `karar.verici@t3ekosistem.test` | Karar Verici | 12 girişimin tamamı; tutarlar ve kişisel veriler maskeli |
+| `admin@t3ekosistem.test` | Süper Yönetici | 32 girişimin tamamı, tüm hassas alanlar |
+| `kulucka.yoneticisi@t3ekosistem.test` | Program Yöneticisi | Yalnızca Ön Kuluçka + Kuluçka'daki 16 girişim; vergi no **göremez** |
+| `teknofest.yoneticisi@t3ekosistem.test` | Program Yöneticisi | Yalnızca TEKNOFEST/DENEYAP/Hızlandırma'daki 16 girişim |
+| `karar.verici@t3ekosistem.test` | Karar Verici | 32 girişimin tamamı; tekil tutarlar ve kişisel veriler maskeli, ekosistem **toplamları** açık |
 | `girisim@t3ekosistem.test` | Girişim Kullanıcısı | Yalnızca Anadolu Robotik |
+| `girisim.marmara@t3ekosistem.test` | Girişim Kullanıcısı | Yalnızca Marmara Biyoteknoloji |
+| `girisim.toros@t3ekosistem.test` | Girişim Kullanıcısı | Yalnızca Toros Uzay Bileşenleri |
+| `girisim.trakya@t3ekosistem.test` | Girişim Kullanıcısı | Yalnızca Trakya Tarım Teknolojileri |
 
 > Bu hesaplar yalnızca yerel geliştirme ve demo içindir. Tohumlayıcı üretim
 > ortamında hiçbir koşulda çalışmaz; şifre `T3_Seed__Password` ile,
@@ -109,10 +117,15 @@ taşları). Tüm hesapların şifresi aynıdır: `T3.Creathon!2026`
 > (RFC 6761) kullanır, telefonlar tahsis edilmemiş bir önek taşır.
 
 İki Program Yöneticisi hesabı bilinçli olarak ayrık programlara atanmıştır:
-aynı ucu çağırdıklarında tamamen farklı girişim listesi görürler. Rol bazlı
-yetkilendirmeyi göstermenin en hızlı yolu bu iki hesapla giriş yapmaktır.
+aynı ucu çağırdıklarında tamamen farklı girişim listesi ve tamamen farklı bir
+ekosistem panosu görürler. Rol bazlı yetkilendirmeyi göstermenin en hızlı yolu
+bu iki hesapla giriş yapmaktır.
 
-## API yüzeyi (Faz 2)
+Tohum verisindeki boşluklar da kasıtlıdır: dört girişim hiçbir programa bağlı
+değil, biri hiç başarı kaydı taşımıyor — "kapsam dışı" ve "boş durum" ekranları
+demoda gerçek veriyle görünsün diye.
+
+## API yüzeyi (Faz 5)
 
 | Uç | Yetki |
 |---|---|
@@ -122,12 +135,51 @@ yetkilendirmeyi göstermenin en hızlı yolu bu iki hesapla giriş yapmaktır.
 | `GET /api/startups/{id}` | kimlik doğrulanmış — hassas alanlar role göre maskelenir |
 | `GET /api/startups/{id}/timeline` | kimlik doğrulanmış |
 | `POST /api/startups` · `PUT /api/startups/{id}` | Süper Yönetici, Program Yöneticisi |
+| `DELETE /api/startups/{id}` | Süper Yönetici — bağlı kayıtları da pasife alır |
 | `POST/PUT/DELETE /api/startups/{id}/team[/{memberId}]` | Süper Yönetici, Program Yöneticisi |
+| `GET /api/startups/{id}/achievements` | kimlik doğrulanmış — tutarlar role göre maskelenir |
+| `POST/PUT/DELETE /api/startups/{id}/achievements[/{achievementId}]` | Süper Yönetici, Program Yöneticisi |
+| `GET /api/startups/{id}/documents` | kimlik doğrulanmış — Karar Verici listeyi göremez |
+| `POST /api/startups/{id}/documents` | yetkili doğrudan kaydeder, girişim kullanıcısı onaya gönderir |
+| `DELETE /api/startups/{id}/documents/{documentId}` | Süper Yönetici, Program Yöneticisi |
+| `GET /api/documents/{id}/download` | kimlik doğrulanmış — her indirme denetim izine yazılır |
 | `GET /api/programs` | kimlik doğrulanmış — kapsama göre daraltılır |
 | `POST /api/participations` | Süper Yönetici, Program Yöneticisi (kendi programı) |
+| `POST /api/change-requests` | Girişim Kullanıcısı — yetki role değil girişim bağına dayanır |
+| `GET /api/change-requests` | kimlik doğrulanmış — yetkiliye kuyruk, girişime kendi geçmişi |
+| `GET /api/change-requests/{id}` | kimlik doğrulanmış — before/after diff, alanlar role göre maskeli |
+| `POST /api/change-requests/{id}/approve` · `/reject` | Süper Yönetici, Program Yöneticisi (kendi kapsamı) |
+| `GET /api/reports/ecosystem` | kimlik doğrulanmış — sayılar kapsamla daralır, tutarlar role göre maskelenir |
+| `GET /api/reports/export` | kimlik doğrulanmış — CSV; maskeli hücre "yetkiniz yok" yazar, her aktarma denetim izine düşer |
+| `POST /api/ai/ask` | kimlik doğrulanmış, dakikada 20 istek — yanıt yalnızca kullanıcının görebildiği kayıtlardan üretilir |
+| `GET /api/ai/startups/{id}/summary` | kimlik doğrulanmış — kart ve kronolojiden üretilen yönetici özeti |
+| `POST /mcp` | kimlik doğrulanmış — JSON-RPC 2.0; araçlar aynı Application handler'larını sarar |
+| `GET /api/audit-logs` | Süper Yönetici |
+| `GET/POST /api/users` · `PUT /api/users/{id}[/password]` · `DELETE /api/users/{id}` | Süper Yönetici |
 
 Yetkilendirme varsayılan olarak kapalıdır (`FallbackPolicy`): üst veri
 taşımayan her uç kimlik ister, herkese açık uçlar bunu açıkça belirtir.
+
+## AI katmanı
+
+Üç uç aynı Application handler'larını kullanır; AI için **paralel bir veri yolu
+yoktur**, dolayısıyla kapsam ve maskeleme kuralları tek yerde kalır.
+
+- `POST /api/ai/ask` — doğal dil soru. Yanıtın altında **hangi araç çağrıldı**
+  listesi durur; AI burada karar verici değil karar *destek* katmanı.
+- `GET /api/ai/startups/{id}/summary` — girişim kartındaki yönetici özeti.
+  Tutarları göremeyen role tutarsız özet üretilir ve bunu ekranda söyler.
+- `POST /mcp` — JSON-RPC 2.0 MCP sunucusu (`initialize`, `ping`, `tools/list`,
+  `tools/call`). Altı araç: `search_startups`, `get_startup_card`,
+  `get_program_history`, `list_achievements`, `ecosystem_stats`,
+  `list_pending_approvals`. Uç kimlik ister: MCP istemcisi de Bearer jetonu
+  taşımak zorunda, araçlar jetonun rolüyle çalışır.
+
+`T3_Ai__ApiKey` boşsa uygulama çalışmaya devam eder: soru yerel planlayıcıya
+düşer, anahtar kelimelerden araç çağrıları üretilir ve yanıt araç özetlerinin
+birleşiminden kurulur. Cümle üretilmediği için uydurma da üretilmez. Arayüz
+hangi modun yanıtladığını rozetle söyler ("Model: …" / "Yerel plan (model
+yok)") — demo internet ya da kota olmadan da çalışır.
 
 ## Proje yapısı
 
@@ -164,7 +216,15 @@ dotnet ef migrations add <Ad> \
   --output-dir Persistence/Migrations
 
 # Frontend tip kontrolü ve üretim derlemesi
-cd frontend && npm run build
+cd frontend && npm run build && npm run lint
+
+# Çalışan sisteme karşı doğrulama (bkz. scripts/README.md)
+python3 scripts/e2e_faz3.py      # onay akışı, denetim izi, kullanıcı yönetimi
+python3 scripts/e2e_faz4.py      # başarı kayıtları ve dokümanlar
+python3 scripts/e2e_faz5.py      # pano, CSV, AI uçları, MCP sunucusu
+python3 scripts/render_faz3.py   # headless Chrome'da gerçek render
+python3 scripts/render_faz4.py
+python3 scripts/render_faz5.py
 
 # Veritabanını sıfırla
 docker compose down -v && docker compose up -d postgres
@@ -184,21 +244,95 @@ JWT altyapısı, Swagger, sağlık uçları, frontend iskeleti.
   kart, ekip yönetimi, denetim izi
 - **MVP #2 — gelişim yolculuğu:** program katılımları, başarı kayıtları ve
   kilometre taşlarından sorgu anında üretilen tek kronoloji
-- **Demo verisi:** 5 program, 12 kurgu girişim, 5 rol hesabı
+
+**Faz 3 tamamlandı** — MVP #3 uçtan uca çalışıyor:
+
+- **Onay akışı:** girişim kullanıcısı hiçbir tabloya doğrudan yazmıyor; her
+  değişiklik `ChangeRequest` olarak kuyruğa giriyor. Onay anında gövde yeniden
+  doğrulanıyor ve ad tekilliği yeniden kontrol ediliyor — gönderimle karar
+  arasında günler geçebilir.
+- **Girişim portalı:** kendi profilini ve ekibini düzenleme önerileri, kendi
+  isteklerinin durumu ve ret gerekçeleri.
+- **Onay kuyruğu + diff:** alan alan before/after karşılaştırması, bekleme
+  süresi rozeti, durum sayıları. Maskelenmiş alan satırdan silinmiyor;
+  "değişiyor ama göremezsiniz" olarak gösteriliyor.
+- **Denetim izi ucu:** kim, ne zaman, neyi değiştirdi — ham gövdeleriyle.
+  Onay iki satır yazar (`ChangeRequest.Approve` + `Startup.Update`), böylece iz
+  değişikliğin portaldan mı doğrudan mı geldiğine bakmadan aynı sorgulanır.
+- **Kullanıcı yönetimi:** Faz 1'den ertelenen CRUD; rol–kapsam bağı zorunlu,
+  hesaplar silinmez pasife alınır, kendi hesabını kilitleme koruması var.
+- **Soft delete zinciri:** `DELETE /api/startups/{id}` bağlı tüm kayıtları elle
+  yürüyerek pasife alır ve kaç kaydın etkilendiğini raporlar.
+- **Demo verisi:** 5 program, 12 kurgu girişim, 8 hesap, 11 onay isteği
+  (bekleyen, onaylanmış ve gerekçesiyle reddedilmiş örnekler dâhil).
+
+**Faz 4 tamamlandı** — MVP #4 uçtan uca çalışıyor:
+
+- **Başarı ve finans kayıtları:** yatırım turu, hibe, ciro, ihracat ve ödül tek
+  tabloda (TPH) ama beş güçlü tipli sınıf olarak duruyor. Gövde tek, doğrulama
+  türe bağlı: mali yılı olmayan ciro, tutarı olmayan yatırım turu kaydedilemez.
+  Kayıt türü sonradan değiştirilemez (409) — tür, satırın kimliğinin parçası.
+- **Tutar maskelemesi:** Karar Verici satırı görür, meblağı görmez. Yanıt
+  `amountMasked` taşır; arayüz maskelenen tutarı `0 ₺` diye göstermez.
+- **Doküman yükleme/indirme:** yerel diske yazan `IDocumentStorage`, uzantı
+  beyaz listesi ve 20 MB sınırı. İçerik tipi istemciden alınmaz, uzantıdan
+  türetilir; indirme `nosniff` başlığıyla döner ve **her indirme denetim izine
+  yazılır**.
+- **Yükleme de onay akışından geçer:** yetkilinin dosyası doğrudan kaydedilir,
+  girişim kullanıcısının dosyası depoya alınıp `ChangeRequest` olarak kuyruğa
+  girer. Onaylanınca kayıt oluşur, reddedilince depoya yazılan dosya silinir.
+- **Doğrulanmışlık:** portaldan gelen kayıt onaylanana kadar "doğrulanmadı"
+  kalır; onaylayan yetkili kayıtta doğrulayan olarak yazılır.
 
 Arayüzde hassas alanlar "veri yok" (—) ile "yetkiniz yok" (🔒) ayrımını
 gösterir; bu ayrım kasıtlıdır, boş kutu kullanıcıyı yanıltır.
 
-Sıradaki: **Faz 3** — `ChangeRequest` onay akışı (MVP #3), girişim portalı,
-onay kuyruğu ve before/after diff görünümü, denetim izi ucu. Ayrıca Faz 1'in
-kalan parçası olan kullanıcı yönetimi CRUD'u. Faz listesi için bkz.
-[teknik plan](docs/Problem7_Teknik_Plan.md#8-faz-planı).
+**Faz 5 tamamlandı** — karar destek katmanı çalışıyor:
+
+- **Ekosistem panosu:** girişim/katılım/yatırım/hibe KPI'ları ve altı grafik
+  (sektör, program, yatırım turu, yıllara göre yatırım, şehir, en çok yatırım
+  alan girişimler). Pano girişim listesiyle **aynı kapsam filtresinden** geçer:
+  Program Yöneticisi burada da yalnızca kendi programlarının karnesini görür.
+- **Agregat/satır maskeleme ayrımı:** Karar Verici ekosistem toplamını görür,
+  tekil girişimin tutarını görmez — sıralama listesinde tutar yerine 🔒 durur.
+  Kural rapora özel bir bileşene değil, `StartupVisibility.Aggregate` içine
+  yazıldı; RBAC'ın üç tek noktası korunuyor.
+- **CSV dışa aktarma:** ekrandaki süzgeçlerle, Excel'in Türkçe kurulumuna göre
+  (`;` ayraç, UTF-8 + BOM, `tr-TR` sayı). Maskeli hücre boş değil "yetkiniz yok"
+  yazar, formül enjeksiyonuna karşı hücreler öneklenir ve her aktarma denetim
+  izine düşer.
+- **MCP sunucusu:** elle yazılmış JSON-RPC 2.0 uç (`POST /mcp`), altı araç. Aynı
+  Application handler'larını sardığı için kapsam ve maskeleme REST ile bire bir
+  aynı — uçtan uca betik MCP ve REST'in aynı sayıyı verdiğini doğruluyor.
+- **AI karar destek:** doğal dil sorusu ve girişim kartı yönetici özeti. Anahtar
+  yoksa yerel planlayıcı devreye giriyor; her yanıtın altında hangi aracın
+  çağrıldığı listeleniyor. Ayrıntı: [AI katmanı](#ai-katmanı).
+- **Gerçekçi demo verisi:** 32 girişim, 41 program katılımı, 97 başarı kaydı —
+  bilinçli boşluklarıyla birlikte.
+
+**Doğrulama:** 153 birim testi, API'ye gerçek rollerle vuran 307 uçtan uca
+kontrol (81 + 123 + 103) ve headless Chrome'da 126 render kontrolü
+(32 + 41 + 53) — hepsi temiz veritabanında geçiyor. Render adımı yine iş gördü:
+Faz 5'te panelin `data-testid`'sini yutan `Card` bileşenini ve Karar Verici'ye
+tekil tutar sızdıran ilk maskeleme sürümünü bu adım yakaladı. Betikler ve
+çalıştırma sırası: [scripts/](scripts/).
+
+Sıradaki: **Creathon haftası** — cilalama, sunum ve Demo Day. Faz listesi için
+bkz. [teknik plan](docs/Problem7_Teknik_Plan.md#8-faz-planı).
 
 ### Bilinen açık işler
 
-- **Soft delete yalnızca sözleşme düzeyinde zincirleniyor.** Bağımlı varlıkların
-  hepsi `ISoftDelete` uyguluyor ve sorgu filtreleri ebeveynleriyle uyumlu, ama
-  bir girişim pasife alındığında çocuklarını işaretleyen kod henüz yok; silme
-  handler'ı bu zincirlemeyi açıkça yapmalı.
-- Doküman yükleme/indirme uçları Faz 4'te; kart şimdilik yalnızca doküman
-  sayısını gösteriyor.
+- Girişim silme ucunun arayüz karşılığı yok — zincir yalnızca API'den ve
+  `scripts/e2e_faz3.py` üzerinden tetikleniyor.
+- Doküman deposu yerel disk; S3 uyumlu sürüm aynı arayüzün arkasında duruyor
+  ama henüz yazılmadı.
+- Onaylanmayı bekleyen doküman yüklemeleri hiç karara bağlanmazsa dosyaları
+  depoda kalır; süreli temizlik işi yok. Girişim başına yükleme kotası da yok —
+  boyut ve tür sınırı var, sayı sınırı yok.
+- Pano agregasyonu bellekte yapılıyor (sorgu kapsamla daraltıldıktan sonra);
+  ekosistem ölçeğinde sorun değil ama on binlerce kayıtta veritabanı tarafına
+  taşınması gerekir.
+- CSV dışa aktarma 2000 satırla sınırlı ve tek seferde üretiliyor; akış
+  (streaming) ya da arka plan işi yok.
+- AI sohbeti tek soruluk; oturum geçmişi tutulmuyor, önceki soruya atıf
+  yapılamıyor.

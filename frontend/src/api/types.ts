@@ -227,3 +227,365 @@ export type TeamMemberWriteModel = {
   isFounder: boolean
   joinedOn?: string | null
 }
+
+// --- Onay akışı (MVP #3) --------------------------------------------------
+
+export type ChangeTargetType = 'Startup' | 'TeamMember' | 'Achievement' | 'Document'
+export type ChangeOperation = 'Create' | 'Update' | 'Delete'
+export type ChangeRequestStatus = 'Pending' | 'Approved' | 'Rejected'
+
+export type ChangeRequestListItem = {
+  id: string
+  startupId: string
+  startupName: string
+  targetType: ChangeTargetType
+  operation: ChangeOperation
+  targetId: string | null
+  /** Sunucuda üretilen Türkçe etiket: "Girişim profili", "Ekip üyesi". */
+  targetLabel: string
+  operationLabel: string
+  changedFieldCount: number
+  submittedByName: string
+  submittedAt: string
+  waitingDays: number
+  status: ChangeRequestStatus
+  reviewedByName: string | null
+  reviewedAt: string | null
+  reviewNote: string | null
+}
+
+/**
+ * Kuyruk yanıtı. Sayımlar durum süzgecinden bağımsız gelir; sekme başlıkları
+ * "Bekleyen (6)" gibi sayıları kendi filtrelerini uygulamadan gösterebilsin.
+ */
+export type ChangeRequestQueue = {
+  page: PagedResult<ChangeRequestListItem>
+  pendingCount: number
+  approvedCount: number
+  rejectedCount: number
+}
+
+/**
+ * Diff satırı. `masked` true ise değer sunucuda hiç yollanmamıştır; `changed`
+ * bilgisi yine gelir — yetkisiz kullanıcı "bir şey değişiyor" bilgisine sahip
+ * olmalı, değerin kendisine değil.
+ */
+export type DiffField = {
+  field: string
+  label: string
+  before: string | null
+  after: string | null
+  changed: boolean
+  masked: boolean
+}
+
+export type ChangeRequestDetail = {
+  id: string
+  startupId: string
+  startupName: string
+  targetType: ChangeTargetType
+  operation: ChangeOperation
+  targetId: string | null
+  targetLabel: string
+  operationLabel: string
+  submittedByName: string
+  submittedAt: string
+  status: ChangeRequestStatus
+  reviewedByName: string | null
+  reviewedAt: string | null
+  reviewNote: string | null
+  /** Karar düğmelerinin görünürlüğü; gerçek yetki kontrolü sunucuda. */
+  canReview: boolean
+  /** Gövde okunamıyorsa onay verilemez; ekran boş diff yerine durumu söyler. */
+  isReadable: boolean
+  changedFieldCount: number
+  fields: DiffField[]
+}
+
+export type SubmitChangeRequestBody = {
+  targetType: ChangeTargetType
+  operation: ChangeOperation
+  targetId?: string | null
+  startup?: StartupWriteModel | null
+  teamMember?: TeamMemberWriteModel | null
+  achievement?: AchievementWriteModel | null
+}
+
+export type ReviewChangeRequestResult = {
+  id: string
+  status: ChangeRequestStatus
+  reviewedAt: string
+  reviewNote: string | null
+  appliedEntityType: string | null
+  appliedEntityId: string | null
+}
+
+// --- Kullanıcı yönetimi ---------------------------------------------------
+
+export type UserProgram = { id: string; name: string }
+
+export type UserRow = {
+  id: string
+  email: string
+  fullName: string
+  role: UserRole
+  roleLabel: string
+  startupId: string | null
+  startupName: string | null
+  programs: UserProgram[]
+  isActive: boolean
+  lastLoginAt: string | null
+  createdAt: string
+}
+
+export type CreateUserBody = {
+  email: string
+  fullName: string
+  role: UserRole
+  password: string
+  startupId?: string | null
+  programIds?: string[] | null
+}
+
+/** E-posta bilinçli olarak yok: kimliğin çapası, güncellemeyle taşınmıyor. */
+export type UpdateUserBody = {
+  fullName: string
+  role: UserRole
+  startupId?: string | null
+  programIds?: string[] | null
+  isActive: boolean
+}
+
+// --- Denetim izi ----------------------------------------------------------
+
+export type AuditLogRow = {
+  id: string
+  action: string
+  entityType: string
+  entityId: string | null
+  actorUserId: string
+  actorName: string
+  actorRole: UserRole
+  ipAddress: string | null
+  occurredAt: string
+  /** Ham JSON: iz kanıt niteliği taşıdığı için biçimlendirilmeden gösterilir. */
+  beforeJson: string | null
+  afterJson: string | null
+}
+
+// --- Girişim silme --------------------------------------------------------
+
+/** Soft delete zincirinin raporu: hangi bağlı kayıt kaç adet pasife alındı. */
+export type DeleteStartupResult = {
+  id: string
+  name: string
+  teamMembers: number
+  participations: number
+  milestones: number
+  achievements: number
+  documents: number
+  changeRequests: number
+  deactivatedUsers: number
+}
+
+// --- Başarı ve finans kayıtları (MVP #4) ----------------------------------
+
+export type AchievementKind = 'Revenue' | 'Export' | 'Investment' | 'Grant' | 'Award'
+
+export type InvestmentRoundType =
+  | 'Other'
+  | 'Angel'
+  | 'PreSeed'
+  | 'Seed'
+  | 'SeriesA'
+  | 'SeriesB'
+  | 'SeriesC'
+  | 'Debt'
+
+export type GrantInstitution =
+  | 'Other'
+  | 'Tubitak'
+  | 'Kosgeb'
+  | 'Teknofest'
+  | 'EuropeanUnion'
+  | 'Ministry'
+  | 'DevelopmentAgency'
+
+/**
+ * Tek başarı/finans kaydı. `amount` iki nedenle `null` olabilir: kayıt tutar
+ * taşımıyor (ödül) ya da tutarı görme yetkisi yok. Ayrımı `amountMasked`
+ * yapıyor — arayüz maskelenen tutarı `0 ₺` diye göstermemeli.
+ */
+export type Achievement = {
+  id: string
+  startupId: string
+  kind: AchievementKind
+  kindLabel: string
+  occurredOn: string
+  title: string
+  note: string | null
+  amount: number | null
+  currency: string | null
+  amountMasked: boolean
+  fiscalYear: number | null
+  quarter: number | null
+  periodLabel: string | null
+  roundType: InvestmentRoundType | null
+  roundTypeLabel: string | null
+  valuation: number | null
+  investorNames: string[]
+  institution: GrantInstitution | null
+  institutionLabel: string | null
+  programName: string | null
+  awardName: string | null
+  organization: string | null
+  rank: number | null
+  targetCountries: string[]
+  isVerified: boolean
+  verifiedAt: string | null
+  createdAt: string
+  updatedAt: string | null
+}
+
+export type AchievementList = {
+  startupId: string
+  exactAmountsVisible: boolean
+  items: Achievement[]
+}
+
+/** Ekleme/güncelleme gövdesi; ilgisiz alanlar `null` gönderilir. */
+export type AchievementWriteModel = {
+  kind: AchievementKind
+  occurredOn: string
+  note: string | null
+  amount: number | null
+  currency: string | null
+  fiscalYear: number | null
+  quarter: number | null
+  roundType: InvestmentRoundType | null
+  valuation: number | null
+  investorNames: string[] | null
+  institution: GrantInstitution | null
+  programName: string | null
+  awardName: string | null
+  organization: string | null
+  rank: number | null
+  targetCountries: string[] | null
+}
+
+// --- Dokümanlar (MVP #4) --------------------------------------------------
+
+export type DocumentType =
+  | 'Other'
+  | 'PitchDeck'
+  | 'Financials'
+  | 'Incorporation'
+  | 'Patent'
+  | 'Report'
+  | 'Contract'
+
+export type StartupDocument = {
+  id: string
+  startupId: string
+  type: DocumentType
+  typeLabel: string
+  fileName: string
+  contentType: string
+  sizeBytes: number
+  sizeLabel: string
+  uploadedByUserId: string
+  uploadedByName: string | null
+  uploadedAt: string
+}
+
+export type DocumentList = {
+  startupId: string
+  items: StartupDocument[]
+}
+
+/**
+ * Yükleme sonucu. `applied` yanlışsa dosya depoya alındı ama kayıt henüz yok:
+ * girişim kullanıcısının yüklemesi onay kuyruğunda bekliyor.
+ */
+export type DocumentUploadResult = {
+  applied: boolean
+  document: StartupDocument | null
+  changeRequestId: string | null
+  message: string
+}
+
+// --- Ekosistem panosu (Faz 5) ---------------------------------------------
+
+/**
+ * `amountsVisible` agregat düzeydeki tutar yetkisidir. Karar Verici için
+ * `true` gelir (ekosistem toplamını görür) ama `topByInvestment` satırlarındaki
+ * `investment` yine de `null` olur — tekil girişimin tutarı satır düzeyi
+ * hassas veridir. İki bayrağın aynı olmaması bilinçli.
+ */
+export type EcosystemStats = {
+  totals: EcosystemTotals
+  bySector: CountSlice[]
+  byStatus: CountSlice[]
+  byCity: CountSlice[]
+  byProgram: CountSlice[]
+  investmentByRound: MoneySlice[]
+  investmentByYear: MoneySlice[]
+  revenueByYear: MoneySlice[]
+  topByInvestment: TopStartupSlice[]
+  amountsVisible: boolean
+  currency: string
+  generatedAt: string
+}
+
+export type EcosystemTotals = {
+  startups: number
+  activeStartups: number
+  graduatedStartups: number
+  programs: number
+  participations: number
+  achievements: number
+  investedStartups: number
+  totalInvestment: number | null
+  totalGrant: number | null
+  totalExport: number | null
+  latestRevenueYear: number | null
+  latestRevenue: number | null
+}
+
+export type CountSlice = { key: string; label: string; count: number }
+export type MoneySlice = { key: string; label: string; count: number; total: number | null }
+
+/** Listeye yalnızca yatırım alan girişimler girer; `investment: null` ⇒ maskeli. */
+export type TopStartupSlice = {
+  startupId: string
+  name: string
+  sectorLabel: string
+  investment: number | null
+}
+
+// --- AI karar destek (Faz 5) ----------------------------------------------
+
+/** `Local`: anahtar tanımlı değil, yanıt yerel anahtar sözcük planlayıcısından. */
+export type AssistantMode = 'Model' | 'Local'
+
+export type AssistantSource = { tool: string; summary: string }
+
+export type AssistantAnswer = {
+  question: string
+  answer: string
+  sources: AssistantSource[]
+  mode: AssistantMode
+  modelName: string
+  answeredAt: string
+}
+
+export type StartupSummary = {
+  startupId: string
+  name: string
+  summary: string
+  highlights: string[]
+  mode: AssistantMode
+  modelName: string
+  exactAmountsVisible: boolean
+  generatedAt: string
+}

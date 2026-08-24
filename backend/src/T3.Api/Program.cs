@@ -68,6 +68,12 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy(Policies.ManageUsers, policy => policy.RequireRole(
         nameof(UserRole.SuperAdmin)));
+
+    // Denetim izi kullanıcı yönetiminden ayrı politika: ikisi bugün aynı role
+    // açık olsa da farklı gerekçelerle açık, tek sabiti paylaşmaları birini
+    // gevşetirken diğerini sessizce gevşetmek olurdu.
+    options.AddPolicy(Policies.ViewAuditLogs, policy => policy.RequireRole(
+        nameof(UserRole.SuperAdmin)));
 });
 
 // Enum'lar sayı değil ad olarak taşınır: arayüz tipleri okunabilir kalır ve
@@ -174,7 +180,15 @@ app.UseAuthorization();
 app.MapHealthEndpoints();
 app.MapAuthEndpoints();
 app.MapStartupEndpoints();
+app.MapAchievementEndpoints();
+app.MapDocumentEndpoints();
 app.MapProgramEndpoints();
+app.MapApprovalEndpoints();
+app.MapAuditEndpoints();
+app.MapUserEndpoints();
+app.MapReportEndpoints();
+app.MapAssistantEndpoints();
+app.MapMcpEndpoints();
 
 // --- Demo verisi ---------------------------------------------------------
 // Üretimde hiçbir koşulda çalışmaz: tohum kullanıcıların şifresi bilinen bir

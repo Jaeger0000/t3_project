@@ -21,7 +21,18 @@ public sealed record StartupWriteModel(
     string? City,
     string? ContactEmail,
     string? ContactPhone,
-    StartupStatus? Status);
+    StartupStatus? Status)
+{
+    /// <summary>
+    /// Varlığın mevcut hâlini öneri gövdesiyle aynı şekle çevirir. Onay
+    /// akışının "önce" anlık görüntüsü bu biçimde saklanır: iki taraf aynı
+    /// alan kümesini taşıdığı için diff alanları birebir hizalanabiliyor.
+    /// </summary>
+    public static StartupWriteModel From(Startup s) => new(
+        s.Name, s.LegalName, s.TaxNumber, s.FoundedOn, s.Sector,
+        [.. s.TechnologyAreas], s.ProductDescription, s.Website, s.LogoUrl,
+        s.City, s.ContactEmail, s.ContactPhone, s.Status);
+}
 
 /// <summary>
 /// Alan kısıtları EF yapılandırmasındaki kolon uzunluklarıyla birebir aynı

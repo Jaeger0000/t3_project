@@ -10,4 +10,5 @@ public static class Policies
     public const string ManageStartups = "startups:manage";
     public const string ReviewApprovals = "approvals:review";
     public const string ManageUsers = "users:manage";
+    public const string ViewAuditLogs = "audit:view";
 }

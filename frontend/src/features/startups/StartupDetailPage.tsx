@@ -17,23 +17,34 @@ import {
   Sensitive,
   Spinner,
 } from '@/components/ui'
+import { useAuth } from '@/lib/auth'
+import AchievementSection from '@/features/achievements/AchievementSection'
+import DocumentSection from '@/features/documents/DocumentSection'
 import StartupTimeline from './StartupTimeline'
+import StartupSummaryCard from '@/features/assistant/StartupSummaryCard'
 import { useStartupCard } from './queries'
 import type { CardParticipation, CardTeamMember, StartupCard } from '@/api/types'
 
-type Tab = 'genel' | 'ekip' | 'programlar' | 'yolculuk'
+type Tab = 'genel' | 'ekip' | 'programlar' | 'basarilar' | 'dokumanlar' | 'yolculuk'
 
 const tabs: { key: Tab; label: string }[] = [
   { key: 'genel', label: 'Genel' },
   { key: 'ekip', label: 'Ekip' },
   { key: 'programlar', label: 'Programlar' },
+  { key: 'basarilar', label: 'Başarılar' },
+  { key: 'dokumanlar', label: 'Dokümanlar' },
   { key: 'yolculuk', label: 'Gelişim yolculuğu' },
 ]
 
 export default function StartupDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const { session } = useAuth()
   const card = useStartupCard(id)
   const [tab, setTab] = useState<Tab>('genel')
+
+  // Girişim kullanıcısı kendi kartını da salt okunur görür: düzenleme portalda,
+  // çünkü oradan giden her değişiklik onay isteğine dönüşüyor.
+  const editMode = session?.permissions.canManageStartups ? 'direct' : 'readonly'
 
   if (card.isPending) return <Spinner label="Girişim kartı yükleniyor…" />
   if (card.error) {
@@ -74,6 +85,10 @@ export default function StartupDetailPage() {
             {item.label}
             {item.key === 'ekip' ? ` (${startup.team.length})` : ''}
             {item.key === 'programlar' ? ` (${startup.programs.length})` : ''}
+            {item.key === 'basarilar' ? ` (${startup.achievements.totalCount})` : ''}
+            {item.key === 'dokumanlar' && startup.visibility.documents
+              ? ` (${startup.documentCount})`
+              : ''}
           </button>
         ))}
       </div>
@@ -81,6 +96,8 @@ export default function StartupDetailPage() {
       {tab === 'genel' ? <GeneralTab startup={startup} /> : null}
       {tab === 'ekip' ? <TeamTab startup={startup} /> : null}
       {tab === 'programlar' ? <ProgramsTab participations={startup.programs} /> : null}
+      {tab === 'basarilar' ? <AchievementSection startupId={id} mode={editMode} /> : null}
+      {tab === 'dokumanlar' ? <DocumentSection startupId={id} mode={editMode} /> : null}
       {tab === 'yolculuk' ? <StartupTimeline startupId={id} /> : null}
     </div>
   )
@@ -197,6 +214,10 @@ function GeneralTab({ startup }: { startup: StartupCard }) {
           </div>
         ) : null}
       </Card>
+
+      <div className="lg:col-span-2">
+        <StartupSummaryCard startupId={startup.id} />
+      </div>
 
       <Card className="p-5">
         <h2 className="font-semibold text-slate-900 dark:text-slate-100">Kurumsal bilgiler</h2>
