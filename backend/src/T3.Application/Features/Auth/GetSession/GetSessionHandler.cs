@@ -5,9 +5,9 @@ using T3.Application.Common.Results;
 namespace T3.Application.Features.Auth.GetSession;
 
 /// <summary>
-/// Jetondaki kimliği veritabanıyla tazeler. Jeton 15 dakika geçerli olduğu
-/// için ad/rol değişikliği ya da hesabın pasife alınması bu uçta yakalanır;
-/// arayüz her açılışta buradan doğrulanır.
+/// Jetondaki kimliği veritabanıyla tazeler. Jetonun ömrü bir iş günü olduğu
+/// için ad/rol değişikliği, hesabın pasife alınması ve "şifre değiştirmelisin"
+/// bayrağı ancak bu uçta yakalanır; arayüz her açılışta buradan doğrulanır.
 /// </summary>
 public sealed class GetSessionHandler(IAppDbContext db, ICurrentUser currentUser)
 {

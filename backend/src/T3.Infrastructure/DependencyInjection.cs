@@ -5,6 +5,7 @@ using T3.Application.Common.Interfaces;
 using T3.Infrastructure.Ai;
 using T3.Infrastructure.Audit;
 using T3.Infrastructure.Identity;
+using T3.Infrastructure.Notifications;
 using T3.Infrastructure.Persistence;
 using T3.Infrastructure.Persistence.Seed;
 using T3.Infrastructure.Storage;
@@ -31,6 +32,7 @@ public static class DependencyInjection
             configuration.GetSection(DocumentStorageOptions.SectionName));
         services.Configure<SeedOptions>(configuration.GetSection(SeedOptions.SectionName));
         services.Configure<AiOptions>(configuration.GetSection(AiOptions.SectionName));
+        services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
 
         services.AddScoped<DevDataSeeder>();
 
@@ -38,6 +40,11 @@ public static class DependencyInjection
         services.AddScoped<ITokenService, JwtTokenService>();
         services.AddScoped<IDocumentStorage, LocalDocumentStorage>();
         services.AddScoped<IAuditWriter, AuditWriter>();
+
+        // Gerçek SMTP Creathon kapsamında yok; gönderici e-postayı diske yazan
+        // geliştirme kutusuna düşüyor (bkz. FileOutboxEmailSender).
+        services.AddScoped<IEmailSender, FileOutboxEmailSender>();
+        services.AddSingleton<IResetLinkBuilder, ResetLinkBuilder>();
 
         AddChatModel(services, configuration);
 

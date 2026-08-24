@@ -72,10 +72,15 @@ public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
         builder.Property(a => a.Action).HasMaxLength(120).IsRequired();
         builder.Property(a => a.EntityType).HasMaxLength(120).IsRequired();
         builder.Property(a => a.IpAddress).HasMaxLength(64);
+        builder.Property(a => a.UserAgent).HasMaxLength(256);
         builder.Property(a => a.BeforeJson).HasColumnType("jsonb");
         builder.Property(a => a.AfterJson).HasColumnType("jsonb");
 
         builder.HasIndex(a => a.OccurredAt);
         builder.HasIndex(a => new { a.EntityType, a.EntityId });
+
+        // Eylem türü süzgeci ön ek eşleşmesiyle çalışıyor ("Auth" → Auth.*);
+        // dizin bu sorguyu tablo taramasından kurtarır.
+        builder.HasIndex(a => a.Action);
     }
 }

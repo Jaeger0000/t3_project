@@ -18,6 +18,7 @@ public interface IAppDbContext
 {
     DbSet<User> Users { get; }
     DbSet<UserProgramAssignment> UserProgramAssignments { get; }
+    DbSet<PasswordResetToken> PasswordResetTokens { get; }
 
     DbSet<Startup> Startups { get; }
     DbSet<TeamMember> TeamMembers { get; }

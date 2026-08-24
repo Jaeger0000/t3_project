@@ -67,6 +67,7 @@ public sealed class ListAuditLogsHandler(IAppDbContext db, ICurrentUser currentU
                 a.ActorUserId,
                 a.ActorRole,
                 a.IpAddress,
+                a.UserAgent,
                 a.OccurredAt,
                 a.BeforeJson,
                 a.AfterJson
@@ -76,7 +77,11 @@ public sealed class ListAuditLogsHandler(IAppDbContext db, ICurrentUser currentU
         // Aktör adı ayrı sorguyla çözülüyor: AuditLog'un kullanıcıya yabancı
         // anahtarı yok ve olmaması doğru — kullanıcı kaydı silinse bile iz
         // ayakta kalmalı. Silinmiş kullanıcılar da dahil ediliyor.
-        var actorIds = rows.Select(r => r.ActorUserId).Distinct().ToList();
+        var actorIds = rows
+            .Where(r => r.ActorUserId is not null)
+            .Select(r => r.ActorUserId!.Value)
+            .Distinct()
+            .ToList();
 
         var actorNames = await db.Users
             .IgnoreQueryFilters()
@@ -90,9 +95,10 @@ public sealed class ListAuditLogsHandler(IAppDbContext db, ICurrentUser currentU
             r.EntityType,
             r.EntityId,
             r.ActorUserId,
-            actorNames.GetValueOrDefault(r.ActorUserId) ?? $"(kayıt yok: {r.ActorUserId})",
+            ActorName(r.ActorUserId, actorNames),
             r.ActorRole,
             r.IpAddress,
+            r.UserAgent,
             r.OccurredAt,
             r.BeforeJson,
             r.AfterJson)).ToList();
@@ -100,4 +106,14 @@ public sealed class ListAuditLogsHandler(IAppDbContext db, ICurrentUser currentU
         return new PagedResult<AuditLogListItemResponse>(
             items, request.Page, request.PageSize, total);
     }
+
+    /// <summary>
+    /// Aktör etiketi. Üç ayrı durum var ve üçü de kullanıcıya farklı bir şey
+    /// anlatıyor: kimlik hiç doğrulanmadı (başarısız giriş), kullanıcı kaydı
+    /// sonradan silindi, ya da ad biliniyor.
+    /// </summary>
+    private static string ActorName(Guid? actorUserId, IReadOnlyDictionary<Guid, string> names) =>
+        actorUserId is not { } id
+            ? "(kimlik doğrulanmadı)"
+            : names.GetValueOrDefault(id) ?? $"(kayıt yok: {id})";
 }

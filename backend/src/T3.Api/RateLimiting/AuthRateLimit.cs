@@ -3,6 +3,9 @@ using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Caching.Memory;
+using T3.Application.Common.Interfaces;
+using T3.Application.Common.Text;
 using T3.Infrastructure.Identity;
 
 namespace T3.Api.RateLimiting;
@@ -91,7 +94,7 @@ public static class AuthRateLimit
     /// Reddedilen isteğe ne kadar sonra tekrar denenebileceğini söyler;
     /// istemci "çok fazla istek" mesajını sayıya çevirebilsin.
     /// </summary>
-    public static ValueTask OnRejected(OnRejectedContext context, CancellationToken ct)
+    public static async ValueTask OnRejected(OnRejectedContext context, CancellationToken ct)
     {
         var seconds = context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter)
             ? (int)Math.Ceiling(retryAfter.TotalSeconds)
@@ -100,7 +103,62 @@ public static class AuthRateLimit
         context.HttpContext.Response.Headers.RetryAfter =
             seconds.ToString(CultureInfo.InvariantCulture);
 
-        return ValueTask.CompletedTask;
+        await WriteRateLimitAuditAsync(context.HttpContext, seconds, ct);
+    }
+
+    /// <summary>
+    /// Kilidin kendisini denetim izine yazar — "bu hesap kaba kuvvete uğradı"
+    /// bilgisi başarısız deneme satırlarından ayrı bir olaydır.
+    ///
+    /// Pencere başına <b>tek</b> satır yazılıyor: reddedilen istek sayısı
+    /// sınırsız olduğu için her redde satır açmak, saldırganın izi şişirerek
+    /// kendi izini boğmasına ya da diski doldurmasına izin verirdi. Bellek
+    /// önbelleği bu yüzden burada bir güvenlik önlemi, hız iyileştirmesi değil.
+    /// </summary>
+    private static async Task WriteRateLimitAuditAsync(
+        HttpContext context, int retryAfterSeconds, CancellationToken ct)
+    {
+        // Yalnızca giriş kovası: AI kotasının dolması güvenlik olayı değil.
+        if (!context.Request.Path.StartsWithSegments("/api/auth"))
+            return;
+
+        var cache = context.RequestServices.GetService<IMemoryCache>();
+        var audit = context.RequestServices.GetService<IAuditWriter>();
+
+        if (cache is null || audit is null)
+            return;
+
+        var attemptedEmail = context.Items[EmailItemKey] as string;
+        var cacheKey = $"auth-429|{Ip(context)}|{attemptedEmail ?? "-"}";
+
+        if (cache.TryGetValue(cacheKey, out _))
+            return;
+
+        cache.Set(cacheKey, true, new MemoryCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1),
+            Size = 1
+        });
+
+        try
+        {
+            await audit.WriteForActorAsync(
+                actorUserId: null,
+                actorRole: null,
+                "Auth.RateLimited", "Auth", null,
+                after: new
+                {
+                    Email = MaskedEmail.Of(attemptedEmail),
+                    RetryAfterSeconds = retryAfterSeconds
+                },
+                ct: ct);
+        }
+        catch (Exception)
+        {
+            // İz yazılamazsa istek yine 429 dönmeli: reddin kendisi güvenlik
+            // önlemi, kaydı ikincil. Yutulan hata ardışık düzenin sonraki
+            // adımını etkilemiyor çünkü yanıt gövdesi henüz yazılmadı.
+        }
     }
 
     private static string Ip(HttpContext context) =>

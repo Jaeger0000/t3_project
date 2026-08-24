@@ -16,6 +16,12 @@ const examples = [
  * çağrısından geldiği ekranda durmalı. Model yapılandırılmamışsa yanıt yerel
  * planlayıcıdan gelir ve rozet bunu açıkça söyler — kullanıcı hangi modun
  * çalıştığını bilmeli.
+ *
+ * Bu kurulumda model anahtarı tanımlı değil ve bilinçli olarak öyle kalıyor:
+ * ekosistem dışarıya <b>MCP sunucusu</b> olarak açılıyor, yani model bağlantısı
+ * uygulamanın içinde değil kullanıcının kendi ajanında kuruluyor. Aşağıdaki
+ * bilgi notu bunu ekranda söylüyor — "AI çalışıyor sanılması" Dalga 0'da tam
+ * olarak bu sessizlikten çıkmıştı.
  */
 export default function AssistantPanel() {
   const [question, setQuestion] = useState('')
@@ -51,6 +57,19 @@ export default function AssistantPanel() {
           </Badge>
         ) : null}
       </header>
+
+      {/* Model doğrudan bağlı değilken kurulumun ne olduğunu söyle. */}
+      {ask.data?.mode === 'Model' ? null : (
+        <p className="mt-3 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-600 dark:bg-stone-900 dark:text-stone-300">
+          <strong>Model bağlantısı MCP üzerinden kuruluyor.</strong> Bu kurulumda
+          uygulamanın içine bir dil modeli anahtarı tanımlı değil; sistem{' '}
+          <code className="rounded bg-stone-100 px-1 dark:bg-stone-800">POST /mcp</code>{' '}
+          ucuyla MCP sunucusu olarak yayımlanıyor ve harici bir ajan (Claude
+          Desktop, Claude Code vb.) kendi jetonuyla bağlanıp aşağıdaki araçların
+          aynısını kullanıyor — kendi yetkisi kadar görerek. Bu panelden gelen
+          yanıtlar model olmadan çalışan yerel planlayıcıdan üretilir.
+        </p>
+      )}
 
       <form
         className="mt-4 flex flex-wrap items-end gap-3"

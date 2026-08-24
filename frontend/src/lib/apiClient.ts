@@ -17,6 +17,26 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Ağ hatasının tek metni. API kapalıyken tarayıcı "Failed to fetch" fırlatıyor
+ * ve bu ham metin kullanıcının ekranına düşüyordu; ayrıca `fetch` reddi bir
+ * yetki sorunu gibi ele alınıp oturumu düşürüyordu. Ağ hatası artık status 0
+ * taşıyan bir ApiError: çağıran taraf "sunucuya ulaşılamıyor" ile "yetkin yok"
+ * arasında ayrım yapabiliyor.
+ */
+export const NETWORK_ERROR_MESSAGE =
+  'Sunucuya ulaşılamıyor. Bağlantınızı kontrol edip yeniden deneyin.'
+
+async function send(path: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(path, init)
+  } catch {
+    // Yakalanan tek durum ağ/CORS kaynaklı reddetme; HTTP hata kodları
+    // `fetch`'i reddetmez, aşağıda status'e göre ele alınıyor.
+    throw new ApiError(0, NETWORK_ERROR_MESSAGE)
+  }
+}
+
 export const tokenStore = {
   get: () => localStorage.getItem(TOKEN_KEY),
   set: (token: string) => localStorage.setItem(TOKEN_KEY, token),
@@ -26,7 +46,7 @@ export const tokenStore = {
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = tokenStore.get()
 
-  const response = await fetch(path, {
+  const response = await send(path, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -66,7 +86,7 @@ async function upload<T>(path: string, file: File, query = ''): Promise<T> {
   const form = new FormData()
   form.append('file', file)
 
-  const response = await fetch(path + query, {
+  const response = await send(path + query, {
     method: 'POST',
     body: form,
     headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -88,7 +108,7 @@ async function upload<T>(path: string, file: File, query = ''): Promise<T> {
 async function download(path: string, fileName: string): Promise<void> {
   const token = tokenStore.get()
 
-  const response = await fetch(path, {
+  const response = await send(path, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
 

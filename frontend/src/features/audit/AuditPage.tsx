@@ -17,8 +17,15 @@ const actionGroups = [
   { value: 'ChangeRequest', label: 'Onay akışı' },
   { value: 'Startup', label: 'Girişim' },
   { value: 'TeamMember', label: 'Ekip' },
+  { value: 'Program', label: 'Program ve dönem' },
   { value: 'User', label: 'Kullanıcı' },
-  { value: 'Auth', label: 'Oturum' },
+  { value: 'Auth', label: 'Oturum (tümü)' },
+  // Giriş olayları Dalga 1'de ize düşmeye başladı; güvenlik incelemesinin iki
+  // sorusu ("hangi hesap deneniyor", "hangi hesap kilitlendi") ayrı süzgeç
+  // istiyor, önek eşleşmesi tam ada da izin veriyor.
+  { value: 'Auth.LoginFailed', label: 'Başarısız giriş' },
+  { value: 'Auth.RateLimited', label: 'Hız sınırı kilidi' },
+  { value: 'Auth.Password', label: 'Şifre işlemleri' },
 ]
 
 /**
@@ -137,7 +144,8 @@ function AuditRow({ row }: { row: AuditLogRow }) {
         </Badge>
         <div className="min-w-40 flex-1 text-sm">
           <p className="text-stone-900 dark:text-stone-100">{row.actorName}</p>
-          <p className="text-stone-500">{roleLabels[row.actorRole]}</p>
+          {/* Rol boş olabilir: başarısız girişte kimlik doğrulanmamıştır. */}
+          <p className="text-stone-500">{row.actorRole ? roleLabels[row.actorRole] : '—'}</p>
         </div>
         <span className="text-sm text-stone-500">{row.entityType}</span>
         <span className="text-sm text-stone-500">
@@ -156,10 +164,15 @@ function AuditRow({ row }: { row: AuditLogRow }) {
       </div>
 
       {open ? (
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <JsonBlock title="Önce" json={row.beforeJson} />
-          <JsonBlock title="Sonra" json={row.afterJson} />
-        </div>
+        <>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <JsonBlock title="Önce" json={row.beforeJson} />
+            <JsonBlock title="Sonra" json={row.afterJson} />
+          </div>
+          <p className="mt-2 text-xs break-words text-stone-400">
+            İstemci: {row.userAgent ?? '—'}
+          </p>
+        </>
       ) : null}
     </Card>
   )

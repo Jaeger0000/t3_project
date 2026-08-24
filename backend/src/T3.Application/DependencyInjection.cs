@@ -3,6 +3,7 @@ using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using T3.Application.Common.Rbac;
 using T3.Application.Features.Approvals;
+using T3.Application.Features.Programs;
 using T3.Application.Features.Assistant;
 using T3.Application.Features.Startups;
 using T3.Application.Features.Users;
@@ -33,6 +34,10 @@ public static class DependencyInjection
         // Kullanıcı yönetiminin ortak ön kontrolleri (rol-kapsam bağı, e-posta
         // tekilliği, program ataması eşitleme).
         services.AddScoped<UserAdminGuard>();
+
+        // Program dilimlerinin ortak yetki kapısı: program tanımı SuperAdmin'e,
+        // dönem/katılım kendi programına sahip yöneticiye açık.
+        services.AddScoped<ProgramAccessGuard>();
 
         // AI ve MCP'nin ortak araç kutusu ile modelsiz çalışan yedek planlayıcı.
         // İkisi de use-case değil; sohbet ve MCP uçları bunları sarar.

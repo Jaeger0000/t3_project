@@ -336,6 +336,99 @@ Kaynak: [Denetim_Duzeltme_Plani.md](Denetim_Duzeltme_Plani.md) Dalga 0.
 
 ---
 
+## 3f. Denetim Dalga 1 kararları (MVP ve KVKK bütünlüğü)
+
+Kaynak: [Denetim_Duzeltme_Plani.md](Denetim_Duzeltme_Plani.md) Dalga 1.
+
+- **Program yetkisi ikiye ayrıldı: `ManagePrograms` (tanım) ve
+  `ManageProgramTerms` (dönem/katılım).** Tek politika kullanmak kolaydı ama
+  yanlış olurdu: program listesi aynı zamanda Program Yöneticisi'nin **yetki
+  kapsamının tanımı** (`StartupScope` bu tablodan besleniyor), dolayısıyla
+  program oluşturabilen bir Program Yöneticisi kendi kapsamını kendisi
+  büyütebilir ve RBAC anlamsızlaşır. Dönem açmak ise günlük operasyon ve kapsamı
+  büyütmüyor — o yüzden Program Yöneticisi'ne açık, ama satır düzeyinde kendi
+  programıyla sınırlı.
+- **Kapsam kontrolü tek noktada: `ProgramAccessGuard`.** `AddParticipation`
+  aynı kontrolü kendi içinde yazmıştı; dört yeni dilim eklenince kural beş yerde
+  olacaktı. Muhafız `StartupEditGuard`/`UserAdminGuard` ile aynı gerekçeyle
+  ayrı bir bileşen (use-case değil, ortak ön kontrol) ve elle DI'a kaydediliyor.
+- **Katılımı olan dönem kapatılamıyor (409), program kapatılınca ise zincir
+  yürüyor.** Asimetri bilinçli: dönem silmek Program Yöneticisi'ne açık ve tek
+  tıkla başkasının gelişim yolculuğunu boşaltabilen bir işlem olmamalı; programı
+  kapatmak yalnızca Süper Yönetici'de ve kaç dönem, kaç katılım, kaç yönetici
+  ataması kapandığı yanıtta raporlanıyor (girişim silmedeki desenin aynısı).
+- **Katılım taşınmıyor, kaldırılıp yeniden ekleniyor.** `UpdateParticipation`
+  yalnızca durum/tarih/not kabul ediyor; girişim ve dönem alanları gövdede yok.
+  Dönemi değiştirebilen bir "düzenle" ucu, gelişim yolculuğundaki tarihi tek
+  istekle yeniden yazmak olurdu.
+- **Sıfırlama jetonunun kendisi değil SHA-256 özeti saklanıyor.** Yedek
+  dosyasını ya da veritabanını okuyan biri hiçbir hesabın şifresini
+  sıfırlayamamalı. Özet için PBKDF2 kullanılmadı: jeton 256 bitlik kriptografik
+  rastgele değer, sözlük saldırısına konu değil — yavaş türetme koruma değil
+  yalnızca gecikme olurdu. Şifreler bundan farklı ve PBKDF2 ile saklanmaya
+  devam ediyor.
+- **Jeton HTTP yanıtında hiç dönmüyor; e-posta diske yazılıyor.** "Geliştirmede
+  kolaylık olsun" diye jetonu yanıta koymak, sıfırlama isteyen herkese hesabı
+  devretmek demekti. `IEmailSender` arkasındaki `FileOutboxEmailSender`
+  e-postayı sunucunun diskindeki kutuya yazıyor: ağdan erişilemez ama uçtan uca
+  doğrulanabilir (`render_faz7.py` jetonu o dosyadan okuyor). SMTP geldiğinde
+  yalnızca DI satırı değişir.
+- **Sıfırlama bağlantısı `Host` başlığından değil yapılandırmadan kuruluyor**
+  (`EmailOptions.AppBaseUrl`, `IResetLinkBuilder`). İstekten türetmek,
+  saldırganın kendi alan adına giden bir sıfırlama bağlantısı ürettirmesine izin
+  verirdi.
+- **`forgot-password` adresin kayıtlı olup olmadığını söylemiyor** — giriş
+  ucundaki aynı kural. Ayrım yalnızca denetim izine yazılıyor ("kayıtlı olmayan
+  adres" / "hesap pasif"), çünkü ize yalnızca Süper Yönetici erişiyor ve
+  güvenlik incelemesinin sorusu tam olarak bu.
+- **Yöneticinin attığı şifre geçici: `User.MustChangePassword`.** Bayrak
+  `CreateUser` ve `SetUserPassword` ile kalkıyor, kullanıcı kendi şifresini
+  belirlediğinde (`change-password` ya da `reset-password`) düşüyor. Sunucu
+  tarafında ekran kilidi yok — kilit arayüzde (`RequireAuth`), çünkü yöneticinin
+  bildiği şifreyle yapılabilecek her şey zaten o rolün yetkisi kadar; amaç
+  yetkiyi kısmak değil **şifrenin ikinci sahibini** ortadan kaldırmak.
+- **Erişim jetonu 15 dakika değil bir iş günü (480 dakika).** Doğru çözüm
+  yenileme jetonunu HttpOnly çereze koymak, ama o değişiklik jetonun tamamını
+  çereze taşımaya ve tek origin kararına bağlı (Dalga 2). O gelene kadar
+  bilinçli takas: tek jeton, iş günü kadar ömür, dolduğunda giriş ekranında
+  gerekçe. Gerekçesiz atılma en sinir bozucu hataydı.
+- **Ağ hatası `ApiError(0)` olarak normalleştiriliyor ve oturumu düşürmüyor.**
+  `fetch` reddi eskiden 401 gibi ele alınıyordu: API kapanınca kullanıcı
+  oturumdan atılıp ham "Failed to fetch" görüyordu. Artık `AuthProvider`
+  yalnızca 401'de jetonu siliyor, status 0'da "sunucuya ulaşılamıyor" durumu ve
+  yeniden deneme düğmesi gösteriliyor. Doğrulama, Chrome'un
+  `Network.setBlockedURLs` komutuyla **yalnızca `/api/*`** isteklerini
+  engelliyor; tüm ağı kesmek uygulamanın kendisini de indirilemez yapıp
+  Chrome'un hata sayfasını sınamak olurdu.
+- **Denetim izinde aktör ve rol artık nullable.** Başarısız girişte kimlik
+  doğrulanmamıştır; eski kod aktörü `Guid.Empty`, rolü de `DecisionMaker` diye
+  yazıyordu — yani iz, hiç var olmayan bir rolü olay yapmış gibi gösteriyordu.
+  Ekranda üç durum ayrı: "(kimlik doğrulanmadı)", "(kayıt yok: …)" ve gerçek ad.
+- **Başarısız denemede e-posta maskeli saklanıyor** (`MaskedEmail`,
+  `k***@alan.test`). Alan adı korunuyor çünkü incelemenin sorusu "hangi kurumdan
+  deniyorlar"; yerel kısım düşüyor çünkü iz, saldırganın denediği ham adreslerin
+  listesine dönüşürse kendisi bir sızıntı kaynağı olur.
+- **Hız sınırı kilidi pencere başına tek satır yazıyor.** Reddedilen istek
+  sayısı sınırsız; her redde satır açmak saldırganın izi şişirip kendi izini
+  boğmasına ya da diski doldurmasına izin verirdi. Bellek önbelleği burada bir
+  hız iyileştirmesi değil güvenlik önlemi ve `SizeLimit` bilinçli: anahtar
+  denenen e-postadan türüyor, sınırsız sözlük bellek şişirme kapısı olurdu.
+- **`IClientContext` kimlikten ayrı arayüz.** IP ve istemci bilgisi "kim"
+  değil "nereden" sorusunun cevabı; `ICurrentUser`'a eklemek iki farklı soruyu
+  tek arayüzde toplamak olurdu. MCP gibi HTTP dışı yollarda boş kalması normal.
+- **KVKK metinleri kod içinde bileşen, veritabanında içerik değil.** Sürüm
+  kontrolünde tutulmaları versiyonlanabilir olmalarını sağlıyor (metin
+  değişikliği bir commit'tir) ve giriş yapmadan açılabilmeleri için
+  yetkilendirme dışında duruyorlar. Görünür **taslak** uyarısı bilinçli:
+  onaylanmamış bir aydınlatma metnini onaylanmış gibi göstermek yükümlülüğü
+  karşılamaz, karşılanmış gibi gösterir.
+- **`RequirePermission` "herhangi biri" (anyOf) semantiğine geçti.** Karar
+  Verici'de `canReviewApprovals` ve `mustSubmitForApproval` ikisi de false
+  olduğu için `/onaylar` sonsuza dek boş kalıyordu; tek izinli koruma bu durumu
+  ifade edemiyordu.
+
+---
+
 ## 4. Ortam tuzakları — tekrar çarpılacak olanlar
 
 ### Faz 0
@@ -459,6 +552,37 @@ Kaynak: [Denetim_Duzeltme_Plani.md](Denetim_Duzeltme_Plani.md) Dalga 0.
 - **Çok satırlı `import { … } from` bloğu olan dosyaya "son import satırından
   sonra ekle" mantığıyla satır enjekte etmeyin**: blok ortasına düşüyor ve
   TS1003 veriyor.
+
+### Dalga 1 (denetim düzeltmeleri)
+
+- **`Network.emulateNetworkConditions(offline=True)` ağ hatasını sınamıyor**,
+  belgeyi de indirilemez yapıyor: ekranda Chrome'un `ERR_INTERNET_DISCONNECTED`
+  sayfası çıkıyor ve test kendi kurgusunu ölçüyor. Doğrusu
+  `Network.setBlockedURLs(urls=["*/api/*"])` — uygulama açık kalıyor, yalnızca
+  API çağrıları düşüyor.
+- **Sekme düğmesi ile menü bağlantısı aynı metni taşıyor** ("Programlar").
+  `cdp.click_text` `button, a` arasında belge sırasına göre ilkini bulduğu için
+  sekme yerine menüyü tıklıyor ve betik sessizce yanlış sayfada devam ediyor —
+  hatta "isim ekranda mı" kontrolü **yeşil kalıyor**, çünkü program adı
+  `/programlar` sayfasında da var. Sekme tıklamaları yalnızca `button` arayan
+  ayrı bir yardımcıyla yapılıyor.
+- **Aynı etiketli düğme ekranda birden fazla** (her program kartında bir "Dönem
+  ekle"). Doğrulama, ilgili kaydın adını taşıyan öğeden DOM'da yukarı yürüyüp o
+  kartın içindeki düğmeyi buluyor (`click_in_card`).
+- **`IAppDbContext`'e yeni `DbSet` eklemek test derlemesini kırar:**
+  `UnreachableDbContext` arayüzü elle uyguluyor. Kırılma bilinçli — o sınıf
+  "bu karar veritabanına gitmemeli" beklentisini kanıtlıyor.
+- **Zorunlu ilişkinin iki tarafı farklı sorgu süzgeci görürse EF uyarı veriyor.**
+  `User` soft-delete süzgeçli, `PasswordResetToken` değildi; eşleşen süzgeç
+  (`HasQueryFilter(t => !t.User.IsDeleted)`) eklendi — silinmiş kullanıcının
+  jetonu geçerli sayılsa kapatılmış hesap sıfırlama bağlantısıyla geri açılırdı.
+- **Gövdesinde e-posta olmayan istekler tek hız sınırı kovasında toplanıyor**
+  (`IP|-`): `reset-password` ve `change-password` bölüm anahtarı için e-posta
+  taşımıyor. Kimlik doğrulamalı ya da jeton taşıyan uçlar olduğu için kabul
+  edilebilir, ama doğrulama betiği bu kovayı hesaba katmak zorunda.
+- **`dotnet run --no-launch-profile` ortamı `Production` yapıyor**: tohum verisi
+  yüklenmiyor ve Swagger kapanıyor. Betikleri koşturmak için
+  `ASPNETCORE_ENVIRONMENT=Development` açıkça verilmeli.
 
 ### Kabuk / araç tuzakları
 

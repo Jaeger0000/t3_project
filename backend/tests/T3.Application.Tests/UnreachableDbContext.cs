@@ -24,6 +24,8 @@ internal sealed class UnreachableDbContext : IAppDbContext
     public DbSet<User> Users => throw Unreachable(nameof(Users));
     public DbSet<UserProgramAssignment> UserProgramAssignments =>
         throw Unreachable(nameof(UserProgramAssignments));
+    public DbSet<PasswordResetToken> PasswordResetTokens =>
+        throw Unreachable(nameof(PasswordResetTokens));
     public DbSet<Startup> Startups => throw Unreachable(nameof(Startups));
     public DbSet<TeamMember> TeamMembers => throw Unreachable(nameof(TeamMembers));
     public DbSet<EcosystemProgram> Programs => throw Unreachable(nameof(Programs));

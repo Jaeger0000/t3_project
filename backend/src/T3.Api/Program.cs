@@ -32,6 +32,16 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 
+// Denetim izinin "nereden" sorusu: IP ve istemci kimliği. Kimlikten ayrı
+// arayüz — bkz. IClientContext.
+builder.Services.AddScoped<IClientContext, HttpClientContext>();
+
+// Hız sınırı reddi izine pencere başına tek satır düşsün diye
+// (bkz. AuthRateLimit.OnRejected). Boyut sınırı bilinçli: anahtar denenen
+// e-postadan türüyor, sınırsız sözlük saldırganın belleği şişirmesine
+// açık kapı olurdu.
+builder.Services.AddMemoryCache(options => options.SizeLimit = 10_000);
+
 var jwtSecret = builder.Configuration["Jwt:Secret"]
     ?? throw new InvalidOperationException(
         "Jwt:Secret tanımlı değil. .env dosyasında T3_Jwt__Secret ayarlayın.");
@@ -62,6 +72,12 @@ builder.Services.AddAuthorization(options =>
         .Build();
 
     options.AddPolicy(Policies.ManageStartups, policy => policy.RequireRole(
+        nameof(UserRole.SuperAdmin), nameof(UserRole.ProgramManager)));
+
+    options.AddPolicy(Policies.ManagePrograms, policy => policy.RequireRole(
+        nameof(UserRole.SuperAdmin)));
+
+    options.AddPolicy(Policies.ManageProgramTerms, policy => policy.RequireRole(
         nameof(UserRole.SuperAdmin), nameof(UserRole.ProgramManager)));
 
     options.AddPolicy(Policies.ReviewApprovals, policy => policy.RequireRole(

@@ -25,6 +25,11 @@ public sealed class SetUserPasswordHandler(
             return Error.NotFound("Kullanıcı bulunamadı.");
 
         user.PasswordHash = passwordHasher.Hash(request.Password);
+
+        // Yöneticinin attığı şifre geçici: kullanıcı ilk girişte değiştirmeden
+        // başka ekrana geçemez. Aksi hâlde şifreyi kalıcı olarak iki kişi bilir.
+        user.MustChangePassword = true;
+
         await db.SaveChangesAsync(ct);
 
         // İzde yalnızca olayın kendisi var: ne şifre ne özeti yazılıyor.

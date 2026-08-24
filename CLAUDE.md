@@ -57,8 +57,13 @@ değerlendirme aşamasına geçemez — **önce MVP, sonra güzellik**.
   `.AllowAnonymous()` demek zorunda.
 - **Derinlemesine savunma:** endpoint politikası + handler içinde tekrar kontrol.
   MCP araçları handler'ları doğrudan çağıracağı için politika hattı atlanabilir.
-- **RBAC'ın üç tek noktası:** `IStartupScope` (satır), `StartupVisibility` (alan/KVKK),
-  `IChangeRequestScope` (onay satırları). Yeni kural bu üçünün dışına yazılmaz.
+- **RBAC'ın tek noktaları:** `IStartupScope` (girişim satırı), `StartupVisibility`
+  (alan/KVKK), `IChangeRequestScope` (onay satırları), `ProgramAccessGuard`
+  (program sahipliği: tanım SuperAdmin'de, dönem/katılım kendi programında).
+  Yeni kural bunların dışına yazılmaz.
+- **Maskeleme yazma yolunda da tutulur:** maskeli alan istemciye `null` gittiği
+  için tam değiştirmeli `PUT` onu sessizce siler
+  (`StartupWriteModel.ApplyTo(startup, visibility)`).
 - **MCP araçları REST ile aynı Application handler'larını sarar** — asla paralel veri yolu.
 - **Girişim kullanıcısı hiçbir tabloya doğrudan yazmaz** — yalnızca `ChangeRequest` üretir.
 

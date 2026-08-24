@@ -10,8 +10,13 @@ namespace T3.Domain.Audit;
 /// </summary>
 public class AuditLog : Entity
 {
-    public Guid ActorUserId { get; set; }
-    public UserRole ActorRole { get; set; }
+    /// <summary>
+    /// Eylemi yapan kullanıcı. Başarısız giriş denemesinde <c>null</c>: kimlik
+    /// doğrulanmamıştır ve olmayan bir aktör yazmak izi yanıltır.
+    /// </summary>
+    public Guid? ActorUserId { get; set; }
+
+    public UserRole? ActorRole { get; set; }
 
     /// <summary>Örn. "Startup.Update", "ChangeRequest.Approve".</summary>
     public string Action { get; set; } = null!;
@@ -23,5 +28,9 @@ public class AuditLog : Entity
     public string? AfterJson { get; set; }
 
     public string? IpAddress { get; set; }
+
+    /// <summary>İstemci kimliği (tarayıcı/araç). Giriş olaylarının ikinci ipucu.</summary>
+    public string? UserAgent { get; set; }
+
     public DateTimeOffset OccurredAt { get; set; }
 }

@@ -31,6 +31,10 @@ export type AssignedProgram = { id: string; name: string }
 
 export type SessionPermissions = {
   canManageStartups: boolean
+  /** Program tanımı — kapsamın kendisi, yalnızca Süper Yönetici. */
+  canManagePrograms: boolean
+  /** Dönem ve katılım işlemleri; Program Yöneticisi kendi programında. */
+  canManageProgramTerms: boolean
   canReviewApprovals: boolean
   canManageUsers: boolean
   canSeeExactAmounts: boolean
@@ -46,6 +50,8 @@ export type SessionUser = {
   startupId: string | null
   startupName: string | null
   programs: AssignedProgram[]
+  /** Yönetici şifre atadı: kullanıcı değiştirmeden başka ekrana geçemez. */
+  mustChangePassword: boolean
   permissions: SessionPermissions
 }
 
@@ -373,15 +379,63 @@ export type AuditLogRow = {
   action: string
   entityType: string
   entityId: string | null
-  actorUserId: string
+  /** Başarısız giriş denemesinde null: kimlik doğrulanmamıştır. */
+  actorUserId: string | null
   actorName: string
-  actorRole: UserRole
+  actorRole: UserRole | null
   ipAddress: string | null
+  userAgent: string | null
   occurredAt: string
   /** Ham JSON: iz kanıt niteliği taşıdığı için biçimlendirilmeden gösterilir. */
   beforeJson: string | null
   afterJson: string | null
 }
+
+// --- Program yönetimi (Dalga 1) -------------------------------------------
+
+export type ProgramWriteModel = {
+  name: string
+  type: ProgramType
+  coordinatorship?: string | null
+  description?: string | null
+}
+
+export type ProgramSummary = {
+  id: string
+  name: string
+  type: ProgramType
+  coordinatorship: string | null
+  description: string | null
+}
+
+export type ProgramTermWriteModel = {
+  name: string
+  startsOn: string
+  endsOn?: string | null
+}
+
+/** Soft delete zincirinin raporu: program kapatınca ne kapandı. */
+export type DeleteProgramResult = {
+  id: string
+  name: string
+  terms: number
+  participations: number
+  managerAssignments: number
+}
+
+/** Katılım düzeltmesi; girişim ve dönem taşınmıyor (kaldır + yeniden ekle). */
+export type UpdateParticipationBody = {
+  status: ParticipationStatus
+  joinedOn: string
+  leftOn?: string | null
+  notes?: string | null
+}
+
+// --- Şifre kurtarma (Dalga 1) ---------------------------------------------
+
+export type ForgotPasswordBody = { email: string }
+export type ResetPasswordBody = { token: string; newPassword: string }
+export type ChangePasswordBody = { currentPassword: string; newPassword: string }
 
 // --- Girişim silme --------------------------------------------------------
 

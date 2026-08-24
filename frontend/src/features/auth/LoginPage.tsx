@@ -1,70 +1,74 @@
 import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
-import { Button, Card, ErrorState, Input } from '@/components/ui'
+import { Button, ErrorState, Input } from '@/components/ui'
 import { useDocumentTitle } from '@/lib/useDocumentTitle'
+import AuthLayout from './AuthLayout'
 
 export default function LoginPage() {
   useDocumentTitle('Giriş')
-  const { session, login, loginError, isLoggingIn } = useAuth()
+  const { session, login, loginError, isLoggingIn, signedOutReason } = useAuth()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
-  if (session) return <Navigate to="/girisimler" replace />
+  // Giriş sonrası kullanıcı gitmek istediği ekrana döner; korunan bir bağlantıyı
+  // paylaşan kişi girişten sonra panoda değil o sayfada olmalı.
+  const target = (location.state as { from?: string } | null)?.from ?? '/girisimler'
+
+  if (session) return <Navigate to={target} replace />
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-6 py-12">
-      <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <span className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-brand-500 font-bold text-white">
-            T3
-          </span>
-          <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-50">
-            Girişim Ekosistemi Yönetim Sistemi
-          </h1>
-          <p className="mt-2 text-sm text-stone-500">
-            Programdan yatırıma, ekosistemin tek kurumsal hafızası.
+    <AuthLayout
+      title="Girişim Ekosistemi Yönetim Sistemi"
+      description="Programdan yatırıma, ekosistemin tek kurumsal hafızası."
+    >
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={(event) => {
+          event.preventDefault()
+          void login(email, password)
+        }}
+      >
+        {/* Sessiz atılma yerine gerekçe: jeton dolduğunda kullanıcı ne olduğunu
+            okumalı. */}
+        {signedOutReason ? (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+            {signedOutReason}
           </p>
-        </div>
+        ) : null}
 
-        <Card className="p-6">
-          <form
-            className="flex flex-col gap-4"
-            onSubmit={(event) => {
-              event.preventDefault()
-              void login(email, password)
-            }}
-          >
-            <Input
-              label="E-posta"
-              type="email"
-              autoComplete="username"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="ad.soyad@t3ekosistem.test"
-            />
-            <Input
-              label="Şifre"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
+        <Input
+          label="E-posta"
+          type="email"
+          autoComplete="username"
+          required
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="ad.soyad@t3ekosistem.test"
+        />
+        <Input
+          label="Şifre"
+          type="password"
+          autoComplete="current-password"
+          required
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
 
-            {loginError ? <ErrorState message={loginError} /> : null}
+        {loginError ? <ErrorState message={loginError} /> : null}
 
-            <Button type="submit" disabled={isLoggingIn} className="mt-2 w-full">
-              {isLoggingIn ? 'Giriş yapılıyor…' : 'Giriş yap'}
-            </Button>
-          </form>
-        </Card>
+        <Button type="submit" disabled={isLoggingIn} className="mt-2 w-full">
+          {isLoggingIn ? 'Giriş yapılıyor…' : 'Giriş yap'}
+        </Button>
 
-        <p className="mt-6 text-center text-xs text-stone-500">
-          T3 Vakfı Bursiyer Yapay Zekâ Creathonu · Problem 7
-        </p>
-      </div>
-    </div>
+        <Link
+          to="/sifremi-unuttum"
+          className="text-center text-sm text-brand-700 hover:underline dark:text-brand-200"
+        >
+          Şifremi unuttum
+        </Link>
+      </form>
+    </AuthLayout>
   )
 }

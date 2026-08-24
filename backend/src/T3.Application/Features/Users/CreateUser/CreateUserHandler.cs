@@ -39,7 +39,11 @@ public sealed class CreateUserHandler(
             Role = request.Role,
             StartupId = request.StartupId,
             PasswordHash = passwordHasher.Hash(request.Password),
-            IsActive = true
+            IsActive = true,
+
+            // Yöneticinin belirlediği ilk şifre geçici: hesabı devralan kişi
+            // ilk girişte kendi şifresini koymadan başka ekrana geçemez.
+            MustChangePassword = true
         };
 
         db.Users.Add(user);

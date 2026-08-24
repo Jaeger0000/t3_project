@@ -16,6 +16,7 @@ yakalamıştı.
 | `e2e_faz5.py` | Ekosistem karnesi, karnede kapsam ve agregat/satır maskeleme ayrımı, CSV dışa aktarma, AI karar destek uçları, MCP sunucusu (JSON-RPC) ve MCP–REST sayı tutarlılığı (103 kontrol) |
 | `render_faz6.py` | Denetim Dalga 0 düzeltmeleri: girişim/ekip/katılım yazma yolları (arayüzden yeni girişim → program dönemine bağlama → kart düzenleme → ekip üyesi), sekme başlığı ve sayfa dili, 404 ekranı, üç genişlikte mobil yatay taşma, kapsam dışı program reddi, maskeli alanın yazma yolunda korunması ve giriş hız sınırı bölümlemesi (75 kontrol) |
 | `render_faz5.py` | Pano ve grafiklerin çizilmesi, Karar Verici'nin ekosistem toplamını görüp tekil tutar yerine kilit görmesi, tarayıcıdan CSV indirme, asistan paneli ve kart özeti — kaynak listesiyle birlikte (53 kontrol) |
+| `render_faz7.py` | Denetim Dalga 1: program/dönem yönetimi ve katılımın yaşam döngüsü (oluştur → düzelt → kaldır → dönemi kapat → programı kapat), şifre kurtarmanın tamamı (zorunlu değiştirme, kutudan okunan jeton, tek kullanımlık kontrolü), oturum ömrü ve **ağ kesintisinde** oturumun düşmemesi, giriş olaylarının denetim izine maskeli düşmesi, KVKK metinlerinin oturumsuz açılması, Karar Verici'nin onay ekranı (86 kontrol) |
 | `cdp.py` | Render betiklerinin kullandığı bağımlısız Chrome DevTools Protocol istemcisi |
 
 ## Çalıştırma
@@ -46,14 +47,23 @@ python3 scripts/render_faz4.py
 python3 scripts/e2e_faz5.py
 python3 scripts/render_faz5.py
 
-# --- Tur 4: Dalga 0 (aynı veritabanının üstünde çalışır, veriyi değiştirir) ---
+# --- Tur 4: Dalga 0 + Dalga 1 (aynı veritabanının üstünde, veriyi değiştirir) ---
 python3 scripts/render_faz6.py
+sleep 65                          # faz6'nın doldurduğu giriş kovası boşalsın
+python3 scripts/render_faz7.py
 ```
 
-`render_faz6.py` en sona bırakılır: yeni bir girişim oluşturup program dönemine
-bağlıyor, kart alanlarını değiştiriyor ve sonunda `admin@` hesabının giriş
-kovasını bilinçli olarak dolduruyor (hız sınırı bölümlemesi kontrolü). Aynı
-turda ondan sonra çalışan bir betik 429 alır.
+`render_faz6.py` ve `render_faz7.py` en sona bırakılır: ikisi de veri
+oluşturuyor ve sonlarında giriş kovasını bilinçli olarak dolduruyor (hız sınırı
+kontrolleri). Aralarında bir dakika beklenmezse `render_faz7.py` giriş
+aşamasında 429 alır.
+
+`render_faz7.py` kendi verisini temizler: açtığı program, dönem ve katılımı
+yaşam döngüsünün sonunda kapatır. Tohum hesaplarının şifresine dokunmaz —
+şifre akışlarını tek kullanımlık bir hesapla sınar, çünkü diğer bütün betikler
+tohum hesaplarıyla giriş yapıyor. Sıfırlama jetonunu HTTP yanıtından değil
+`backend/src/T3.Api/storage/outbox/` altındaki e-posta dosyasından okur: jetonu
+yanıta koymak, sıfırlama isteyen herkese hesabı devretmek olurdu.
 
 `render_faz5.py` beklenen sayıları API'den okur (girişim sayısı, toplam yatırım,
 CSV satır sayısı), bu yüzden tohum verisi büyüdüğünde kendiliğinden güncel kalır.

@@ -34,18 +34,21 @@ göstereceğine** göre dizildi:
 
 > **Durum: tamamlandı (24 Ağustos).** Altı maddenin hepsi kapandı; doğrulama
 > 156 birim testi, 307 uçtan uca kontrol, 201 render kontrolü — sonuncusu
-> `scripts/render_faz6.py` (yeni, 75 kontrol) dâhil. Kalan tek kayıt:
-> **0.1'in kabul kriteri ortam eksiği yüzünden doğrulanamıyor** — `.env`
-> içindeki `T3_Ai__ApiKey` **boş**, yani Creathon anahtarı hiç girilmemiş.
-> Bölüm adı düzeltildi ve açılışta uyarı log'u eklendi; anahtar yazıldığı anda
-> rozet "Model: claude-…" olacak. Aşağıdaki her maddenin altında ne yapıldığı
-> ve nerede doğrulandığı yazıyor.
+> `scripts/render_faz6.py` (yeni, 75 kontrol) dâhil. 0.1'in kabul kriteri
+> Dalga 1'de bilinçli olarak değişti: AI, uygulamaya gömülü anahtarla değil
+> **MCP sunucusu** olarak sunuluyor (bkz. 0.1 notu ve Dalga 1 başlığı).
+> Aşağıdaki her maddenin altında ne yapıldığı ve nerede doğrulandığı yazıyor.
 
 ### 0.1 · AI anahtarı adını düzelt — **5 dakika** `[Y-04]`
 > **Yapıldı.** `.env` anahtarı `T3_Ai__ApiKey` oldu; `Program.cs` açılışta
 > modeli sorguluyor — anahtar boşsa `LogWarning`, varsa `LogInformation` ile
-> model adı. **Anahtarın değeri hâlâ boş**: rozet ancak değer girildikten sonra
-> "Model: …" yazar.
+> model adı.
+>
+> **Kabul kriteri Dalga 1'de bilinçli olarak değişti:** anahtar uygulamaya
+> girilmiyor, model bağlantısı **MCP üzerinden** kuruluyor (harici ajan
+> `POST /mcp`'ye kendi jetonuyla bağlanır). Bu yüzden rozet "Yerel plan (model
+> yok)" kalıyor ve panel kurulumu kalıcı bir bilgi notuyla açıklıyor: sessizlik
+> gitti, yanıltma da. Anahtar bir gün girilirse aynı uç modele bağlanır.
 
 
 `.env` içindeki `T3_Anthropic__ApiKey` hiçbir yerde okunmuyor; kod
@@ -245,7 +248,37 @@ Videoda telefon görüntüsü kullanılacaksa bu görünür.
 
 ## Dalga 1 — Creathon haftasına kadar (26 Ağustos – 5 Eylül)
 
+> **Durum: tamamlandı (24 Ağustos).** Altı maddenin hepsi kapandı. Doğrulama:
+> 185 birim testi, 307 uçtan uca kontrol, 287 render kontrolü — sonuncusu
+> `scripts/render_faz7.py` (yeni, 86 kontrol) dâhil. Tek kalan kayıt teknik
+> değil: **1.5'in metinleri hukuki onay bekliyor** ve ekranda görünür biçimde
+> "taslak" işaretli. Aşağıdaki her maddenin altında ne yapıldığı ve nerede
+> doğrulandığı yazıyor.
+>
+> Bu dalgada AI tarafında bilinçli bir karar da netleşti: **model bağlantısı
+> yalnızca MCP üzerinden kuruluyor.** Uygulamanın içine anahtar gömmek yerine
+> sistem `POST /mcp` ile MCP sunucusu olarak yayımlanıyor; harici ajan kendi
+> jetonuyla bağlanıp aynı araçları kendi yetkisi kadar kullanıyor. Panel içi
+> yanıtlar bu yüzden yerel planlayıcıdan geliyor ve panel bunu kalıcı bir bilgi
+> notuyla söylüyor (0.1'in "rozet Model: … yazsın" kabul kriteri bu kararla
+> yerini bu nota bırakıyor).
+
 ### 1.1 · Program ve dönem yönetimi — **~1 gün** `[B-02]`
+> **Yapıldı.** Sekiz yeni dikey dilim (`CreateProgram`, `UpdateProgram`,
+> `DeleteProgram`, `Terms/AddTerm|UpdateTerm|DeleteTerm`,
+> `UpdateParticipation`, `RemoveParticipation`), ortak yetki kapısı
+> `ProgramAccessGuard` ve iki yeni politika: `Policies.ManagePrograms`
+> (program tanımı — yalnızca SuperAdmin, çünkü program listesi yetki
+> kapsamının tanımı) ile `Policies.ManageProgramTerms` (dönem/katılım —
+> Program Yöneticisi'ne de açık, satır düzeyinde kendi programıyla sınırlı).
+> `AddParticipation` de aynı muhafıza taşındı, kural beş yerde tekrarlanmasın.
+> Arayüz: `ProgramsPage` artık yönetim ekranı (`ProgramForm`, `TermForm`,
+> iki adımlı kapatma), girişim kartının programlar sekmesinde
+> `ParticipationEditor` (düzelt/kaldır). Katılımı olan dönem 409 ile
+> reddediliyor. Doğrulama: `render_faz7.py` yaşam döngüsünün tamamını
+> arayüzden yürütüyor (oluştur → dönem ekle → katılım düzelt → katılım kaldır
+> → dönem kapat → program kapat) ve Program Yöneticisi'nin API'den de program
+> oluşturamadığını sınıyor.
 
 Programlar bugün yalnızca `DevDataSeeder` ile, yani doğrudan veritabanına
 yazılarak var oluyor. `EcosystemProgram` → `ProgramTerm` →
@@ -284,6 +317,19 @@ yöneticisine kapsam olarak atar; o yönetici giriş yaptığında yeni program�
 ona bağlı girişimleri görür; program yöneticisi program oluşturmayı denerse 403.
 
 ### 1.2 · Şifre kurtarma ve şifre değiştirme — **~1 gün** `[B-03]`
+> **Yapıldı.** Üç dilim (`RequestPasswordReset`, `ResetPassword`,
+> `ChangePassword`), yeni tablo `PasswordResetTokens` (migration
+> `Faz7DalgaBir_ParolaKurtarma_DenetimGirisleri`) ve `User.MustChangePassword`.
+> Jetonun **SHA-256 özeti** saklanıyor, tek kullanımlık ve 2 saat geçerli;
+> `forgot-password` adresin kayıtlı olup olmadığını söylemiyor. E-posta
+> `IEmailSender` arkasındaki `FileOutboxEmailSender` ile sunucunun diskindeki
+> kutuya yazılıyor — jeton HTTP yanıtında **hiç dönmüyor**; bağlantı `Host`
+> başlığından değil `Email:AppBaseUrl`'den kuruluyor. Arayüz:
+> `/sifremi-unuttum`, `/sifre-sifirla/:token`, `/sifre-degistir` ve yönetici
+> şifre attığında `RequireAuth` kullanıcıyı o ekrana kilitliyor. Doğrulama:
+> `render_faz7.py` tek kullanımlık bir hesapla tüm akışı yürütüyor (jetonu
+> kutudaki e-postadan okuyor, ikinci kullanımın reddedildiğini sınıyor);
+> tohum hesaplarının şifresine dokunulmuyor.
 
 Bugün: `forgot-password`, `reset-password`, `change-password` → **hepsi 404**.
 Tek yol yöneticinin şifre ataması, yani **yönetici her hesabın şifresini biliyor**.
@@ -314,6 +360,16 @@ yapar; bağlantı ikinci kullanımda ve süresi dolduğunda reddedilir; yönetic
 şifre atadığında kullanıcı ilk girişte değiştirmeden başka ekrana geçemez.
 
 ### 1.3 · Oturum ömrü ve ağ hatası ayrımı — **~4 saat** `[Y-01]`
+> **Yapıldı — plandaki kısa yol seçildi.** `AccessTokenMinutes = 480`
+> (yenileme jetonu Dalga 2'deki çerez/tek origin kararına bağlı, sıra
+> bozulmadı). `apiClient` ağ hatasını `ApiError(0, 'Sunucuya ulaşılamıyor…')`
+> olarak normalleştiriyor; `AuthProvider` yalnızca **401'de** oturumu
+> düşürüyor ve gerekçeyi (`signedOutReason`) giriş ekranında gösteriyor.
+> `RequireAuth` bağlantı hatasında "yeniden dene" düğmesi gösteriyor,
+> oturumsuz derin bağlantıda hedefi `state.from` ile taşıyor ve giriş sonrası
+> kullanıcıyı oraya döndürüyor. Doğrulama: `render_faz7.py` Chrome'un
+> `Network.setBlockedURLs` komutuyla yalnızca `/api/*` isteklerini engelleyip
+> jetonun yerinde kaldığını ve ham "Failed to fetch" yazmadığını sınıyor.
 
 Üç ayrı sorun, tek kök: oturum durumu tek noktada yönetilmiyor.
 
@@ -337,6 +393,18 @@ ulaşılamıyor" durumu ve "yeniden dene" düğmesi görür; jeton dolduğunda g
 ekranında gerekçeyi okur ve giriş sonrası kaldığı sayfaya döner.
 
 ### 1.4 · Giriş olaylarını denetim izine yaz — **~2 saat** `[B-05]`
+> **Yapıldı.** `LoginHandler` artık `Auth.LoginSucceeded` / `Auth.LoginFailed`
+> yazıyor, hız sınırı reddi `Auth.RateLimited` olarak düşüyor, şifre olayları
+> (`Auth.PasswordResetRequested`, `Auth.PasswordReset`, `Auth.PasswordChanged`,
+> `Auth.PasswordChangeFailed`) da izde. Yeni `IClientContext` ile **IP ve
+> istemci bilgisi** kaydediliyor (`AuditLogs.IpAddress` kolonu vardı ama hiç
+> yazılmıyordu; `UserAgent` kolonu eklendi). E-posta **maskeli**
+> (`MaskedEmail`, `k***@alan.test`). `ActorUserId`/`ActorRole` nullable oldu:
+> başarısız girişte kimlik doğrulanmamıştır ve eski kod aktörü `Guid.Empty`,
+> rolü `DecisionMaker` diye yazıyordu. Kilit satırı **pencere başına bir**
+> yazılıyor — her redde satır açmak izi saldırı yüzeyine çevirirdi. `/denetim`
+> süzgecine "Başarısız giriş", "Hız sınırı kilidi", "Şifre işlemleri" ve
+> "Program ve dönem" grupları eklendi. Doğrulama: `render_faz7.py`.
 
 15 başarısız giriş denemesinden sonra denetim izinde **sıfır** kayıt var;
 eylem türleri yalnızca `Report.Export`, `Assistant.Ask`, `Document.Download`,
@@ -354,6 +422,15 @@ eylem türleri yalnızca `Report.Export`, `Assistant.Ask`, `Document.Download`,
 satır; satırlar IP ve zaman damgası taşır; girişim kullanıcısı göremez.
 
 ### 1.5 · KVKK metinleri ve başvuru yolu — **~3 saat (teknik)** `[B-06]`
+> **Yapıldı (teknik kısım).** `/kvkk-aydinlatma` ve `/kullanim-sartlari`
+> oturum gerektirmiyor; oturum açıkken kabuk içinde, kapalıyken çıplak
+> render ediliyor. `AppShell`'e her ekranda görünen alt bilgi geldi (sürüm,
+> KVKK metni, kullanım şartları, destek/KVKK başvuru adresi); giriş ve şifre
+> ekranları da aynı bağlantıları taşıyor. Portal ekip formundaki kişisel veri
+> uyarısı Dalga 0'da eklenmişti, yerinde.
+> ⚠️ **Metinlerin hukuki içeriği onaylanmadı** — sayfalar görünür biçimde
+> "Taslak" işaretli. Onaylanmamış bir aydınlatma metnini onaylanmış gibi
+> göstermek yükümlülüğü karşılamaz, karşılanmış gibi gösterir.
 
 Sistemde aydınlatma metni, çerez bildirimi, kullanım şartları ve KVKK başvuru
 yolu **hiç yok** — 55 render'ın hiçbirinde geçmiyor.
@@ -371,6 +448,11 @@ yolu **hiç yok** — 55 render'ın hiçbirinde geçmiyor.
 alt bilgisinden erişilir; portal formunda kişisel veri uyarısı görünür.
 
 ### 1.6 · Karar Verici'nin `/onaylar` ekranı — **15 dakika** `[O-03]`
+> **Yapıldı.** `RequirePermission` "herhangi biri" (anyOf) semantiğine geçti;
+> `/onaylar` artık `canReviewApprovals` **veya** `mustSubmitForApproval`
+> istiyor. Karar Verici gerekçeyi okuyor, diğer üç rolün davranışı değişmedi.
+> `render_faz3.py`'deki eski beklenti (boş "Önerilerim" ekranı) düzeltildi —
+> o kontrol denetimin bulduğu hatayı doğru sayıyordu.
 
 Karar Verici doğrudan URL ile `/onaylar`'a girdiğinde sonsuza dek boş kalacak
 "Önerilerim" ekranını görüyor; bu rolde `mustSubmitForApproval` ve

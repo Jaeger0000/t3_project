@@ -5,6 +5,18 @@ export type AuthState = {
   session: SessionUser | null
   /** Jeton var ama oturum henüz doğrulanmadı — yönlendirme kararı beklemeli. */
   isResolving: boolean
+  /**
+   * Sunucuya ulaşılamıyor. Oturumu düşürmüyoruz: ağ kesintisi yetki sorunu
+   * değil, kullanıcı bağlantı gelince kaldığı yerden devam etmeli.
+   */
+  connectionError: string | null
+  /** Bağlantı hatasından sonra yeniden denemek için. */
+  retrySession: () => void
+  /**
+   * Oturumun neden kapandığı (jeton süresi doldu vb.). Giriş ekranı bunu
+   * gösteriyor — kullanıcı sessizce atıldığını sanmasın.
+   */
+  signedOutReason: string | null
   login: (email: string, password: string) => Promise<void>
   logout: () => void
   loginError: string | null

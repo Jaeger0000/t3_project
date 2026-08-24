@@ -32,13 +32,19 @@ public sealed record AuditLogListItemResponse(
     string Action,
     string EntityType,
     Guid? EntityId,
-    Guid ActorUserId,
 
-    /// <summary>Kullanıcı sonradan silinmiş olabilir; o durumda kimlik gösterilir.</summary>
+    /// <summary>Başarısız giriş denemesinde boş: kimlik doğrulanmamıştır.</summary>
+    Guid? ActorUserId,
+
+    /// <summary>
+    /// Kullanıcı sonradan silinmiş olabilir; o durumda kimlik gösterilir.
+    /// Kimlik doğrulanmamış olaylarda "(kimlik doğrulanmadı)".
+    /// </summary>
     string ActorName,
 
-    UserRole ActorRole,
+    UserRole? ActorRole,
     string? IpAddress,
+    string? UserAgent,
     DateTimeOffset OccurredAt,
     string? BeforeJson,
     string? AfterJson);

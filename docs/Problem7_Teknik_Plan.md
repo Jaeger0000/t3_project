@@ -317,10 +317,21 @@ Karar Verici rolü finansalları **yalnızca agregat** görür: "12 girişim top
 
 ## 5. API Yüzeyi
 
+> **Uygulanan yüzey ile fark (Dalga 1, 24 Ağustos):** `POST /api/auth/refresh`
+> **yazılmadı** — yenileme jetonu HttpOnly çereze taşıma kararına bağlı ve o
+> karar tek origin dağıtımını bekliyor (Dalga 2). Yerine erişim jetonunun ömrü
+> bir iş günü yapıldı. Bunun karşılığında planda olmayan üç uç eklendi:
+> `forgot-password`, `reset-password`, `change-password`. Program tarafında
+> plandaki `POST /api/programs` ve `/api/programs/{id}/terms` uçları eklendi,
+> yanlarına güncelleme/kapatma ve katılım düzeltme uçları geldi. Güncel liste:
+> [README — API yüzeyi](../README.md#api-yüzeyi).
+
 ```
-POST   /api/auth/login                          → JWT + refresh
-POST   /api/auth/refresh
-GET    /api/me                                  → kullanıcı + rol + kapsam
+POST   /api/auth/login                          → JWT (yenileme jetonu Dalga 2'de)
+POST   /api/auth/forgot-password                → sıfırlama bağlantısı (yanıt adresi doğrulamaz)
+POST   /api/auth/reset-password                 → tek kullanımlık jetonla yeni şifre
+POST   /api/auth/change-password                → oturum içi, mevcut şifre doğrulamalı
+GET    /api/me                                  → kullanıcı + rol + kapsam + mustChangePassword
 
 GET    /api/startups                            ?q&sector&programId&status&page
 GET    /api/startups/{id}                       → girişim kartı (rol filtreli)
@@ -334,11 +345,16 @@ GET    /api/startups/{id}/documents
 POST   /api/startups/{id}/documents             (multipart upload)
 GET    /api/documents/{id}/download
 
-GET    /api/programs
-POST   /api/programs
-GET    /api/programs/{id}/terms
-POST   /api/programs/{id}/terms
+GET    /api/programs                            → dönemleriyle birlikte (kapsam filtreli)
+POST   /api/programs                            (yalnızca SuperAdmin)
+PUT    /api/programs/{id}
+DELETE /api/programs/{id}                       → zinciri pasife alır, sayıları raporlar
+POST   /api/programs/{id}/terms                 (kendi programı)
+PUT    /api/programs/{id}/terms/{termId}
+DELETE /api/programs/{id}/terms/{termId}        → katılım varsa 409
 POST   /api/participations
+PUT    /api/participations/{id}                 → durum/tarih/not düzeltmesi
+DELETE /api/participations/{id}
 
 POST   /api/change-requests                     → startup kullanıcısı gönderir
 GET    /api/change-requests                     ?status=Pending  (onay kuyruğu)
@@ -427,6 +443,8 @@ Bugün **20 Ağustos**. İlk teslim **26 Ağustos 10.00** (iş modeli canvası +
 | **3 — Onay akışı** ✅ | 23 Ağu | ChangeRequest, startup portalı, onay kuyruğu + diff görünümü, AuditLog | **#3** |
 | **4 — Finansal & doküman** ✅ | 24 Ağu | Achievement TPH (5 tip), doküman yükleme/indirme, maskeleme kuralları | **#4** |
 | **5 — Dashboard & AI** ✅ | 24 Ağu | EcosystemStats + ekosistem panosu, el yazımı SVG grafikler, CSV dışa aktarma (maskeli hücreler dâhil), JSON-RPC MCP sunucusu, AI karar destek paneli ve yönetici özeti (model yoksa yerel planlayıcı), 32 girişimlik gerçekçi tohum verisi | karar destek |
+| **Denetim Dalga 0** ✅ | 24 Ağu | Ürün denetiminin videodan önce kapanması gereken bulguları: girişim/ekip/katılım yazma yolları arayüze, hız sınırı bölümlemesi, sekme başlığı/dil, 404 ekranı, mobil taşma, yazma yolunda maskeleme | **#1–#4 bütünlüğü** |
+| **Denetim Dalga 1** ✅ | 24 Ağu | Program ve dönem yönetimi, şifre kurtarma/değiştirme, oturum ömrü ve ağ hatası ayrımı, giriş olaylarının denetim izi, KVKK metinleri, Karar Verici'nin onay ekranı | MVP + KVKK |
 | **Teslim** | 26 Ağu | Canvas + prototip videosu + sunum | — |
 | **Creathon** | 5-6 Eyl | Cilalama, AI genişletme, testler, Demo Day sunumu | — |
 

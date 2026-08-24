@@ -19,7 +19,7 @@ T3 Vakfı Bursiyer Yapay Zekâ Creathonu — **Problem 7** çözümü.
 - **Backend:** .NET 8 · Clean Architecture + dikey dilim · Minimal API · EF Core 8
 - **Frontend:** React 19 · TypeScript · Vite · Tailwind CSS 4 · TanStack Query
 - **Veritabanı:** PostgreSQL 16 (Docker)
-- **AI:** MCP sunucusu (.NET içinde) + Claude API — anahtar **opsiyonel**, yoksa sorular yerel planlayıcıyla yanıtlanır
+- **AI:** MCP sunucusu (.NET içinde) — model bağlantısı **MCP üzerinden** kurulur; uygulama içi Claude API anahtarı opsiyonel ve bu kurulumda tanımlı değil
 
 ## Kurulum
 
@@ -125,12 +125,15 @@ Tohum verisindeki boşluklar da kasıtlıdır: dört girişim hiçbir programa b
 değil, biri hiç başarı kaydı taşımıyor — "kapsam dışı" ve "boş durum" ekranları
 demoda gerçek veriyle görünsün diye.
 
-## API yüzeyi (Faz 5)
+## API yüzeyi
 
 | Uç | Yetki |
 |---|---|
 | `POST /api/auth/login` | herkese açık — **IP + e-posta başına** dakikada 10 istek |
-| `GET /api/me` | kimlik doğrulanmış |
+| `POST /api/auth/forgot-password` | herkese açık — yanıt adresin kayıtlı olup olmadığını **söylemez** |
+| `POST /api/auth/reset-password` | herkese açık — jeton tek kullanımlık ve 2 saat geçerli |
+| `POST /api/auth/change-password` | kimlik doğrulanmış — mevcut şifre yeniden doğrulanır |
+| `GET /api/me` | kimlik doğrulanmış — `mustChangePassword` bayrağını da taşır |
 | `GET /api/startups` | kimlik doğrulanmış — satırlar role göre daraltılır |
 | `GET /api/startups/{id}` | kimlik doğrulanmış — hassas alanlar role göre maskelenir |
 | `GET /api/startups/{id}/timeline` | kimlik doğrulanmış |
@@ -144,7 +147,10 @@ demoda gerçek veriyle görünsün diye.
 | `DELETE /api/startups/{id}/documents/{documentId}` | Süper Yönetici, Program Yöneticisi |
 | `GET /api/documents/{id}/download` | kimlik doğrulanmış — her indirme denetim izine yazılır |
 | `GET /api/programs` | kimlik doğrulanmış — kapsama göre daraltılır |
+| `POST /api/programs` · `PUT /api/programs/{id}` · `DELETE /api/programs/{id}` | **yalnızca Süper Yönetici** — program listesi aynı zamanda yetki kapsamının tanımı |
+| `POST/PUT/DELETE /api/programs/{id}/terms[/{termId}]` | Süper Yönetici, Program Yöneticisi (kendi programı) — katılımı olan dönem kapatılamaz (409) |
 | `POST /api/participations` | Süper Yönetici, Program Yöneticisi (kendi programı) |
+| `PUT /api/participations/{id}` · `DELETE /api/participations/{id}` | Süper Yönetici, Program Yöneticisi (kendi programı) |
 | `POST /api/change-requests` | Girişim Kullanıcısı — yetki role değil girişim bağına dayanır |
 | `GET /api/change-requests` | kimlik doğrulanmış — yetkiliye kuyruk, girişime kendi geçmişi |
 | `GET /api/change-requests/{id}` | kimlik doğrulanmış — before/after diff, alanlar role göre maskeli |
@@ -175,11 +181,21 @@ yoktur**, dolayısıyla kapsam ve maskeleme kuralları tek yerde kalır.
   `list_pending_approvals`. Uç kimlik ister: MCP istemcisi de Bearer jetonu
   taşımak zorunda, araçlar jetonun rolüyle çalışır.
 
-`T3_Ai__ApiKey` boşsa uygulama çalışmaya devam eder: soru yerel planlayıcıya
-düşer, anahtar kelimelerden araç çağrıları üretilir ve yanıt araç özetlerinin
-birleşiminden kurulur. Cümle üretilmediği için uydurma da üretilmez. Arayüz
-hangi modun yanıtladığını rozetle söyler ("Model: …" / "Yerel plan (model
-yok)") — demo internet ya da kota olmadan da çalışır.
+### Bu kurulumda model bağlantısı: yalnızca MCP
+
+Sistem, dil modelini kendi içine gömmek yerine **MCP sunucusu olarak
+yayımlanıyor**: harici bir ajan (Claude Desktop, Claude Code vb.) `POST /mcp`
+ucuna kendi Bearer jetonuyla bağlanır ve yukarıdaki altı aracı kullanır — kendi
+rolünün yetkisi kadar görerek. Model istemcide, veri sunucuda kalır; kurumun
+API kotası ve anahtarı uygulamaya girmez.
+
+Bunun sonucu ürün içinde de görünür: `T3_Ai__ApiKey` tanımlı değil, dolayısıyla
+panel içi sorular yerel planlayıcıyla yanıtlanıyor. Yerel planlayıcı anahtar
+kelimelerden araç çağrıları üretir ve yanıtı araç özetlerinin birleşiminden
+kurar; cümle üretmediği için uydurma da üretmez. Panel bu durumu rozetle
+("Model: …" / "Yerel plan (model yok)") ve kalıcı bir bilgi notuyla söylüyor —
+kullanıcı hangi modun çalıştığını ekranda okumalı. Anahtar bir gün girilirse
+aynı uç modele bağlanır, başka değişiklik gerekmez.
 
 ## Proje yapısı
 
@@ -225,6 +241,8 @@ python3 scripts/e2e_faz5.py      # pano, CSV, AI uçları, MCP sunucusu
 python3 scripts/render_faz3.py   # headless Chrome'da gerçek render
 python3 scripts/render_faz4.py
 python3 scripts/render_faz5.py
+python3 scripts/render_faz6.py   # Dalga 0: yazma yolları, 404, mobil taşma
+python3 scripts/render_faz7.py   # Dalga 1: program/dönem, şifre kurtarma, KVKK, iz
 
 # Veritabanını sıfırla
 docker compose down -v && docker compose up -d postgres
@@ -338,9 +356,51 @@ gereken bulguları ([plan](docs/Denetim_Duzeltme_Plani.md)):
   düzenlemesi numarayı boşaltırdı. Sunucu artık göremediği alanı korur, arayüz
   o alanı formda hiç göstermez ve gerekçesini yazar.
 
-**Doğrulama:** 156 birim testi, API'ye gerçek rollerle vuran 307 uçtan uca
-kontrol (81 + 123 + 103) ve headless Chrome'da 201 render kontrolü
-(32 + 41 + 53 + 75) — hepsi temiz veritabanında geçiyor. Render adımı yine iş gördü:
+**Denetim Dalga 1 tamamlandı** — MVP ve KVKK bütünlüğü
+([plan](docs/Denetim_Duzeltme_Plani.md)):
+
+- **Program ve dönem yönetimi arayüze açıldı.** `EcosystemProgram → ProgramTerm
+  → ProgramParticipation` zincirinin ilk iki halkası artık tohumlayıcıya bağlı
+  değil. Yetki bilinçli olarak ikiye ayrıldı: program *tanımı* yalnızca Süper
+  Yönetici'de (program listesi aynı zamanda Program Yöneticisi'nin yetki
+  kapsamının tanımı — kendi kapsamını büyütebilen rol RBAC'ı anlamsız kılar),
+  dönem ve katılım işlemleri Program Yöneticisi'ne de açık ama yalnızca kendi
+  programında. Katılımı olan dönem kapatılamaz (409): gelişim yolculuğunun
+  kaynağı tek tıkla boşaltılmamalı.
+- **Şifre kurtarma ve değiştirme:** `forgot-password`, `reset-password`,
+  `change-password`. Jetonun kendisi değil **SHA-256 özeti** saklanır, tek
+  kullanımlıktır ve 2 saat geçerlidir; `forgot-password` adresin kayıtlı olup
+  olmadığını söylemez. Yöneticinin attığı şifre artık geçici:
+  `mustChangePassword` bayrağı düşene kadar kullanıcı başka ekrana geçemez —
+  amaç şifrenin ikinci sahibini ortadan kaldırmak. Gerçek SMTP yok; e-posta
+  sunucunun diskindeki geliştirme kutusuna yazılıyor (`IEmailSender` arkasında),
+  jeton HTTP yanıtında **hiç dönmüyor**.
+- **Oturum ömrü ve ağ hatası ayrımı:** jeton 15 dakika yerine bir iş günü
+  (yenileme jetonu Dalga 2'deki çerez kararına bağlı). Ağ hatası artık
+  `ApiError(0)` olarak normalleşiyor: API kapalıyken kullanıcı oturumda kalıyor,
+  ham "Failed to fetch" yerine Türkçe durum ve **yeniden dene** düğmesi görüyor.
+  Jeton dolduğunda giriş ekranında gerekçeyi okuyor ve giriş sonrası kaldığı
+  rotaya dönüyor.
+- **Giriş olayları denetim izinde:** `Auth.LoginSucceeded`, `Auth.LoginFailed`,
+  `Auth.RateLimited` ve şifre olayları. IP ve istemci bilgisi kaydediliyor,
+  e-posta **maskeli** (`k***@alan.test`) yazılıyor — iz, denenen adreslerin ham
+  listesine dönüşmemeli. Hız sınırı kilidi pencere başına **tek** satır açıyor:
+  reddedilen istek sayısı sınırsız olduğu için her redde satır açmak izin
+  kendisini bir saldırı yüzeyi yapardı.
+- **KVKK metinleri:** `/kvkk-aydinlatma` ve `/kullanim-sartlari` giriş yapmadan
+  açılıyor, her ekranın alt bilgisinden ve giriş ekranından erişiliyor, başvuru
+  adresi metinde duruyor. Metinler görünür biçimde **taslak** işaretli: hukuki
+  içerik T3 Vakfı onayını bekliyor.
+- **Karar Verici'nin `/onaylar` ekranı:** sonsuza dek boş "Önerilerim" yerine
+  yetki açıklaması.
+- **AI tarafında karar netleşti: model bağlantısı yalnızca MCP üzerinden.**
+  Uygulamaya anahtar gömülmüyor; sistem `POST /mcp` ile MCP sunucusu olarak
+  yayımlanıyor ve harici ajan kendi jetonuyla bağlanıyor. Panel bunu kalıcı bir
+  bilgi notuyla söylüyor — ayrıntı: [AI katmanı](#ai-katmanı).
+
+**Doğrulama:** 185 birim testi, API'ye gerçek rollerle vuran 307 uçtan uca
+kontrol (81 + 123 + 103) ve headless Chrome'da 287 render kontrolü
+(32 + 41 + 53 + 75 + 86) — hepsi temiz veritabanında geçiyor. Render adımı yine iş gördü:
 Faz 5'te panelin `data-testid`'sini yutan `Card` bileşenini ve Karar Verici'ye
 tekil tutar sızdıran ilk maskeleme sürümünü bu adım yakaladı. Betikler ve
 çalıştırma sırası: [scripts/](scripts/).
@@ -350,12 +410,21 @@ bkz. [teknik plan](docs/Problem7_Teknik_Plan.md#8-faz-planı).
 
 ### Bilinen açık işler
 
-Denetim raporunun Dalga 1 ve Dalga 2 maddeleri açık:
-[Denetim_Duzeltme_Plani.md](docs/Denetim_Duzeltme_Plani.md). Başlıklar: program
-ve dönem yönetimi arayüzü yok (programlar yalnızca tohumlayıcıyla oluşuyor),
-şifre kurtarma/değiştirme uçları yok, erişim jetonu 15 dakikalık ve yenileme
-yok, KVKK aydınlatma metni ve başvuru yolu yok, üretim dağıtım yolu (tek origin
-statik sunum) yok.
+Denetim raporunun **Dalga 2** maddeleri açık
+([plan](docs/Denetim_Duzeltme_Plani.md)): üretim dağıtım yolu yok (`npm run
+build` çıktısını API'ye bağlayan tek şey Vite dev proxy'si; tek origin statik
+sunum + `docker-compose.prod.yml` yazılacak), erişim jetonu `localStorage`'da ve
+CSP başlığı yok (jeton HttpOnly çereze taşınacak — sıra üretim kararına bağlı),
+filtre durumu URL'ye yazılmıyor, `SearchText.Normalize` aksanları katlamıyor,
+kirli formdan çıkış uyarısı ve rota bazlı kod bölme yok.
+
+- **KVKK metinlerinin hukuki içeriği onaylanmadı** — teknik iş bitti, metin
+  taslak olarak işaretli.
+- **Şifre sıfırlama e-postası gerçekten gönderilmiyor:** SMTP sağlayıcısı yok,
+  gönderici e-postayı sunucunun diskindeki kutuya yazıyor. Arayüz akışı ve
+  jeton yaşam döngüsü buna rağmen uçtan uca doğrulanıyor.
+- Yenileme jetonu yok; jeton dolduğunda kullanıcı yeniden giriş yapar
+  (gerekçeyi ekranda görerek).
 
 - Doküman deposu yerel disk; S3 uyumlu sürüm aynı arayüzün arkasında duruyor
   ama henüz yazılmadı.

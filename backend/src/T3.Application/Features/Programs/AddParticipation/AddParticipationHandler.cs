@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using T3.Application.Common.Interfaces;
 using T3.Application.Common.Results;
-using T3.Domain.Identity;
 using T3.Domain.Programs;
 
 namespace T3.Application.Features.Programs.AddParticipation;
@@ -18,15 +17,12 @@ namespace T3.Application.Features.Programs.AddParticipation;
 /// </summary>
 public sealed class AddParticipationHandler(
     IAppDbContext db,
-    ICurrentUser currentUser,
+    ProgramAccessGuard guard,
     IAuditWriter audit)
 {
     public async Task<Result<AddParticipationResponse>> Handle(
         AddParticipationRequest request, CancellationToken ct)
     {
-        if (currentUser.Role is not (UserRole.SuperAdmin or UserRole.ProgramManager))
-            return Error.Forbidden("Program katılımı ekleme yetkiniz yok.");
-
         var term = await db.ProgramTerms.AsNoTracking()
             .Where(t => t.Id == request.ProgramTermId)
             .Select(t => new
@@ -42,9 +38,10 @@ public sealed class AddParticipationHandler(
         if (term is null)
             return Error.NotFound("Program dönemi bulunamadı.");
 
-        if (currentUser.Role is UserRole.ProgramManager
-            && !currentUser.AssignedProgramIds.Contains(term.ProgramId))
-            return Error.Forbidden("Bu program sizin sorumluluğunuzda değil.");
+        // Kapsam kontrolü dönem bulunduktan sonra: hangi programa yazıldığı
+        // ancak dönemden okunuyor. Ortak muhafız aynı mesajı üretiyor.
+        if (await guard.EnsureOwnsProgramAsync(term.ProgramId, ct) is { } denied)
+            return denied;
 
         // Girişim varlığı kapsam filtresi olmadan doğrulanır; işlemin yetkisi
         // program sahipliğinden gelir. Guid tahmin edilemez olduğu için bu

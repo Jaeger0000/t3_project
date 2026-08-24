@@ -17,6 +17,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<UserProgramAssignment> UserProgramAssignments => Set<UserProgramAssignment>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
 
     public DbSet<Startup> Startups => Set<Startup>();
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();

@@ -20,6 +20,15 @@ public class User : Entity, IAuditable, ISoftDelete
     public bool IsActive { get; set; } = true;
     public DateTimeOffset? LastLoginAt { get; set; }
 
+    /// <summary>
+    /// Yönetici şifre atadığında <c>true</c> olur, kullanıcı kendi şifresini
+    /// belirlediğinde <c>false</c>. Amaç yöneticinin bildiği şifrenin kalıcı
+    /// olmaması: aksi hâlde her hesabın şifresini bir başkası da biliyor.
+    /// </summary>
+    public bool MustChangePassword { get; set; }
+
+    public ICollection<PasswordResetToken> PasswordResetTokens { get; set; } = [];
+
     /// <summary>Program Yöneticisi'nin yetki kapsamını belirler.</summary>
     public ICollection<UserProgramAssignment> ProgramAssignments { get; set; } = [];
 

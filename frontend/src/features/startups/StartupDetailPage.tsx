@@ -26,6 +26,7 @@ import StartupTimeline from './StartupTimeline'
 import StartupForm from './StartupForm'
 import TeamSection from './TeamSection'
 import ParticipationForm from './ParticipationForm'
+import ParticipationEditor from './ParticipationEditor'
 import StartupSummaryCard from '@/features/assistant/StartupSummaryCard'
 import { useStartupCard, useDeleteStartup } from './queries'
 import type { CardParticipation, StartupCard } from '@/api/types'
@@ -425,13 +426,33 @@ function ProgramsTab({
       ) : null}
 
       {participations.map((participation) => (
-        <ParticipationRow key={participation.id} participation={participation} />
+        <ParticipationRow
+          key={participation.id}
+          participation={participation}
+          canEdit={canEdit}
+          onNotice={setNotice}
+        />
       ))}
     </div>
   )
 }
 
-function ParticipationRow({ participation }: { participation: CardParticipation }) {
+/**
+ * Katılım satırı. Düzeltme ve kaldırma Dalga 1'de eklendi: yanlış döneme
+ * eklenen kayıt gelişim yolculuğunda kalıcı bir hata olarak duruyordu ve tek
+ * çözüm veritabanına elle müdahaleydi.
+ */
+function ParticipationRow({
+  participation,
+  canEdit,
+  onNotice,
+}: {
+  participation: CardParticipation
+  canEdit: boolean
+  onNotice: (message: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+
   return (
     <Card className="flex flex-wrap items-center gap-x-6 gap-y-2 p-4">
       <div className="min-w-56 flex-1">
@@ -453,6 +474,27 @@ function ParticipationRow({ participation }: { participation: CardParticipation 
 
       {participation.notes ? (
         <p className="w-full text-sm text-stone-600 dark:text-stone-400">{participation.notes}</p>
+      ) : null}
+
+      {canEdit ? (
+        <div className="flex w-full flex-wrap items-center gap-3">
+          <Button variant="ghost" onClick={() => setEditing((value) => !value)}>
+            {editing ? 'Düzenlemeyi kapat' : 'Katılımı düzelt'}
+          </Button>
+        </div>
+      ) : null}
+
+      {editing ? (
+        <div className="w-full">
+          <ParticipationEditor
+            participation={participation}
+            onDone={(message) => {
+              setEditing(false)
+              onNotice(message)
+            }}
+            onCancel={() => setEditing(false)}
+          />
+        </div>
       ) : null}
     </Card>
   )

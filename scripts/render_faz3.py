@@ -100,10 +100,13 @@ try:
     check("girişim kullanıcısında başlık 'Önerilerim'",
           "Önerilerim" in text and "Onay kuyruğu" not in text, text[:200])
 
-    text = as_user("karar", "/onaylar", wait_for="")
-    check("karar vericide kuyruk boş durumu gösteriliyor",
-          "öneri yok" in text.lower() or "Önerilerim" in text or "Onay kuyruğu" in text,
-          text[:300])
+    # Dalga 1'e kadar Karar Verici burada sonsuza dek boş kalacak bir
+    # "Önerilerim" ekranı görüyordu (denetim bulgusu O-03): bu rolde
+    # canReviewApprovals ve mustSubmitForApproval ikisi de false. Artık
+    # gerekçeyi okuyor.
+    text = as_user("karar", "/onaylar", wait_for="yetkiniz yok")
+    check("karar verici onay ekranında gerekçe görüyor",
+          "Bu ekranı görme yetkiniz yok" in text, text[:300])
 
     print("\n=== Diff ekranı ve maskeleme ===")
     check("vergi numarası taşıyan öneri bulundu", tax_case is not None)

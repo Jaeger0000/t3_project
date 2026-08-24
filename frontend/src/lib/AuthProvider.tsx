@@ -1,26 +1,32 @@
 import { useCallback, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, tokenStore } from '@/lib/apiClient'
+import { ApiError, api, tokenStore } from '@/lib/apiClient'
 import { AuthContext } from '@/lib/auth'
 import type { LoginResponse, SessionUser } from '@/api/types'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
   const [token, setToken] = useState<string | null>(() => tokenStore.get())
+  const [signedOutReason, setSignedOutReason] = useState<string | null>(null)
 
-  // Jeton 15 dakika geçerli; /api/me her açılışta rolü ve hesabın aktifliğini
-  // sunucudan tazeler, böylece jetonun içindeki bilgiye körü körüne güvenmiyoruz.
+  // Jetonun ömrü bir iş günü; /api/me her açılışta rolü, hesabın aktifliğini ve
+  // "şifre değiştir" bayrağını sunucudan tazeler — jetonun içindeki bilgiye
+  // körü körüne güvenmiyoruz.
   const session = useQuery({
     queryKey: ['session'],
     queryFn: async () => {
       try {
         return await api.get<SessionUser>('/api/me')
       } catch (error) {
-        // apiClient 401'de jetonu zaten sildi; yerel durumu da hizalıyoruz.
-        // Bu, effect içinde senkronlamaya göre daha doğru yer: durumu
-        // değiştiren olayın tam kendisi burada.
-        setToken(null)
+        // Oturum yalnızca 401'de düşüyor. Ağ hatası (status 0) jetonu
+        // silmiyordu ama eskiden burada ayrım yoktu: API kapandığında
+        // kullanıcı oturumdan atılıyor ve ham "Failed to fetch" görüyordu.
+        if (error instanceof ApiError && error.status === 401) {
+          setToken(null)
+          setSignedOutReason('Oturum süresi doldu. Lütfen tekrar giriş yapın.')
+        }
+
         throw error
       }
     },
@@ -35,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: (data) => {
       tokenStore.set(data.accessToken)
       setToken(data.accessToken)
+      setSignedOutReason(null)
       // Giriş yanıtı oturum bilgisini de taşıyor: fazladan /api/me turu yok.
       queryClient.setQueryData(['session'], data.user)
     },
@@ -50,14 +57,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     tokenStore.clear()
     setToken(null)
+    setSignedOutReason(null)
     queryClient.clear()
   }, [queryClient])
+
+  const retrySession = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['session'] })
+  }, [queryClient])
+
+  // Jeton elimizde ama sunucu yanıt vermiyor: bu "oturum yok" değil "şu an
+  // doğrulanamıyor" durumu ve ekranda öyle görünmesi gerekiyor.
+  const connectionError =
+    token !== null && session.error instanceof ApiError && session.error.status === 0
+      ? session.error.message
+      : null
 
   return (
     <AuthContext.Provider
       value={{
         session: session.data ?? null,
         isResolving: token !== null && session.isPending,
+        connectionError,
+        retrySession,
+        signedOutReason,
         login,
         logout,
         loginError: loginMutation.error?.message ?? null,

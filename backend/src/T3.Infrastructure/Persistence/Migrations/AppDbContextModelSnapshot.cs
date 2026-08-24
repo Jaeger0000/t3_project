@@ -150,10 +150,10 @@ namespace T3.Infrastructure.Persistence.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
-                    b.Property<int>("ActorRole")
+                    b.Property<int?>("ActorRole")
                         .HasColumnType("integer");
 
-                    b.Property<Guid>("ActorUserId")
+                    b.Property<Guid?>("ActorUserId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("AfterJson")
@@ -177,7 +177,13 @@ namespace T3.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("Action");
 
                     b.HasIndex("OccurredAt");
 
@@ -241,6 +247,46 @@ namespace T3.Infrastructure.Persistence.Migrations
                     b.ToTable("Documents", (string)null);
                 });
 
+            modelBuilder.Entity("T3.Domain.Identity.PasswordResetToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RequestedFromIp")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PasswordResetTokens", (string)null);
+                });
+
             modelBuilder.Entity("T3.Domain.Identity.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -271,6 +317,9 @@ namespace T3.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset?>("LastLoginAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("MustChangePassword")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -782,6 +831,17 @@ namespace T3.Infrastructure.Persistence.Migrations
                     b.Navigation("Startup");
                 });
 
+            modelBuilder.Entity("T3.Domain.Identity.PasswordResetToken", b =>
+                {
+                    b.HasOne("T3.Domain.Identity.User", "User")
+                        .WithMany("PasswordResetTokens")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("T3.Domain.Identity.User", b =>
                 {
                     b.HasOne("T3.Domain.Startups.Startup", "Startup")
@@ -865,6 +925,8 @@ namespace T3.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("T3.Domain.Identity.User", b =>
                 {
+                    b.Navigation("PasswordResetTokens");
+
                     b.Navigation("ProgramAssignments");
                 });
 

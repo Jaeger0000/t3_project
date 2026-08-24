@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import { roleLabels } from '@/lib/labels'
 import { usePendingCount } from '@/features/approvals/queries'
@@ -78,18 +78,27 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           </nav>
 
           {session ? (
-            <div className="ml-auto flex items-center gap-3">
-              <div className="text-right leading-tight">
+            {/* Kullanıcı bloğu sarabiliyor ve metin kırpılabiliyor: 360 px'te
+                e-posta + rol rozeti + iki eylem tek satıra sığmıyor ve satır
+                dışarı taşıyordu (min-content genişliği). */}
+            <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-2">
+              <div className="min-w-0 text-right leading-tight">
                 <p className="text-sm font-medium text-stone-900 dark:text-stone-100">
                   {session.fullName}
                 </p>
-                <p className="text-xs text-stone-500">
+                <p className="truncate text-xs text-stone-500">
                   {session.startupName ?? session.email}
                 </p>
               </div>
               <Badge tone="bg-brand-100 text-brand-800 dark:bg-brand-950 dark:text-brand-200">
                 {roleLabels[session.role]}
               </Badge>
+              <Link
+                to="/sifre-degistir"
+                className="text-xs text-stone-500 hover:text-brand-700 hover:underline dark:hover:text-brand-200"
+              >
+                Şifre değiştir
+              </Link>
               <Button variant="outline" onClick={logout}>
                 Çıkış
               </Button>
@@ -102,6 +111,32 @@ export default function AppShell({ children }: { children?: ReactNode }) {
         {/* `children` yalnızca rota ağacına girmeyen ekranlar için (404). */}
         {children ?? <Outlet />}
       </main>
+
+      {/* Alt bilgi her ekranda: KVKK metinlerine erişim tek bir ekrana
+          gömülemez, aydınlatma yükümlülüğü sürekli erişilebilirlik ister. */}
+      <footer className="mt-8 border-t border-stone-200 dark:border-stone-800">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-6 text-xs text-stone-500 sm:px-6">
+          <span>T3 Vakfı · Girişim Ekosistemi Yönetim Sistemi · Sürüm 1.0</span>
+          <Link
+            to="/kvkk-aydinlatma"
+            className="text-brand-700 hover:underline dark:text-brand-200"
+          >
+            KVKK aydınlatma metni
+          </Link>
+          <Link
+            to="/kullanim-sartlari"
+            className="text-brand-700 hover:underline dark:text-brand-200"
+          >
+            Kullanım şartları
+          </Link>
+          <a
+            href="mailto:kvkk@t3vakfi.org.tr"
+            className="text-brand-700 hover:underline dark:text-brand-200"
+          >
+            Destek ve KVKK başvurusu
+          </a>
+        </div>
+      </footer>
     </div>
   )
 }
