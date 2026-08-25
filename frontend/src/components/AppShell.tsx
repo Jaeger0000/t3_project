@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth'
 import { roleLabels } from '@/lib/labels'
 import { usePendingCount } from '@/features/approvals/queries'
 import { Badge, Button } from '@/components/ui'
+import { LogoLockup } from '@/components/Logo'
 
 /**
  * Menü rol bazlı kurulur. Bu bir güvenlik önlemi değil — yetki sunucuda
@@ -49,17 +50,11 @@ export default function AppShell({ children }: { children?: ReactNode }) {
 
       <header className="sticky top-0 z-10 border-b border-stone-200 bg-white/90 backdrop-blur dark:border-stone-800 dark:bg-stone-950/90">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 items-center justify-center rounded-lg bg-brand-500 text-sm font-bold text-white">
-              T3
-            </span>
-            <div className="leading-tight">
-              <p className="text-sm font-semibold text-stone-900 dark:text-stone-50">
-                Girişim Ekosistemi
-              </p>
-              <p className="text-xs text-stone-500">Yönetim Sistemi</p>
-            </div>
-          </div>
+          {/* Logo panoya götürüyor: her arayüzde sol üstteki marka ana ekrana
+              dönüş düğmesidir ve kullanıcı önce oraya tıklıyor. */}
+          <Link to="/pano" className="rounded-lg focus-visible:ring-2 focus-visible:ring-brand-500/60">
+            <LogoLockup compact />
+          </Link>
 
           <nav className="flex flex-wrap items-center gap-1">
             {links

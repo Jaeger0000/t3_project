@@ -64,6 +64,12 @@ try:
               ".find(b => (b.innerText||'').includes('Giriş yap')).disabled") is True)
     check("CSP kendi paketini engellemiyor (script çalıştı)",
           browser.evaluate("!!document.querySelector('#root').children.length") is True)
+    # Logo satır içi SVG: harici dosya olsaydı CSP img-src/connect-src tarafında
+    # ayrı bir karar isterdi ve bir istek daha ederdi.
+    check("logo ekranda çizilmiş",
+          browser.evaluate(
+              "(() => { const s = document.querySelector('[data-testid=\"logo\"]');"
+              "  return !!s && s.getBoundingClientRect().width > 8; })()") is True)
 
     # --- Süper Yönetici: liste, kart, pano ------------------------------
     admin = token_of("admin@t3ekosistem.test")

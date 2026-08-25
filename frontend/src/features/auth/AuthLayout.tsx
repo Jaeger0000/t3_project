@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Card } from '@/components/ui'
+import { LogoMark } from '@/components/Logo'
 
 /**
  * Oturum açmadan görülen ekranların ortak çerçevesi (giriş, şifre kurtarma).
@@ -20,9 +21,7 @@ export default function AuthLayout({
     <div className="flex min-h-screen items-center justify-center px-6 py-12">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <span className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-brand-500 font-bold text-white">
-            T3
-          </span>
+          <LogoMark className="mx-auto mb-4 size-12" label="T3 Girişim Ekosistemi" />
           <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-50">{title}</h1>
           <p className="mt-2 text-sm text-stone-500">{description}</p>
         </div>
