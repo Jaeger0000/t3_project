@@ -528,8 +528,21 @@ ekranını gösterecek biçimde koru.
 >
 > Doğrulama: `render_faz8.py` derlenmiş arayüzü 5080'den açıp giriş yapıyor,
 > derin bağlantının index.html'e düştüğünü ve `/api/olmayan-uc`'un JSON 404
-> döndüğünü sınıyor. Konteyner imajı bu makinede **derlenmedi** (aşağıdaki
-> "kalan" notu).
+> döndüğünü sınıyor.
+>
+> **25 Ağustos:** konteyner imajı da bu makinede derlendi ve çalıştırıldı
+> (`t3-ekosistem:local`, 339 MB). Boş bir veritabanına karşı kaldırıldığında:
+> göçleri kendisi uyguladı (`MigrateOnStartup`), "Tohum verisi kapalı (ortam:
+> Production)" log'unu düştü, `uid=1654(app)` ile koştu (kök değil),
+> `/health` 200, `/girisimler` derin bağlantısı index.html'e düştü,
+> `/api/yok` JSON 404 verdi, `/api/...` yanıtları `no-store`, kök yanıtta CSP +
+> `X-Frame-Options: DENY` + `Permissions-Policy` vardı. Yani imaj yalnızca
+> "derleniyor" değil, üretim ayarlarıyla **doğru davranıyor**.
+>
+> İki makineye özgü tuzak: bu kutuda `docker buildx` kurulu değil
+> (`DOCKER_BUILDKIT=0` ile eski derleyici) ve docker köprüleri `DOWN` olduğu
+> için derleme adımlarının ağı yok — `docker build --network host` olmadan
+> `npm ci` ilk adımda düşüyor.
 
 
 Frontend tüm isteklerini göreli `/api/...` yoluna atıyor; bu yolu backend'e

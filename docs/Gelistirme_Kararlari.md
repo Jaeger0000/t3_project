@@ -681,6 +681,13 @@ Kaynak: [Denetim_Duzeltme_Plani.md](Denetim_Duzeltme_Plani.md) Dalga 1.
   Kontrol: `ip -br addr show | grep br-`. Çözüm root ister
   (`sudo ip link set <br> up` ya da docker yeniden başlatma); geçici çare
   `docker exec … nc` üzerinden yerel bir TCP köprüsü.
+- **Köprü `DOWN` iken imaj derlemesinin de ağı yok**: `npm ci` ilk `RUN`
+  adımında düşüyor. `docker build --network host` derleme adımlarını host
+  ağına alıyor ve iş görüyor. Bu kutuda ayrıca `docker buildx` kurulu değil;
+  `DOCKER_BUILDKIT=0` ile eski derleyici kullanılıyor (Dockerfile'ın
+  `# syntax` satırı eski derleyicide yalnızca yorum, sorun çıkarmıyor).
+  İmaj tek başına kalkarken host ağı `--network host` ile veriyor; `.env`
+  köprüsündeki 5434 vekili aynı şekilde görülüyor.
 
 ### Kabuk / araç tuzakları
 

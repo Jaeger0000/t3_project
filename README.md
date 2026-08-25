@@ -264,8 +264,15 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 ```
 
 Konteyner şemayı kendisi kuruyor (`T3_Database__MigrateOnStartup=true`) ve tohum
-verisi **çalışmıyor** — ortam `Production`. Yığını kurmadan aynı yolu yerelde
-denemek için:
+verisi **çalışmıyor** — ortam `Production`. İmaj bu makinede derlenip boş bir
+veritabanına karşı kaldırıldı (`t3-ekosistem:local`, 339 MB): göçler uygulandı,
+tohumlama kapalı kaldı, süreç `uid=1654(app)` ile koştu, `/health` 200, derin
+bağlantı index.html'e düştü, `/api/yok` JSON 404 verdi, CSP ve `no-store`
+başlıkları yerindeydi. `docker buildx` kurulu değilse `DOCKER_BUILDKIT=0`
+gerekir; docker köprüsü `DOWN` ise derleme `--network host` ister (yoksa
+`npm ci` ağsız kalır).
+
+Yığını kurmadan aynı yolu yerelde denemek için:
 
 ```bash
 cd frontend && npm run build
@@ -463,25 +470,20 @@ bkz. [teknik plan](docs/Problem7_Teknik_Plan.md#8-faz-planı).
 Denetim planının üç dalgası da kapandı ([plan](docs/Denetim_Duzeltme_Plani.md)).
 Geriye teknik olmayan ya da bu depoda karara bağlanamayan kalemler kaldı:
 
-- **KVKK metinlerinin hukuki içeriği onaylanmadı** — sayfalar görünür biçimde
-  "Taslak" işaretli (Dalga 1.5).
+- **KVKK metinlerinin hukuki içeriği onaylanmadı** — teknik iş bitti, sayfalar
+  görünür biçimde "Taslak" işaretli (Dalga 1.5).
 - **Sentry bağlanmadı** — hesap, DSN ve yurt dışı aktarım kararı gerekiyor
   (Dalga 2.3 / O-06). Kod tarafında bağlanacak yer hazır.
-- **Konteyner imajı bu makinede derlenmedi**: `Dockerfile` ve
-  `docker-compose.prod.yml` yazıldı, tek origin sunum yerelde (API + `wwwroot`)
-  uçtan uca doğrulandı, ancak `docker compose -f docker-compose.prod.yml build`
-  henüz koşulmadı.
 - **Gerçek SMTP yok:** şifre sıfırlama e-postaları sunucunun diskindeki
   geliştirme kutusuna yazılıyor (`IEmailSender` arkasında sağlayıcı değişir).
+  Arayüz akışı ve jeton yaşam döngüsü buna rağmen uçtan uca doğrulanıyor.
 
-- **KVKK metinlerinin hukuki içeriği onaylanmadı** — teknik iş bitti, metin
-  taslak olarak işaretli.
-- **Şifre sıfırlama e-postası gerçekten gönderilmiyor:** SMTP sağlayıcısı yok,
-  gönderici e-postayı sunucunun diskindeki kutuya yazıyor. Arayüz akışı ve
-  jeton yaşam döngüsü buna rağmen uçtan uca doğrulanıyor.
-- Yenileme jetonu yok; jeton dolduğunda kullanıcı yeniden giriş yapar
-  (gerekçeyi ekranda görerek).
+### Bilinçli sınırlar
 
+Bunlar eksik değil, kapsam kararı — ölçek gerektirdiğinde değişecek yer belli:
+
+- Yenileme jetonu yok; jeton dolduğunda kullanıcı gerekçeyi ekranda görerek
+  yeniden giriş yapar.
 - Doküman deposu yerel disk; S3 uyumlu sürüm aynı arayüzün arkasında duruyor
   ama henüz yazılmadı.
 - Onaylanmayı bekleyen doküman yüklemeleri hiç karara bağlanmazsa dosyaları
