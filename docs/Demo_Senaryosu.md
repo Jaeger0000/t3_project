@@ -66,7 +66,7 @@ ekranda görünenle birebir aynı olur.
 | 0:00–0:40 | **Problem** | "T3 ekosisteminde girişim verisi program program dağınık: Ön Kuluçka'nın Excel'i, TEKNOFEST'in formu, kurucunun sunumu. Aynı girişimin üç farklı hikâyesi var ve hiçbiri güncel değil." |
 | 0:40–1:10 | **Kime ne kaybettiriyor** | Program yöneticisi mükerrer veri girişi; karar verici haftalar süren rapor turu; girişim aynı bilgiyi her yere yeniden yazıyor; program sorumlusu değişince hafıza kişiyle gidiyor. |
 | 1:10–3:30 | **Çözüm — canlı demo** | Videodaki 3, 4, 5, 6, 7 numaralı sahneler (kart → yolculuk → portal önerisi → onay → maskeleme). **Panoyu en sona bırakın**: en gösterişli ekran ama en az ayırt edici olan. |
-| 3:30–4:10 | **Nasıl kurumsal** | Varsayılan kapalı yetkilendirme, satır + alan düzeyinde erişim, onay akışı, denetim izi, KVKK maskelemesi tek noktada, tek origin dağıtım + CSP/çerez güvenliği. "Doğrulama: 191 birim testi, 310 uçtan uca kontrol, 346 render kontrolü." |
+| 3:30–4:10 | **Nasıl kurumsal** | Varsayılan kapalı yetkilendirme, satır + alan düzeyinde erişim, onay akışı, denetim izi, KVKK maskelemesi tek noktada, tek origin dağıtım + CSP/çerez güvenliği. "Doğrulama: 191 birim testi, 310 uçtan uca kontrol, 352 render kontrolü." |
 | 4:10–4:40 | **AI** | "AI'ı uygulamaya anahtar gömerek değil **MCP sunucusu** olarak verdik: analist Claude'dan bağlanıyor ve **kendi yetkisi kadar** görüyor. Yani AI yetki sisteminin yanından dolaşan bir kapı değil." |
 | 4:40–5:00 | **Kapanış** | "Altı zorunlu MVP maddesi çalışıyor, kalanı ölçek ve içerik onayı. Bugün kurulabilir hâlde." |
 

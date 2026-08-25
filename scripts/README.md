@@ -17,7 +17,7 @@ yakalamıştı.
 | `render_faz6.py` | Denetim Dalga 0 düzeltmeleri: girişim/ekip/katılım yazma yolları (arayüzden yeni girişim → program dönemine bağlama → kart düzenleme → ekip üyesi), sekme başlığı ve sayfa dili, 404 ekranı, üç genişlikte mobil yatay taşma, kapsam dışı program reddi, maskeli alanın yazma yolunda korunması ve giriş hız sınırı bölümlemesi (75 kontrol) |
 | `render_faz5.py` | Pano ve grafiklerin çizilmesi, Karar Verici'nin ekosistem toplamını görüp tekil tutar yerine kilit görmesi, tarayıcıdan CSV indirme, asistan paneli ve kart özeti — kaynak listesiyle birlikte (53 kontrol) |
 | `render_faz8.py` | Denetim Dalga 2: oturum çerezinin bayrakları ve script'in jetona erişemediği, CSRF çift-gönderimi (çerezle gelen yazma isteği reddediliyor, başlıkla gelen istemiyor), çıkışın çerezi silmesi, **derlenmiş arayüzün API'den sunulması** (SPA geri dönüşü + API yolunda JSON 404), güvenlik başlıkları ve önbellek politikası, rota bazlı kod bölme, filtre durumunun URL'de olması, aksansız aramanın aksanlı kaydı bulması, kaydedilmemiş form uyarısı, sekmeler arası oturum senkronu, "İçeriğe atla" ve odak halkası, süresi dolmuş oturumun giriş ekranına düşmesi (54 kontrol) |
-| `render_faz7.py` | Denetim Dalga 1: program/dönem yönetimi ve katılımın yaşam döngüsü (oluştur → düzelt → kaldır → dönemi kapat → programı kapat), şifre kurtarmanın tamamı (zorunlu değiştirme, kutudan okunan jeton, tek kullanımlık kontrolü), oturum ömrü ve **ağ kesintisinde** oturumun düşmemesi, giriş olaylarının denetim izine maskeli düşmesi, KVKK metinlerinin oturumsuz açılması, Karar Verici'nin onay ekranı (91 kontrol) |
+| `render_faz7.py` | Denetim Dalga 1: program/dönem yönetimi ve katılımın yaşam döngüsü (oluştur → düzelt → kaldır → dönemi kapat → programı kapat), şifre kurtarmanın tamamı (zorunlu değiştirme, kutudan okunan jeton, tek kullanımlık kontrolü), oturum ömrü ve **ağ kesintisinde** oturumun düşmemesi, giriş olaylarının denetim izine maskeli düşmesi, KVKK metinlerinin oturumsuz açılması, **giriş ekranındaki KVKK onay kapısı** (kutu işaretlenmeden giriş düğmesi kapalı, onay denetim izine maskeli düşüyor), Karar Verici'nin onay ekranı (97 kontrol) |
 | `cdp.py` | Render betiklerinin kullandığı bağımlısız Chrome DevTools Protocol istemcisi |
 
 ## Çalıştırma
@@ -119,6 +119,16 @@ kayıt sildiği için kapsam sayıları değişir.
 > seçiyor ve silmeden önce kendi dosyasını yüklüyor — kontrol tohum düzenini
 > değil zinciri ölçüyor. Buna rağmen tam yeşil bir zincir hâlâ temiz
 > tohum verisi ister — yukarıdaki tur sırası bunun için var.
+>
+> **Sayfa iskeleti ile veri aynı an gelmiyor.** `wait_for` başlığı gördüğü an
+> dönüyor; satırlar sorgudan sonra basılıyor. "Yeni program düğmesi var" ve
+> "kimliği doğrulanmamış olay ayırt ediliyor" kontrolleri bu yüzden ekranda
+> "… yükleniyor" varken ölçüp düştü — yine ürünü değil zamanlamayı ölçen bir
+> kontrol. `render_faz7.py` içindeki `wait_loaded()` yükleniyor metni kaybolana
+> kadar bekliyor. Aynı dosyada KVKK onay kapısı kontrolü, onay tarayıcıda
+> hatırlandığı için ölçmeden önce `localStorage`'daki kaydı siliyor: yoksa
+> ikinci koşuda kutu işaretli açılır ve "varsayılan kapalı" kontrolü profilin
+> durumunu ölçerdi.
 >
 > Docker köprüsü host tarafında `DOWN` düşerse (`ip -br addr show | grep br-`)
 > yayımlanan Postgres portu bağlantıyı kabul edip iletmez ve API açılışta

@@ -340,6 +340,25 @@ Kaynak: [Denetim_Duzeltme_Plani.md](Denetim_Duzeltme_Plani.md) Dalga 0.
 
 Kaynak: [Denetim_Duzeltme_Plani.md](Denetim_Duzeltme_Plani.md) Dalga 1.
 
+- **KVKK onayı giriş ekranında kapı, izde kayıt (25 Ağustos).** Üç karar bir
+  arada:
+  1. *Kutu girişi kilitliyor.* "Giriş yaparak kabul etmiş olursunuz" kalıbı
+     hukuken beyan değil varsayım; kutu işaretlenmeden düğme açılmıyor ve
+     nedeni ekranda yazıyor (gerekçesiz devre dışı düğme "form bozuk" gibi
+     okunuyor).
+  2. *Onay sürüme bağlı* (`KVKK_ONAY_SURUMU`, `features/auth/kvkkConsent.ts`).
+     Metin değişip sürüm artınca aynı kişiye yeniden soruluyor. Sürümsüz bir
+     bayrak, güncellenmiş metne eski onayı saymak olurdu.
+  3. *Kanıt sunucuda.* İstemcideki `localStorage` kaydı yalnızca "bu tarayıcıda
+     bir daha sormayalım" kolaylığı — kullanıcı silebilir. Giriş isteği sürümü
+     taşıyor ve `LoginHandler` denetim izine ayrı bir `Auth.KvkkConsent` satırı
+     (maskeli e-posta + sürüm) yazıyor; ayrı satır, çünkü "kim hangi metni ne
+     zaman onayladı" sorusu giriş olaylarından bağımsız süzülmeli (denetim
+     ekranındaki "KVKK onayı" süzgeci).
+  `LoginRequest.KvkkConsentVersion` bilinçli olarak **isteğe bağlı**: aynı uçtan
+  giriş ekranını hiç görmeyen istemciler (doğrulama betikleri, MCP, Swagger)
+  geçiyor, alanı zorunlu kılmak onları kırardı. Şema değişmedi — kayıt zaten
+  değiştirilemez olan denetim izine gidiyor, yeni tablo/kolon gerekmedi.
 - **Program yetkisi ikiye ayrıldı: `ManagePrograms` (tanım) ve
   `ManageProgramTerms` (dönem/katılım).** Tek politika kullanmak kolaydı ama
   yanlış olurdu: program listesi aynı zamanda Program Yöneticisi'nin **yetki
@@ -755,7 +774,7 @@ kanıtlayan `UnreachableDbContext` — her `DbSet` erişimi istisna fırlatıyor
 | Faz 5 | ✅ | Ekosistem panosu ve grafikler, CSV dışa aktarma, MCP sunucusu, AI karar destek paneli ve yönetici özeti, 32 girişimlik gerçekçi tohum verisi. Doğrulama: 153 birim testi, 103 uçtan uca kontrol, 53 render kontrolü. |
 | Denetim Dalga 0 | ✅ | Ürün denetiminin videodan önce kapanması gereken altı bulgusu: yazma yolları arayüze, hız sınırı bölümlemesi, sekme başlığı/dil, 404 ekranı, mobil taşma, yazma yolunda maskeleme. Doğrulama: 156 birim testi, 201 render kontrolü (`render_faz6.py` yeni). |
 | Denetim Dalga 1 | ✅ | Program/dönem yönetimi, şifre kurtarma ve değiştirme, oturum ömrü + ağ hatası ayrımı, giriş olaylarının denetim izi, KVKK metinleri, Karar Verici'nin onay ekranı. Doğrulama: 185 birim testi, `render_faz7.py` (yeni). |
-| Denetim Dalga 2 | ✅ | Tek origin dağıtım (API arayüzü sunuyor) + `Dockerfile`/`docker-compose.prod.yml`, jeton `HttpOnly` çerezde + CSRF + CSP ve güvenlik başlıkları, güvenilen vekil listesi, URL'de filtre durumu, aksan katlaması, kirli form uyarısı, kod bölme, erişilebilirlik. Doğrulama: 191 birim testi, 310 uçtan uca kontrol, 346 render kontrolü (`render_faz8.py` yeni, 54 kontrol). |
+| Denetim Dalga 2 | ✅ | Tek origin dağıtım (API arayüzü sunuyor) + `Dockerfile`/`docker-compose.prod.yml`, jeton `HttpOnly` çerezde + CSRF + CSP ve güvenlik başlıkları, güvenilen vekil listesi, URL'de filtre durumu, aksan katlaması, kirli form uyarısı, kod bölme, erişilebilirlik. Doğrulama: 191 birim testi, 310 uçtan uca kontrol, 352 render kontrolü (`render_faz8.py` yeni, 54 kontrol; KVKK onay kapısıyla `render_faz7.py` 97'ye çıktı). |
 
 **Faz 1'den bilinçli ertelenen:** kullanıcı yönetimi CRUD'u — girişim kartı buna
 ihtiyaç duymadığı için onay akışıyla birlikte Faz 3'e alındı.

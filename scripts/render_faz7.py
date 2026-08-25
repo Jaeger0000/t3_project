@@ -204,6 +204,18 @@ def as_user(role_or_token, path, wait_for=None):
     return browser.goto(f"{APP}{path}", wait_for=wait_for)
 
 
+def wait_loaded(text, marker="yükleniyor", timeout=10):
+    """Sayfa iskeleti başlığıyla birlikte geliyor, satırlar sorgudan sonra:
+    `wait_for` başlığı gördüğü an dönüyor ve o anda ekranda hâlâ
+    "… yükleniyor" yazıyor olabiliyor. Veri beklenmeden yapılan kontrol ürünü
+    değil zamanlamayı ölçer (iki kontrol bu yüzden düşmüştü)."""
+    deadline = time.time() + timeout
+    while marker in (text or "") and time.time() < deadline:
+        time.sleep(0.3)
+        text = browser.text()
+    return text
+
+
 def anonymous(path, wait_for=None):
     browser.goto(f"{APP}/giris")
     browser.clear_session()
@@ -251,6 +263,31 @@ try:
           "KVKK aydınlatma metni" in text, text[:400])
     check("giriş ekranında 'Şifremi unuttum' var", "Şifremi unuttum" in text, text[:400])
 
+    # --- KVKK onay kapısı ------------------------------------------------
+    # Kayıtlı onay silinip sayfa yenileniyor: onay tarayıcıda hatırlandığı için
+    # ikinci koşuda kutu işaretli açılır ve "varsayılan kapalı" kontrolü ürünü
+    # değil profilin durumunu ölçerdi.
+    browser.evaluate("localStorage.removeItem('t3.kvkk.onay')")
+    text = browser.goto(f"{APP}/giris", wait_for="Giriş yap")
+    check("giriş ekranında KVKK onay kutusu var",
+          browser.evaluate("!!document.querySelector('[data-testid=\"kvkk-onay\"]')") is True,
+          text[:400])
+    check("onay verilmeden giriş düğmesi kapalı",
+          browser.evaluate(
+              "[...document.querySelectorAll('button')]"
+              ".find(b => (b.innerText||'').includes('Giriş yap')).disabled") is True,
+          text[:400])
+    check("düğmenin neden kapalı olduğu ekranda yazıyor",
+          "aydınlatma metnini onaylamanız" in text, text[:600])
+
+    browser.evaluate("document.querySelector('[data-testid=\"kvkk-onay\"]').click()")
+    time.sleep(0.4)
+    check("onay işaretlenince giriş düğmesi açılıyor",
+          browser.evaluate(
+              "[...document.querySelectorAll('button')]"
+              ".find(b => (b.innerText||'').includes('Giriş yap')).disabled") is False,
+          browser.evaluate("document.querySelector('[data-testid=\"kvkk-onay\"]').checked"))
+
     text = as_user("admin", "/pano", wait_for="Ekosistem panosu")
     check("alt bilgi her ekranda KVKK bağlantısı taşıyor",
           "KVKK aydınlatma metni" in text and "Kullanım şartları" in text, text[-400:])
@@ -288,10 +325,25 @@ try:
           browser.evaluate("location.pathname"))
     check("giriş formu doldurulabiliyor",
           fill({"E-posta": "admin@t3ekosistem.test", "Şifre": PW}) == "ok")
+    # Onay kutusu girişi kilitliyor: işaretlenmeden düğmeye basmak bir şey yapmaz.
+    browser.evaluate(
+        "(() => { const k = document.querySelector('[data-testid=\"kvkk-onay\"]');"
+        "  if (k && !k.checked) k.click(); return k ? k.checked : null; })()")
     browser.click_text("Giriş yap", wait_for="Denetim izi")
     check("giriş sonrası istenen ekrana dönülüyor",
           browser.evaluate("location.pathname") == "/denetim",
           browser.evaluate("location.pathname"))
+
+    # Tarayıcıda tutulan onay kanıt değil: kayıt sunucuda, denetim izinde.
+    status, consent = call("GET", "/api/audit-logs?action=Auth.KvkkConsent&pageSize=5",
+                           token_of("admin@t3ekosistem.test"))
+    rows = consent.get("items", []) if isinstance(consent, dict) else []
+    check("KVKK onayı denetim izine düşüyor", status == 200 and len(rows) >= 1,
+          f"{status} {json.dumps(consent, ensure_ascii=False)[:300]}")
+    check("iz onaylanan metin sürümünü ve maskeli e-postayı taşıyor",
+          bool(rows) and "ConsentVersion" in json.dumps(rows[0], ensure_ascii=False)
+          and "***" in json.dumps(rows[0], ensure_ascii=False),
+          json.dumps(rows[0], ensure_ascii=False)[:300] if rows else "satır yok")
 
     # Ağ hatası: jeton elde kalıyor, ham "Failed to fetch" yerine Türkçe durum.
     as_user("admin", "/pano", wait_for="Ekosistem panosu")
@@ -325,7 +377,7 @@ try:
 
     # --- B-02: program ve dönem yönetimi --------------------------------
     print("\n=== Program ve dönem yönetimi ===")
-    text = as_user("admin", "/programlar", wait_for="Programlar")
+    text = wait_loaded(as_user("admin", "/programlar", wait_for="Programlar"))
     check("süper yöneticide 'Yeni program' düğmesi var", "Yeni program" in text, text[:400])
 
     text = as_user("kulucka", "/programlar", wait_for="Programlar")
@@ -571,7 +623,7 @@ try:
     status, _ = call("GET", "/api/audit-logs?action=Auth", tokens["portal"])
     check("girişim kullanıcısı giriş izini göremiyor", status == 403, str(status))
 
-    text = as_user("admin", "/denetim", wait_for="Denetim izi")
+    text = wait_loaded(as_user("admin", "/denetim", wait_for="Denetim izi"))
     check("izde eylem türü süzgeci var", "Başarısız giriş" in text, text[:600])
     check("kimliği doğrulanmamış olay ayırt ediliyor",
           "kimlik doğrulanmadı" in text, text[:1200])

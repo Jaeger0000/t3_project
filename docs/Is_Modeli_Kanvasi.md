@@ -158,5 +158,5 @@ karar kalitesi** var.
 Kanvastaki her değer iddiasının çalışan karşılığı var; ayrıntı ve doğrulama
 kayıtları için: [README — Durum](../README.md#durum),
 [Denetim düzeltme planı](Denetim_Duzeltme_Plani.md). Ürün 191 birim testi,
-310 uçtan uca kontrol ve headless tarayıcıda 346 render kontrolüyle
+310 uçtan uca kontrol ve headless tarayıcıda 352 render kontrolüyle
 doğrulanıyor; bu sayılar kanvasın "çalışıyor" iddiasının dayanağı.

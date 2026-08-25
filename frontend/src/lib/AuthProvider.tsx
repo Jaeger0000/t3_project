@@ -69,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
 
   const loginMutation = useMutation({
-    mutationFn: (body: { email: string; password: string }) =>
+    mutationFn: (body: { email: string; password: string; kvkkConsentVersion?: string }) =>
       api.post<LoginResponse>('/api/auth/login', body),
     onSuccess: (data) => {
       // Jeton yanıt gövdesinde de geliyor ama bilinçli olarak saklanmıyor:
@@ -83,8 +83,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
 
   const login = useCallback(
-    async (email: string, password: string) => {
-      await loginMutation.mutateAsync({ email, password })
+    async (email: string, password: string, kvkkOnaySurumu?: string) => {
+      // Onay sürümü isteğe bağlı: Bearer ile gelen betikler, MCP istemcileri ve
+      // Swagger giriş ekranını hiç görmüyor, alanı zorunlu yapmak onları kırardı.
+      await loginMutation.mutateAsync({ email, password, kvkkConsentVersion: kvkkOnaySurumu })
     },
     [loginMutation],
   )

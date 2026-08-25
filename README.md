@@ -419,6 +419,10 @@ gereken bulguları ([plan](docs/Denetim_Duzeltme_Plani.md)):
   listesine dönüşmemeli. Hız sınırı kilidi pencere başına **tek** satır açıyor:
   reddedilen istek sayısı sınırsız olduğu için her redde satır açmak izin
   kendisini bir saldırı yüzeyi yapardı.
+- **KVKK onay kapısı:** giriş ekranındaki onay kutusu işaretlenmeden giriş
+  düğmesi açılmıyor; onay bir metin sürümüne bağlı ve sunucuda denetim izine
+  düşüyor (`Auth.KvkkConsent`, maskeli e-posta + sürüm). Tarayıcıdaki kayıt
+  yalnızca "bir daha sormayalım" kolaylığı, kanıt izde.
 - **KVKK metinleri:** `/kvkk-aydinlatma` ve `/kullanim-sartlari` giriş yapmadan
   açılıyor, her ekranın alt bilgisinden ve giriş ekranından erişiliyor, başvuru
   adresi metinde duruyor. Metinler görünür biçimde **taslak** işaretli: hukuki
@@ -453,8 +457,8 @@ gereken bulguları ([plan](docs/Denetim_Duzeltme_Plani.md)):
   (hesap/DSN/KVKK aktarım kararı gerekiyor); yerine `ErrorBoundary` var.
 
 **Doğrulama:** 191 birim testi, API'ye gerçek rollerle vuran 310 uçtan uca
-kontrol (81 + 125 + 104) ve headless Chrome'da 346 render kontrolü
-(32 + 41 + 53 + 75 + 91 + 54) — **temiz tohum verisiyle**. Betikler veriyi
+kontrol (81 + 125 + 104) ve headless Chrome'da 352 render kontrolü
+(32 + 41 + 53 + 75 + 97 + 54) — **temiz tohum verisiyle**. Betikler veriyi
 değiştirdiği için (girişim pasife alma, kullanıcı oluşturma) tam yeşil bir zincir
 sıfırlanmış veritabanı ister; ayrıntı [scripts/](scripts/). Render adımı yine iş
 gördü: Faz 5'te panelin `data-testid`'sini yutan `Card` bileşenini, Karar

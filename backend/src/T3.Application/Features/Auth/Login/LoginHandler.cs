@@ -62,6 +62,20 @@ public sealed class LoginHandler(
             after: new { Email = MaskedEmail.Of(user.Email), Role = user.Role.ToString() },
             ct: ct);
 
+        // KVKK onayı ayrı satır olarak yazılıyor: "kim, hangi metin sürümünü, ne
+        // zaman onayladı" sorusu giriş olaylarından bağımsız süzülebilmeli
+        // (denetim ekranındaki "KVKK onayı" süzgeci bu adı arıyor).
+        if (!string.IsNullOrWhiteSpace(request.KvkkConsentVersion))
+            await audit.WriteForActorAsync(
+                user.Id, user.Role,
+                "Auth.KvkkConsent", nameof(User), user.Id,
+                after: new
+                {
+                    Email = MaskedEmail.Of(user.Email),
+                    ConsentVersion = request.KvkkConsentVersion.Trim(),
+                },
+                ct: ct);
+
         return new LoginResponse(
             token.Value,
             token.ExpiresAt,

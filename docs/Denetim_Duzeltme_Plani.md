@@ -431,6 +431,19 @@ satır; satırlar IP ve zaman damgası taşır; girişim kullanıcısı göremez
 > ⚠️ **Metinlerin hukuki içeriği onaylanmadı** — sayfalar görünür biçimde
 > "Taslak" işaretli. Onaylanmamış bir aydınlatma metnini onaylanmış gibi
 > göstermek yükümlülüğü karşılamaz, karşılanmış gibi gösterir.
+>
+> **25 Ağustos — onay kapısı eklendi.** Metne bağlantı vermek "bilgilendirme",
+> onay kutusu "beyan": giriş ekranındaki kutu işaretlenmeden **giriş düğmesi
+> açılmıyor** ve düğmenin neden kapalı olduğu ekranda yazıyor. Onay bir sürüme
+> bağlı (`KVKK_ONAY_SURUMU`); metin değişip sürüm artınca aynı kullanıcıya
+> yeniden soruluyor — eski onayı yeni metne saymak onay değil varsayım olurdu.
+> Kanıt niteliğindeki kayıt sunucuda: giriş isteği sürümü taşıyor, `LoginHandler`
+> denetim izine `Auth.KvkkConsent` satırı (maskeli e-posta + sürüm) yazıyor ve
+> denetim ekranında "KVKK onayı" süzgeci var. `localStorage`'daki kopya yalnızca
+> "bu tarayıcıda bir daha sormayalım" kolaylığı; kullanıcı silebilir, kanıt orada
+> değil. Alan `LoginRequest`'te **isteğe bağlı**: giriş ekranını hiç görmeyen
+> istemciler (betikler, MCP, Swagger) aynı uçtan geçiyor. Doğrulama:
+> `render_faz7.py` +6 kontrol (91 → 97).
 
 Sistemde aydınlatma metni, çerez bildirimi, kullanım şartları ve KVKK başvuru
 yolu **hiç yok** — 55 render'ın hiçbirinde geçmiyor.
@@ -470,7 +483,7 @@ ekranını gösterecek biçimde koru.
 ## Dalga 2 — Gerçek canlıya çıkış (Demo Day sonrası)
 
 > **Durum: tamamlandı (24 Ağustos).** Üç maddenin hepsi kapandı. Doğrulama:
-> 191 birim testi, 310 uçtan uca kontrol, 346 render kontrolü — sonuncusu
+> 191 birim testi, 310 uçtan uca kontrol, 352 render kontrolü — sonuncusu
 > `scripts/render_faz8.py` (yeni, 54 kontrol) dâhil. Yeni betik **iki origin'e**
 > karşı koşuyor: davranış kontrolleri Vite'ta (5173), barındırma ve güvenlik
 > başlıkları API'nin kendi sunduğu derlenmiş arayüzde (5080).

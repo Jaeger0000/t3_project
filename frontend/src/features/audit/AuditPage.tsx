@@ -26,6 +26,7 @@ const actionGroups = [
   { value: 'Auth.LoginFailed', label: 'Başarısız giriş' },
   { value: 'Auth.RateLimited', label: 'Hız sınırı kilidi' },
   { value: 'Auth.Password', label: 'Şifre işlemleri' },
+  { value: 'Auth.KvkkConsent', label: 'KVKK onayı' },
 ]
 
 /**

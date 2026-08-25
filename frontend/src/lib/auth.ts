@@ -21,7 +21,11 @@ export type AuthState = {
    * gösteriyor — kullanıcı sessizce atıldığını sanmasın.
    */
   signedOutReason: string | null
-  login: (email: string, password: string) => Promise<void>
+  /**
+   * `kvkkOnaySurumu`: giriş ekranında onaylanan aydınlatma metninin sürümü.
+   * Sunucu bunu denetim izine yazıyor; istemcideki kayıt yalnızca kolaylık.
+   */
+  login: (email: string, password: string, kvkkOnaySurumu?: string) => Promise<void>
   logout: () => void
   loginError: string | null
   isLoggingIn: boolean

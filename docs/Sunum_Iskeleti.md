@@ -17,7 +17,7 @@
 | 8 | **Yapılandırılmış veri** (MVP #4) | Serbest metin değil, alan bazlı | Başarı türleri tablosu (ciro/ihracat/yatırım/hibe/ödül) + CSV çıktısı | "Toplanabilir, filtrelenebilir, raporlanabilir olmasının sebebi bu." |
 | 9 | **KVKK** | Aynı kart, farklı rol | Yan yana iki ekran görüntüsü: aynı kart, biri tutarlı biri kilitli | "Maskeleme kuralı kodda **tek yerde** ve okunabilir; 'kim neyi neden göremiyor' sorusunu koddan gösterebiliyoruz. Yazma yolunda da korunuyor: göremediğiniz alanı kaydederken silmiyorsunuz." |
 | 10 | **AI — MCP kararı** | AI yetki sisteminin yanından dolaşmıyor | Şema: Claude → `POST /mcp` → aynı handler'lar → aynı kapsam/maskeleme | "Modeli uygulamaya gömmedik. Analist kendi jetonuyla bağlanıyor ve **kendi yetkisi kadar** görüyor." |
-| 11 | **Kurumsal olgunluk** | Çalışıyor ve doğrulanıyor | Rakamlar: 191 birim testi · 310 uçtan uca kontrol · 346 render kontrolü · varsayılan kapalı yetki · denetim izi · tek origin dağıtım | "Doğrulama zincirimiz üç katmanlı; ekranın gerçekten açıldığını headless tarayıcıda ölçüyoruz." |
+| 11 | **Kurumsal olgunluk** | Çalışıyor ve doğrulanıyor | Rakamlar: 191 birim testi · 310 uçtan uca kontrol · 352 render kontrolü · varsayılan kapalı yetki · denetim izi · tek origin dağıtım | "Doğrulama zincirimiz üç katmanlı; ekranın gerçekten açıldığını headless tarayıcıda ölçüyoruz." |
 | 12 | **Kapanış + yol haritası** | Bugün kurulabilir | Üç madde: bugün hazır / onay bekleyen (KVKK metni) / sıradaki (hata izleme, SMTP, gerçek dağıtım) | "Altı zorunlu MVP maddesi çalışıyor. Kalanı içerik onayı ve ölçek." |
 
 ## Tasarım notları
