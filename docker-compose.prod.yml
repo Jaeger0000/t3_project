@@ -1,0 +1,72 @@
+# Üretim benzeri yığın: postgres + tek konteynerde API/arayüz.
+#
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# Geliştirme yığınından (docker-compose.yml) ayrı dosya: orada yalnızca veritabanı
+# vardı ve uygulama makinede çalışıyordu. Burada uygulama da konteynerde ve
+# postgres dışarıya port açmıyor.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: t3-postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-t3ekosistem}
+      POSTGRES_USER: ${POSTGRES_USER:-t3}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD gerekli}
+    # Port yayımlanmıyor: veritabanına yalnızca uygulama ağı üzerinden erişilir.
+    volumes:
+      - postgres-prod-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-t3} -d ${POSTGRES_DB:-t3ekosistem}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: t3-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Bağlantı dizesi konteyner ağındaki servis adını kullanıyor.
+      T3_ConnectionStrings__Default: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-t3ekosistem};Username=${POSTGRES_USER:-t3};Password=${POSTGRES_PASSWORD}"
+      T3_Jwt__Secret: ${T3_JWT_SECRET:?T3_JWT_SECRET gerekli}
+
+      # Şemayı uygulamanın kendisi kurar: "tek komutla kalkan yığın" hedefi bunu
+      # gerektiriyor (bkz. Program.cs, Database:MigrateOnStartup).
+      T3_Database__MigrateOnStartup: "true"
+
+      # Tohum verisi üretimde çalışmaz; değer yine de açıkça yazılıyor ki
+      # yapılandırmayı okuyan kişi kararı görsün.
+      T3_Seed__Enabled: "false"
+
+      # TLS'i önde duran vekil sonlandırıyor: yönlendirme ve HSTS orada.
+      # Vekilin IP'si güvenilen listeye girmeli, yoksa denetim izine ve hız
+      # sınırına vekilin adresi yazılır (herkes tek kovaya düşer).
+      T3_Hosting__RequireHttps: "false"
+      T3_Hosting__TrustedProxies__0: ${TRUSTED_PROXY_IP:-127.0.0.1}
+
+      # Şifre sıfırlama bağlantısı bu adresten kurulur — istekteki Host
+      # başlığından değil.
+      T3_Email__AppBaseUrl: ${PUBLIC_BASE_URL:?PUBLIC_BASE_URL gerekli}
+      T3_Email__From: ${MAIL_FROM:-no-reply@t3ekosistem.test}
+
+      # Arayüz aynı kökten geldiği için CORS'a gerek yok; liste bilinçli boş.
+      T3_Cors__Origins__0: ${PUBLIC_BASE_URL}
+
+      T3_Ai__ApiKey: ${T3_AI_API_KEY:-}
+    ports:
+      # Yalnızca loopback'e bağlanıyor: dışarıya açılan yüz TLS sonlandıran
+      # vekil olmalı.
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    volumes:
+      - api-storage:/app/storage
+
+volumes:
+  postgres-prod-data:
+  api-storage:

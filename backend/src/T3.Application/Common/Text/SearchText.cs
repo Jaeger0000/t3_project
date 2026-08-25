@@ -18,4 +18,34 @@ public static class SearchText
     /// </summary>
     public static string Normalize(string value) =>
         value.Trim().Replace('İ', 'I').ToLowerInvariant();
+
+    /// <summary>
+    /// Türkçe aksanları ASCII karşılığına katlar: "saglik" araması "Sağlık"
+    /// kaydını bulsun.
+    ///
+    /// <see cref="Normalize"/>'dan <b>ayrı</b> tutuluyor ve bu ayrım bilinçli:
+    /// Normalize'ın çıktısı veritabanındaki <em>katlanmamış</em> kolonla
+    /// karşılaştırılıyor (e-posta eşitliği, isim tekilliği). Katlamayı oraya
+    /// eklemek terimi "oguz" yaparken kolonu "oğuz" bırakır ve giriş sessizce
+    /// çalışmaz hâle gelirdi.
+    ///
+    /// Katlama yalnızca <b>iki tarafın da katlandığı</b> yerlerde kullanılır:
+    /// bellekte bu metot, sorguda aynı harf çiftlerini SQL <c>replace()</c>
+    /// zincirine çeviren <c>StartupSearch</c>. Gösterim etiketleri hiç
+    /// katlanmaz — kullanıcı "Sağlık" görmeye devam eder.
+    /// </summary>
+    public static string Fold(string value)
+    {
+        var lowered = Normalize(value);
+
+        // Sıra önemsiz ama liste kısa ve okunur olsun diye alfabetik: her çift
+        // "kullanıcının klavyesinde olmayabilir" varsayımıyla tek yönlü.
+        return lowered
+            .Replace("ç", "c")
+            .Replace("ğ", "g")
+            .Replace("ı", "i")
+            .Replace("ö", "o")
+            .Replace("ş", "s")
+            .Replace("ü", "u");
+    }
 }

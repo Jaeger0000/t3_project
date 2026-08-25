@@ -200,13 +200,13 @@ def click_in_card(name, label, wait_for=None, timeout=10):
 def as_user(role_or_token, path, wait_for=None):
     token = tokens.get(role_or_token, role_or_token)
     browser.goto(f"{APP}/giris")
-    browser.evaluate(f"localStorage.setItem('t3.accessToken', {json.dumps(token)})")
+    browser.set_session(token)
     return browser.goto(f"{APP}{path}", wait_for=wait_for)
 
 
 def anonymous(path, wait_for=None):
     browser.goto(f"{APP}/giris")
-    browser.evaluate("localStorage.clear()")
+    browser.clear_session()
     return browser.goto(f"{APP}{path}", wait_for=wait_for)
 
 
@@ -281,7 +281,7 @@ try:
 
     # Derin bağlantı: oturumsuz kullanıcı giriş sonrası gitmek istediği ekrana döner.
     browser.goto(f"{APP}/giris")
-    browser.evaluate("localStorage.clear()")
+    browser.clear_session()
     browser.goto(f"{APP}/denetim", wait_for="Giriş yap")
     check("oturumsuz derin bağlantı giriş ekranına düşüyor",
           browser.evaluate("location.pathname") == "/giris",
@@ -311,8 +311,10 @@ try:
     check("ağ kesildiğinde Türkçe durum gösteriliyor", "ulaşılamıyor" in text, text[:300])
     check("ham 'Failed to fetch' ekranda yok", "Failed to fetch" not in text, text[:300])
     check("yeniden deneme düğmesi var", "Yeniden dene" in text, text[:300])
-    check("ağ hatası oturumu düşürmüyor (jeton duruyor)",
-          bool(browser.evaluate("localStorage.getItem('t3.accessToken')")))
+    # Jeton HttpOnly çerezde: script okuyamıyor, çerez deposuna CDP ile bakıyoruz.
+    cookies = [c["name"] for c in browser.call("Network.getCookies")["cookies"]]
+    check("ağ hatası oturumu düşürmüyor (oturum çerezi duruyor)",
+          "t3.session" in cookies, str(cookies))
     check("giriş ekranına atılmıyor", browser.evaluate("location.pathname") == "/pano",
           browser.evaluate("location.pathname"))
 
@@ -586,6 +588,17 @@ try:
     check("kilit ize düşüyor", after > before, f"{before} → {after}")
     check("her reddedilen istek için satır açılmıyor (pencerede bir kayıt)",
           after - before == 1, f"{before} → {after}, {codes.count(429)} adet 429")
+
+    # --- Temizlik: tek kullanımlık hesap listede kalmasın ---------------
+    # e2e_faz3 kullanıcı sayısını sabit bekliyor; bu betiğin bıraktığı hesap
+    # oradaki kontrolü sessizce düşürüyordu. Silme soft delete: kayıt duruyor,
+    # listeden ve girişten çıkıyor.
+    print("\n=== Temizlik ===")
+    users = api("/api/users?pageSize=100", tokens["admin"])["items"]
+    temp = next((u for u in users if u["email"] == TEST_USER), None)
+    if temp:
+        status, _ = call("DELETE", f"/api/users/{temp['id']}", tokens["admin"])
+        check("tek kullanımlık hesap pasife alındı", status in (200, 204), str(status))
 
 finally:
     browser.close()

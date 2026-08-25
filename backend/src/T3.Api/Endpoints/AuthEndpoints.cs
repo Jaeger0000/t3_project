@@ -1,6 +1,7 @@
 using T3.Api.Filters;
 using T3.Api.Http;
 using T3.Api.RateLimiting;
+using T3.Api.Security;
 using T3.Application.Features.Auth.ChangePassword;
 using T3.Application.Features.Auth.GetSession;
 using T3.Application.Features.Auth.Login;
@@ -18,12 +19,34 @@ public static class AuthEndpoints
         auth.MapPost("/login", async (
                 LoginRequest request,
                 LoginHandler handler,
+                HttpContext http,
                 CancellationToken ct) =>
-            (await handler.Handle(request, ct)).ToHttp())
+            {
+                var result = await handler.Handle(request, ct);
+
+                // Tarayıcı jetonu HttpOnly çerezden kullanır — script okuyamaz.
+                // Gövdedeki jeton kalıyor çünkü betikler, MCP istemcileri ve
+                // Swagger çerez taşımıyor; ikisi aynı jeton, iki taşıma yolu.
+                if (result.IsSuccess)
+                    SessionCookie.Issue(http, result.Value!.AccessToken, result.Value.ExpiresAt);
+
+                return result.ToHttp();
+            })
             .AllowAnonymous()
             .RequireRateLimiting(AuthRateLimit.AuthPolicy)
             .WithValidation<LoginRequest>()
-            .WithSummary("E-posta ve şifreyle giriş yapar, erişim jetonu döner.");
+            .WithSummary("E-posta ve şifreyle giriş yapar; jetonu HttpOnly çerezde ve gövdede döner.");
+
+        // Çıkış sunucu tarafında çerezi siliyor: istemcinin "unutması" yetmez,
+        // çerezi yalnızca sunucu geçersiz kılabilir. Kimlik istemiyor — süresi
+        // dolmuş jetonu olan kullanıcı da çerezini temizleyebilmeli.
+        auth.MapPost("/logout", (HttpContext http) =>
+            {
+                SessionCookie.Clear(http);
+                return Results.NoContent();
+            })
+            .AllowAnonymous()
+            .WithSummary("Oturum çerezlerini siler.");
 
         // Kurtarma uçları da giriş kovasında: ikisi de kimlik doğrulamadan önce
         // e-posta alan, kaba kuvvete ve numaralandırmaya açık yüzeyler.
@@ -58,8 +81,14 @@ public static class AuthEndpoints
 
         app.MapGet("/api/me", async (
                 GetSessionHandler handler,
+                HttpContext http,
                 CancellationToken ct) =>
-            (await handler.Handle(ct)).ToHttp())
+            {
+                // Oturum çerezi varken CSRF çerezi kaybolmuşsa istemci hiçbir
+                // yazma isteği yapamaz hâle gelir; açılışta sessizce onarılıyor.
+                SessionCookie.EnsureCsrf(http);
+                return (await handler.Handle(ct)).ToHttp();
+            })
             .WithTags("Auth")
             .WithSummary("Oturum sahibinin kimliğini, rolünü ve yetki kapsamını döner.");
 

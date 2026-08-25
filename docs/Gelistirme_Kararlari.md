@@ -429,6 +429,63 @@ Kaynak: [Denetim_Duzeltme_Plani.md](Denetim_Duzeltme_Plani.md) Dalga 1.
 
 ---
 
+## 3g. Denetim Dalga 2 kararları (canlıya çıkış altyapısı)
+
+- **Arayüzü API'nin kendisi sunuyor** (`SpaHosting`), nginx + ayrı konteyner
+  değil. Tek origin CORS'u, vekil yapılandırmasını ve çerezin `SameSite`
+  gevşetmesini birden ortadan kaldırıyor; alternatif aynı sonucu iki imaj ve bir
+  konfigürasyon dosyası daha ile veriyordu. Reddedilen: `MapFallbackToFile`'ı
+  koşulsuz kullanmak — `/api/olmayan-uc` için index.html dönerdi ve 404
+  sözleşmesi bozulurdu (istemci JSON beklerken HTML ayrıştırır).
+- **Göç uygulaması seçmeli** (`Database:MigrateOnStartup`, varsayılan kapalı).
+  Konteynerde açık, geliştirme makinesinde kapalı: bir uygulama sürümünün
+  üretim şemasını haberimiz olmadan değiştirmesi varsayılan olamaz.
+- **TLS bayrağı yapılandırmada** (`Hosting:RequireHttps`). Uygulama TLS
+  sonlandırıyorsa HSTS + yönlendirme onda; ters vekil kurulumunda kapalı kalıyor
+  ama üretimde **uyarı log'u** düşüyor — sessiz bir "TLS yok" durumu yok.
+- **`X-Forwarded-*` yalnızca güvenilen vekil adına** (`Hosting:TrustedProxies`,
+  boşsa yalnızca loopback). "Hepsine güven" seçeneği bilinçli olarak sunulmadı:
+  denetim izine yazılan IP o başlıktan geliyor ve herkesin yazabildiği bir
+  başlığa güvenmek izi kanıttan saldırganın kalemine çevirir. `HttpClientContext`
+  bu yüzden başlığı artık elle okumuyor, tek kaynak `RemoteIpAddress`.
+- **Jeton `HttpOnly` çerezde, ama `Authorization: Bearer` yolu duruyor.** İkisi
+  aynı jeton, iki taşıma yolu: MCP istemcileri, doğrulama betikleri ve Swagger
+  çerez taşımıyor. `OnMessageReceived` başlığı önceliyor.
+- **CSRF yalnızca çerezle kimliklenen yazma isteklerinde.** Başka bir sitenin
+  sayfası bizim jetonumuzu *başlığa* koyamaz; dolayısıyla Bearer istekleri CSRF
+  yüzeyi değil. `SameSite=Strict` tek savunma olarak bırakılmadı (eski
+  tarayıcılar + ileride gevşetilebilecek bir çerez ayarı kuralı sessizce
+  çürütürdü). Çıkış ucu kuralın dışında: zorlanmış çıkışın zararı yeniden giriş,
+  karşı taraftaki risk "çerezini temizleyemeyen kullanıcı".
+- **CSP'de `style-src 'unsafe-inline'` var, `script-src`'de yok.** Grafikler
+  ölçüleri element `style` özniteliğine yazıyor; XSS'in tehlikeli kolu script
+  tarafı ve orası `'self'` ile kapalı. Swagger yalnızca geliştirmede ve kendi
+  script bloklarını gömdüğü için politikanın dışında.
+- **`localStorage`'da yalnızca `t3.session.active` işareti var** (sır değil).
+  İki işi var: siteye ilk gelen ziyaretçiye "oturum süreniz doldu" dememek ve
+  sekmeler arası senkronu `storage` olayıyla tetiklemek.
+- **Oturum durumu açık bir React durumu** (`signedOut`). `queryClient.clear()`
+  önbelleği boşaltıyor ama bileşenlere yeni sonuç bildirmiyor; React Query hata
+  durumunda eldeki `data`'yı da koruyor. İkisi birlikte "çıkış düğmesi çalışmıyor"
+  ve "süresi dolmuş oturum ekranda açık" hatalarını üretti.
+- **`SearchText.Fold` Normalize'dan ayrı.** Normalize'ın çıktısı veritabanındaki
+  *katlanmamış* kolonla karşılaştırılıyor (e-posta eşitliği, isim tekilliği);
+  katlamayı oraya koymak girişi sessizce bozardı. Sorgu tarafında katlama
+  `StartupSearch` içindeki `Expression` yüklemlerinde, SQL `replace()` zincirine
+  çevrilerek yapılıyor — `unaccent`/`ILIKE` sağlayıcıya özel olurdu. Zincir her
+  kolon için tekrar yazılıyor çünkü EF gövdesi başka metotta duran çağrıyı
+  çeviremiyor; tekrarın bedeli tek dosyada kalıyor.
+- **Yönlendirici `createBrowserRouter`'a taşındı.** `useBlocker` (kirli form
+  uyarısı) yalnızca veri yönlendiricisiyle çalışıyor. Rota ağacı JSX olarak
+  kaldı (`createRoutesFromElements`), okunabilirlik değişmedi; bedeli ana
+  paketin ~55 kB büyümesi — kod bölmenin kazancının yanında kabul edildi.
+- **Sentry bağlanmadı, yeri hazırlandı.** Hesap, DSN ve KVKK tarafında yurt dışı
+  aktarım kararı gerekiyor; üçü de bu depoda kararlaştırılamaz. `ErrorBoundary`
+  beyaz ekranı Türkçe açıklamayla değiştiriyor ve raporlama tek bir noktada
+  toplanıyor.
+
+---
+
 ## 4. Ortam tuzakları — tekrar çarpılacak olanlar
 
 ### Faz 0
@@ -584,6 +641,47 @@ Kaynak: [Denetim_Duzeltme_Plani.md](Denetim_Duzeltme_Plani.md) Dalga 1.
   yüklenmiyor ve Swagger kapanıyor. Betikleri koşturmak için
   `ASPNETCORE_ENVIRONMENT=Development` açıkça verilmeli.
 
+### Dalga 2 (denetim düzeltmeleri)
+
+- **`npx tsc --noEmit` bu repoda hiçbir şeyi kontrol etmiyor.** Kök
+  `tsconfig.json` yalnızca referans dosyası (`references`), kendi `files`
+  listesi boş: komut sessizce başarıyla çıkıyor. Geçersiz JSX konumundaki bir
+  yorum bu yüzden fark edilmeden depoya girdi ve **arayüz derlenmez** hâle
+  geldi (Dalga 1'in son render koşusunun asılı kalma sebebi). Tek geçerli
+  kontrol `npm run build` (= `tsc -b && vite build`).
+- **JSX yorumu koşullu ifadenin parantezinden hemen sonra konulamaz.**
+  `{session ? (\n {/* … */}\n <div>` geçersiz; yorum koşulun *dışına* ya da
+  etiketin *içine* alınmalı.
+- **Headless Chrome'da `:focus` seçicisi eşleşmiyor**: pencere odakta sayılmadığı
+  için element `document.activeElement` olsa bile odak stilleri uygulanmıyor ve
+  erişilebilirlik ölçülemiyor. `Emulation.setFocusEmulationEnabled` açılınca
+  `oklab(… / 0.6)` halka ölçülebiliyor (bkz. `cdp.py`).
+- **Jeton çereze taşınınca render betiklerinin oturum kurma yolu kapandı**:
+  `localStorage.setItem('t3.accessToken', …)` artık hiçbir şey yapmıyor —
+  kapanan açığın kendisi bu. Çerezi yalnızca CDP yazabiliyor
+  (`Browser.set_session`), ayrıca CSRF çerezi de yazılmalı yoksa her yazma
+  isteği 403 alır.
+- **Betikler birbirinin verisini yiyor.** `e2e_faz3` her koşuda bir girişimi
+  pasife alıyor; `e2e_faz5` o kaydı **adıyla** arıyordu ve ikinci koşuda
+  çöküyordu. Sabit ada bağlı kontrol ürünü değil veri durumunu ölçer: kapsam
+  dışı kayıt artık kapsamdan türetiliyor. Aynı sebeple `e2e_faz3`'ün kullanıcı
+  sayısı kontrolü `== 8` yerine "tohum hesaplarının tamamı listede" oldu ve
+  `render_faz7` açtığı tek kullanımlık hesabı sonunda pasife alıyor.
+  Silme zincirinin dokümanı kapattığı kontrol de aynı sınıftaydı: seçilen kaydın
+  tohumda dosyası olduğunu varsayıyordu, artık silmeden önce kendi dosyasını
+  yükleyip zincire bakıyor.
+  **Tam yeşil bir zincir yine de temiz veritabanı ister** — hacim silinemiyorsa
+  (yetki yok, köprü bozuk) **tur başına ayrı veritabanı** aynı sonucu veriyor:
+  `CREATE DATABASE t3_turN` → bağlantı dizesindeki `Database=` adını çevir →
+  `dotnet ef database update`. Geliştirme tohumlayıcısı boş şemayı doldurduğu
+  için tur temiz başlıyor, üstelik önceki turun verisi incelenmek üzere kalıyor.
+- **Docker köprü arayüzleri host tarafında `DOWN` düşebiliyor** (`br-*`,
+  `docker0`): yayımlanan port bağlantıyı kabul ediyor ama konteynere iletmiyor,
+  Npgsql "Timeout during reading attempt" diyor ve teşhis yanlış yere gidiyor.
+  Kontrol: `ip -br addr show | grep br-`. Çözüm root ister
+  (`sudo ip link set <br> up` ya da docker yeniden başlatma); geçici çare
+  `docker exec … nc` üzerinden yerel bir TCP köprüsü.
+
 ### Kabuk / araç tuzakları
 
 - Bash aracı, ortam bloğu fish dese de **zsh** çalıştırır. `for … end` çalışmaz;
@@ -648,6 +746,9 @@ kanıtlayan `UnreachableDbContext` — her `DbSet` erişimi istisna fırlatıyor
 | Faz 3 | ✅ | `ChangeRequest` onay akışı (MVP #3), girişim portalı, onay kuyruğu + before/after diff, denetim izi ucu, Faz 1'den ertelenen kullanıcı yönetimi CRUD'u ve soft delete zinciri. Doğrulama: 91 birim testi, 80 uçtan uca kontrol, 32 render kontrolü. |
 | Faz 4 | ✅ | Başarı/finans kayıtları (MVP #4, TPH ile beş tip), doküman yükleme/indirme, tutar ve doküman maskelemesi, onay akışının yeni hedef türleri. Doğrulama: 129 birim testi, 123 uçtan uca kontrol, 41 render kontrolü. |
 | Faz 5 | ✅ | Ekosistem panosu ve grafikler, CSV dışa aktarma, MCP sunucusu, AI karar destek paneli ve yönetici özeti, 32 girişimlik gerçekçi tohum verisi. Doğrulama: 153 birim testi, 103 uçtan uca kontrol, 53 render kontrolü. |
+| Denetim Dalga 0 | ✅ | Ürün denetiminin videodan önce kapanması gereken altı bulgusu: yazma yolları arayüze, hız sınırı bölümlemesi, sekme başlığı/dil, 404 ekranı, mobil taşma, yazma yolunda maskeleme. Doğrulama: 156 birim testi, 201 render kontrolü (`render_faz6.py` yeni). |
+| Denetim Dalga 1 | ✅ | Program/dönem yönetimi, şifre kurtarma ve değiştirme, oturum ömrü + ağ hatası ayrımı, giriş olaylarının denetim izi, KVKK metinleri, Karar Verici'nin onay ekranı. Doğrulama: 185 birim testi, `render_faz7.py` (yeni). |
+| Denetim Dalga 2 | ✅ | Tek origin dağıtım (API arayüzü sunuyor) + `Dockerfile`/`docker-compose.prod.yml`, jeton `HttpOnly` çerezde + CSRF + CSP ve güvenlik başlıkları, güvenilen vekil listesi, URL'de filtre durumu, aksan katlaması, kirli form uyarısı, kod bölme, erişilebilirlik. Doğrulama: 191 birim testi, 310 uçtan uca kontrol, 346 render kontrolü (`render_faz8.py` yeni, 54 kontrol). |
 
 **Faz 1'den bilinçli ertelenen:** kullanıcı yönetimi CRUD'u — girişim kartı buna
 ihtiyaç duymadığı için onay akışıyla birlikte Faz 3'e alındı.

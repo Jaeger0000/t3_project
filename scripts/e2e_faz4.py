@@ -139,9 +139,24 @@ p0, p0_u = login("girisim@t3ekosistem.test")
 st, page, _ = call("GET", "/api/startups?pageSize=50", admin)
 by_name = {s["name"]: s["id"] for s in page["items"]}
 S0 = p0_u["startupId"]                       # Anadolu Robotik — Kuluçka kapsamı
-S6 = by_name["Toros Uzay Bileşenleri"]       # TEKNOFEST kapsamı
+
+# TEKNOFEST kapsamındaki kayıt **kapsamdan** seçiliyor, addan değil: betik bu
+# kaydı sonunda pasife alıyor (soft delete zinciri kontrolü), dolayısıyla sabit
+# ad ikinci koşuda KeyError veriyordu — kontrol ürünü değil veri durumunu
+# ölçmüş oluyordu.
+st, tek_page, _ = call("GET", "/api/startups?pageSize=100", tek)
+# Zincir kontrolü başarı kaydı olan bir girişim ister; kapsamın ilk kaydında
+# olup olmadığı tohum sırasına bağlı, o yüzden karta bakılarak seçiliyor.
+S6 = None
+for cand in (s["id"] for s in tek_page["items"] if s["id"] != S0):
+    _, cand_card, _ = call("GET", f"/api/startups/{cand}", tek)
+    if cand_card and cand_card["achievements"]["totalCount"] >= 1:
+        S6 = cand
+        break
 
 check("5 rol hesabı giriş yapabiliyor", True)
+check("TEKNOFEST kapsamında silinebilir bir girişim var", S6 is not None,
+      f"kapsam={len(tek_page['items'])}")
 check("portal kullanıcısı Anadolu Robotik'e bağlı",
       by_name["Anadolu Robotik"] == S0, S0)
 
@@ -554,6 +569,15 @@ check("onaylanan kayıt zaman çizelgesine düşüyor",
       any(e["kind"] == "Revenue" and e["amount"] == 18400000
           for e in timeline["entries"]),
       json.dumps([e["title"] for e in timeline["entries"]], ensure_ascii=False)[:200])
+
+# Dokümanı da kapattığını görmek için silinecek girişime bir dosya konuyor:
+# hangi tohum kaydının dosyası olduğu kapsam sırasına göre değişiyor ve kontrol
+# ürünü değil tohum düzenini ölçüyordu.
+st, up = upload(f"/api/startups/{S6}/documents", admin,
+                "zincir_denemesi.pdf", pdf_bytes, doc_type="Report")
+check("zincir denemesi için dosya yüklendi",
+      st == 200 and up["applied"] is True,
+      f"{st} {json.dumps(up, ensure_ascii=False)[:160]}")
 
 st, deleted, raw = call("DELETE", f"/api/startups/{S6}", admin)
 check("girişim silme zinciri çalışıyor", st == 200, f"{st} {raw[:160]}")

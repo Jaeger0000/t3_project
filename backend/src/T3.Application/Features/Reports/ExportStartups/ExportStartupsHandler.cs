@@ -136,14 +136,10 @@ public sealed class ExportStartupsHandler(
     private static IQueryable<Startup> Filter(
         IQueryable<Startup> query, ExportStartupsRequest request)
     {
+        // Aktarım listeyle aynı yüklemi kullanıyor: ekranda gördüğü satırların
+        // CSV'de farklı çıkması en sinsi rapor hatası olurdu.
         if (!string.IsNullOrWhiteSpace(request.Q))
-        {
-            var term = SearchText.Normalize(request.Q);
-            query = query.Where(s =>
-                s.Name.ToLower().Contains(term)
-                || (s.ProductDescription != null && s.ProductDescription.ToLower().Contains(term))
-                || (s.City != null && s.City.ToLower().Contains(term)));
-        }
+            query = query.Where(StartupSearch.Matches(request.Q));
 
         if (request.Sector is { } sector)
             query = query.Where(s => s.Sector == sector);
@@ -156,10 +152,7 @@ public sealed class ExportStartupsHandler(
                 .Any(p => p.ProgramTerm.ProgramId == programId));
 
         if (!string.IsNullOrWhiteSpace(request.City))
-        {
-            var city = SearchText.Normalize(request.City);
-            query = query.Where(s => s.City != null && s.City.ToLower() == city);
-        }
+            query = query.Where(StartupSearch.InCity(request.City));
 
         return query;
     }

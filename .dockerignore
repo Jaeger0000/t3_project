@@ -1,0 +1,23 @@
+# Yapı bağlamını küçük tutar ve *sırların imaja girmesini engeller*.
+.env
+.env.local
+*.pem
+*.key
+
+.git
+.github
+
+**/bin
+**/obj
+**/node_modules
+**/dist
+**/TestResults
+
+# Yerel yüklemeler ve geliştirme e-posta kutusu imaja girmez.
+backend/src/T3.Api/storage
+backend/src/T3.Api/wwwroot
+storage
+
+docs
+scripts
+*.md

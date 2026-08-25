@@ -3,7 +3,11 @@ import type { SessionUser } from '@/api/types'
 
 export type AuthState = {
   session: SessionUser | null
-  /** Jeton var ama oturum henüz doğrulanmadı — yönlendirme kararı beklemeli. */
+  /**
+   * Oturum sunucudan doğrulanmadı — yönlendirme kararı beklemeli. Kimlik
+   * HttpOnly çerezde olduğu için istemci "jetonum var mı" diye bakamıyor;
+   * cevabı yalnızca /api/me veriyor.
+   */
   isResolving: boolean
   /**
    * Sunucuya ulaşılamıyor. Oturumu düşürmüyoruz: ağ kesintisi yetki sorunu

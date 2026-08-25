@@ -68,8 +68,7 @@ browser = Browser()
 
 def as_user(role, path, wait_for=None):
     browser.goto(f"{APP}/giris")
-    browser.evaluate(
-        f"localStorage.setItem('t3.accessToken', {json.dumps(tokens[role])})")
+    browser.set_session(tokens[role])
     return browser.goto(f"{APP}{path}", wait_for=wait_for)
 
 
@@ -106,10 +105,9 @@ def fmt(amount, compact=False):
 
 FETCH_CSV = """
 (async () => {
-  const token = localStorage.getItem('t3.accessToken');
-  const res = await fetch('/api/reports/export', {
-    headers: { Authorization: 'Bearer ' + token },
-  });
+  // Kimlik HttpOnly çerezde: başlığa jeton koymak gerekmiyor, tarayıcı çerezi
+  // aynı origin isteğine kendisi ekliyor.
+  const res = await fetch('/api/reports/export', { credentials: 'same-origin' });
   // `res.text()` BOM'u çözerken yutuyor; Excel'in ihtiyaç duyduğu baytı
   // görmek için ham tampona bakmak gerekiyor.
   const buffer = await res.arrayBuffer();

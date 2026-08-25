@@ -331,8 +331,20 @@ st, _, _ = call("GET", "/api/users", p0)
 check("portal kullanıcısı kullanıcı yönetemez", st == 403, str(st))
 
 st, users, raw = call("GET", "/api/users?pageSize=100", admin)
+# Sabit sayı beklenmiyor. Betik kendi hesabını geride bırakıyor (pasife alınan
+# kullanıcı listede kalır, silinmez) ve `== 8` ikinci koşuda düşüyordu: kontrol
+# ürünü değil, önceki koşunun izini ölçmüş oluyordu. Aranan şey listenin
+# **tohum hesaplarının tamamını** içermesi.
+seed_accounts = {
+    "admin@t3ekosistem.test", "kulucka.yoneticisi@t3ekosistem.test",
+    "teknofest.yoneticisi@t3ekosistem.test", "karar.verici@t3ekosistem.test",
+    "girisim@t3ekosistem.test", "girisim.marmara@t3ekosistem.test",
+    "girisim.toros@t3ekosistem.test", "girisim.trakya@t3ekosistem.test",
+}
+listed = {u["email"] for u in users.get("items", [])}
 check("süper yönetici kullanıcıları listeleyebiliyor",
-      st == 200 and users["totalCount"] == 8, f"{st} {users.get('totalCount')}")
+      st == 200 and seed_accounts.issubset(listed),
+      f"{st} eksik: {sorted(seed_accounts - listed)}")
 check("kullanıcı listesinde parola özeti yok", "passwordhash" not in raw.lower())
 
 st, _, raw = call("POST", "/api/users", admin,

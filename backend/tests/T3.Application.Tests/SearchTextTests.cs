@@ -45,4 +45,24 @@ public class SearchTextTests
     {
         Assert.Equal(expected, SearchText.Normalize(input));
     }
+
+    [Theory]
+    // Aksansız klavyeyle aranan terim aksanlı kaydı bulmalı.
+    [InlineData("Sağlık", "saglik")]
+    [InlineData("saglik", "saglik")]
+    [InlineData("Şanlıurfa", "sanliurfa")]
+    [InlineData("ÇAĞRI ÖZÜ", "cagri ozu")]
+    [InlineData("İstanbul", "istanbul")]
+    public void Fold_aksanlari_ASCII_karsiligina_indirir(string input, string expected) =>
+        Assert.Equal(expected, SearchText.Fold(input));
+
+    [Fact]
+    public void Normalize_katlama_yapmaz()
+    {
+        // Ayrım bilinçli: Normalize'ın çıktısı veritabanındaki katlanmamış
+        // kolonla karşılaştırılıyor (e-posta eşitliği, isim tekilliği).
+        // Katlamayı oraya taşımak girişi sessizce bozardı.
+        Assert.Equal("sağlık", SearchText.Normalize("Sağlık"));
+        Assert.Equal("saglik", SearchText.Fold("Sağlık"));
+    }
 }

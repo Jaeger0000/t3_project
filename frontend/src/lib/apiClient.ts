@@ -1,9 +1,13 @@
 /**
- * Tek HTTP giriş noktası. Jeton saklama ve hata normalleştirme burada durur;
+ * Tek HTTP giriş noktası. Kimlik taşıma ve hata normalleştirme burada durur;
  * özellik klasörleri yalnızca `api.get/post` çağırır.
+ *
+ * Jeton artık JavaScript'in elinde değil: sunucu onu `HttpOnly` çereze yazıyor
+ * (bkz. backend `SessionCookie`). Bu dosyada bilinçli olarak *hiçbir* jeton
+ * saklama kodu yok — `localStorage`'daki jeton tek bir XSS ile okunabiliyordu
+ * ve Süper Yönetici oturumu 32 girişimin vergi numarasına, iletişim bilgisine
+ * ve finansallarına açılıyordu.
  */
-
-const TOKEN_KEY = 't3.accessToken'
 
 export class ApiError extends Error {
   readonly status: number
@@ -37,26 +41,40 @@ async function send(path: string, init: RequestInit): Promise<Response> {
   }
 }
 
-export const tokenStore = {
-  get: () => localStorage.getItem(TOKEN_KEY),
-  set: (token: string) => localStorage.setItem(TOKEN_KEY, token),
-  clear: () => localStorage.removeItem(TOKEN_KEY),
+const CSRF_COOKIE = 't3.csrf'
+const CSRF_HEADER = 'X-CSRF-Token'
+
+/**
+ * CSRF çift-gönderim jetonu. Sunucu onu okunabilir bir çereze yazıyor; buradaki
+ * tek iş onu geri başlığa koymak. Değer sır değil — kanıtladığı şey isteğin
+ * *bizim sayfamızda* kurulduğu, çünkü başka bir origin bu çerezi okuyamaz.
+ */
+function csrfToken(): string | null {
+  const match = document.cookie.match(new RegExp(`(?:^|; )${CSRF_COOKIE}=([^;]*)`))
+  return match ? decodeURIComponent(match[1]) : null
+}
+
+/** Durum değiştiren yöntemler CSRF başlığı taşır; okumalar taşımaz. */
+function csrfHeaders(method: string | undefined): Record<string, string> {
+  if (!method || method === 'GET' || method === 'HEAD') return {}
+  const token = csrfToken()
+  return token ? { [CSRF_HEADER]: token } : {}
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const token = tokenStore.get()
-
   const response = await send(path, {
     ...init,
+    // Kimlik çerezde: `same-origin` tek origin kurulumunda çerezi gönderir,
+    // üçüncü taraf bir adrese asla göndermez.
+    credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...csrfHeaders(init.method),
       ...init.headers,
     },
   })
 
   if (response.status === 401) {
-    tokenStore.clear()
     throw new ApiError(401, 'Oturum süresi doldu, tekrar giriş yapın.')
   }
 
@@ -82,14 +100,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
  * gövdeyi ayrıştırılamaz hâle getirir.
  */
 async function upload<T>(path: string, file: File, query = ''): Promise<T> {
-  const token = tokenStore.get()
   const form = new FormData()
   form.append('file', file)
 
   const response = await send(path + query, {
     method: 'POST',
     body: form,
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: 'same-origin',
+    headers: csrfHeaders('POST'),
   })
 
   if (!response.ok) {
@@ -101,16 +119,12 @@ async function upload<T>(path: string, file: File, query = ''): Promise<T> {
 }
 
 /**
- * Dosya indirme. Bağlantıyı doğrudan `<a href>` ile açamıyoruz: indirme ucu
- * jeton istiyor ve tarayıcı gezinme isteğine Authorization başlığı eklemiyor.
- * Bu yüzden içerik fetch ile alınıp geçici bir nesne URL'sinden kaydediliyor.
+ * Dosya indirme. Jeton çereze taşındıktan sonra `<a href>` de çalışırdı ama
+ * fetch yolu korunuyor: hata durumunda sunucunun JSON gövdesini okuyup Türkçe
+ * mesaj gösterebiliyoruz, gezinme isteğinde tarayıcı ham hata sayfası basardı.
  */
 async function download(path: string, fileName: string): Promise<void> {
-  const token = tokenStore.get()
-
-  const response = await send(path, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })
+  const response = await send(path, { credentials: 'same-origin' })
 
   if (!response.ok) {
     const body = await response.json().catch(() => null)

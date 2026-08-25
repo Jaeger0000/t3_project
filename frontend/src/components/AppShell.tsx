@@ -38,6 +38,15 @@ export default function AppShell({ children }: { children?: ReactNode }) {
 
   return (
     <div className="min-h-screen">
+      {/* Klavye ve ekran okuyucu kullanıcısı her sayfada menünün tamamını
+          geçmek zorunda kalmasın. Görünmez duruyor, odaklanınca görünür. */}
+      <a
+        href="#icerik"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-20 focus:rounded-lg focus:bg-brand-500 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
+      >
+        İçeriğe atla
+      </a>
+
       <header className="sticky top-0 z-10 border-b border-stone-200 bg-white/90 backdrop-blur dark:border-stone-800 dark:bg-stone-950/90">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
@@ -77,10 +86,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
               ))}
           </nav>
 
+          {/* Kullanıcı bloğu sarabiliyor ve metin kırpılabiliyor: 360 px'te
+              e-posta + rol rozeti + iki eylem tek satıra sığmıyor ve satır
+              dışarı taşıyordu (min-content genişliği). */}
           {session ? (
-            {/* Kullanıcı bloğu sarabiliyor ve metin kırpılabiliyor: 360 px'te
-                e-posta + rol rozeti + iki eylem tek satıra sığmıyor ve satır
-                dışarı taşıyordu (min-content genişliği). */}
             <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-2">
               <div className="min-w-0 text-right leading-tight">
                 <p className="text-sm font-medium text-stone-900 dark:text-stone-100">
@@ -107,7 +116,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <main id="icerik" className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         {/* `children` yalnızca rota ağacına girmeyen ekranlar için (404). */}
         {children ?? <Outlet />}
       </main>

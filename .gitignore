@@ -1,6 +1,7 @@
 # --- Sırlar ---------------------------------------------------------------
 .env
 .env.local
+.env.prod
 *.pem
 *.key
 
@@ -23,6 +24,9 @@ coverage*.xml
 storage/
 backend/src/T3.Api/storage/
 
+# --- Derlenmiş arayüz (API tek origin'de bunu sunar; yapı çıktısı) -------
+backend/src/T3.Api/wwwroot/
+
 # --- Node / frontend ------------------------------------------------------
 node_modules/
 dist/
@@ -32,6 +36,10 @@ dist-ssr/
 npm-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# --- Python (doğrulama betikleri) ----------------------------------------
+__pycache__/
+*.pyc
 
 # --- Editör / işletim sistemi --------------------------------------------
 .idea/

@@ -2,16 +2,20 @@ using System.Text;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using T3.Api.Authorization;
 using T3.Api.Endpoints;
+using T3.Api.Hosting;
 using T3.Api.Http;
 using T3.Api.Identity;
 using T3.Api.Middleware;
 using T3.Api.RateLimiting;
+using T3.Api.Security;
 using T3.Application;
 using T3.Application.Common.Interfaces;
 using T3.Domain.Identity;
@@ -24,6 +28,16 @@ var builder = WebApplication.CreateBuilder(args);
 // --- Yapılandırma ---------------------------------------------------------
 // Sırlar ortam değişkeninden gelir; appsettings.json'a yazılmaz.
 builder.Configuration.AddEnvironmentVariables("T3_");
+
+// Barındırma kararları (TLS, güvenilen vekil, arayüz kökü) tek yerde.
+var hosting = builder.Configuration.GetSection(HostingOptions.SectionName)
+    .Get<HostingOptions>() ?? new HostingOptions();
+
+// Derlenmiş arayüzün kökü yapılandırmadan gelebiliyor: konteynerde yayın
+// çıktısıyla aynı klasörde, geliştirme makinesinde ise arayüz Vite'ta çalıştığı
+// için genelde hiç yok.
+if (!string.IsNullOrWhiteSpace(hosting.WebRoot))
+    builder.WebHost.UseWebRoot(hosting.WebRoot);
 
 // --- Servisler -----------------------------------------------------------
 builder.Services.AddApplication();
@@ -41,6 +55,21 @@ builder.Services.AddScoped<IClientContext, HttpClientContext>();
 // e-postadan türüyor, sınırsız sözlük saldırganın belleği şişirmesine
 // açık kapı olurdu.
 builder.Services.AddMemoryCache(options => options.SizeLimit = 10_000);
+
+// Ters vekil arkasında istemcinin gerçek IP'si ve şeması X-Forwarded-*
+// başlıklarında gelir. Denetim izine yazdığımız IP buradan türediği için
+// başlığa yalnızca güvenilen vekiller adına inanıyoruz: liste boşsa ASP.NET'in
+// varsayılanı (yalnızca loopback) geçerli kalır. "Hepsine güven" seçeneği
+// bilinçli olarak yok — herkesin yazabildiği bir başlığa güvenmek izi
+// doğrulanabilir bir kayıttan saldırganın kalemine çevirir.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+    foreach (var proxy in hosting.TrustedProxies)
+        if (System.Net.IPAddress.TryParse(proxy, out var address))
+            options.KnownProxies.Add(address);
+});
 
 var jwtSecret = builder.Configuration["Jwt:Secret"]
     ?? throw new InvalidOperationException(
@@ -60,6 +89,23 @@ builder.Services
             ValidAudience = builder.Configuration["Jwt:Audience"] ?? "t3-ekosistem-api",
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
             ClockSkew = TimeSpan.FromSeconds(30)
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            // Tarayıcı jetonu HttpOnly çerezde taşıyor (localStorage'daki jeton
+            // tek bir XSS ile okunabiliyordu). Başlık yolu duruyor ve önceliği
+            // var: MCP istemcileri, doğrulama betikleri ve Swagger çerez
+            // kavramı olmadan geliyor.
+            OnMessageReceived = context =>
+            {
+                var header = context.Request.Headers.Authorization.ToString();
+
+                if (!header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                    context.Token = SessionCookie.ReadToken(context.HttpContext);
+
+                return Task.CompletedTask;
+            }
         };
     });
 
@@ -152,7 +198,30 @@ builder.Services.AddSwaggerGen(options =>
 var app = builder.Build();
 
 // --- Ardışık düzen -------------------------------------------------------
+// En başta: sonraki her katman (hız sınırı bölümü, denetim izi IP'si, çerezin
+// Secure bayrağı) isteğin gerçek kaynağına ve şemasına bakıyor.
+app.UseForwardedHeaders();
+
 app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+// Güvenlik başlıkları hata yanıtlarında da bulunsun diye ardışık düzenin
+// tepesine yakın: CSP'yi yalnızca mutlu yolda göndermek onu savunma değil
+// süsleme yapardı.
+app.Use(SecurityHeaders.Invoke);
+
+// TLS'i uygulamanın kendisi sonlandırıyorsa yönlendirme + HSTS burada; ters
+// vekil arkasındaki kurulumda bayrak kapalı kalır ve iş vekile aittir.
+if (hosting.RequireHttps)
+{
+    app.UseHsts();
+    app.UseHttpsRedirection();
+}
+else if (!app.Environment.IsDevelopment())
+{
+    app.Logger.LogWarning(
+        "Hosting:RequireHttps kapalı — TLS sonlandırma ve HTTP→HTTPS yönlendirmesi "
+        + "önde bir vekilde olmalı, yoksa oturum çerezi düz metin taşınır.");
+}
 
 // Ardışık düzenin ürettiği gövdesiz hataları (401/403 politika reddi, 429 hız
 // sınırı) handler hatalarıyla aynı JSON şekline sokar. Gövdesi olan yanıtlara
@@ -181,12 +250,21 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(options => options.DocumentTitle = "T3 Ekosistem API");
 }
 
+// Derlenmiş arayüz API ile aynı kökten sunuluyor (tek origin): CORS ve vekil
+// gerekmiyor. Geliştirmede bu klasör boş, arayüz Vite'ta çalışıyor.
+var servesFrontend = app.UseCompiledFrontend();
+
 app.UseCors(FrontendCors);
 
 // Hız sınırı bölüm anahtarı giriş gövdesindeki e-postayı kullanıyor; gövde
 // sınırlayıcıdan önce tamponlanmak zorunda.
 app.Use(AuthRateLimit.CaptureLoginEmail);
 app.UseRateLimiter();
+
+// Çerezle kimliklenen yazma istekleri çift-gönderim jetonu taşımak zorunda.
+// Başlıkla gelen istekler (betik, MCP) kuralın dışında — bkz. CsrfProtection.
+app.Use(CsrfProtection.Invoke);
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -203,6 +281,9 @@ app.MapReportEndpoints();
 app.MapAssistantEndpoints();
 app.MapMcpEndpoints();
 
+// İstemci rotaları (/girisimler/…) index.html'e düşer; API önekleri düşmez.
+app.MapSpaFallback();
+
 // --- Açılış teşhisi ------------------------------------------------------
 // Sessiz yedek mekanizma bir daha kimseyi yanıltmasın: anahtar okunmadığında
 // asistan hata vermeden yerel plana düşüyor, bu da "AI çalışıyor" sanılıyordu.
@@ -214,19 +295,52 @@ else
     app.Logger.LogWarning(
         "Ai:ApiKey boş — asistan yerel plana düşecek. .env içinde T3_Ai__ApiKey ayarlayın.");
 
+// --- Şema ----------------------------------------------------------------
+// Göç uygulaması bilinçli olarak seçmeli: geliştirme makinesinde şemayı
+// `dotnet ef database update` yönetiyor, konteynerde ise API'nin kendisi
+// uygulamalı (yoksa "tek komutla kalkan yığın" ilk istekte boş tabloya çarpar).
+// Varsayılan kapalı — bir uygulama sürümünün üretim şemasını haberimiz olmadan
+// değiştirmesi, kolaylık olsun diye açılacak bir kapı değil.
+if (builder.Configuration.GetValue("Database:MigrateOnStartup", false))
+{
+    using var migrationScope = app.Services.CreateScope();
+    var database = migrationScope.ServiceProvider
+        .GetRequiredService<T3.Infrastructure.Persistence.AppDbContext>();
+
+    app.Logger.LogInformation("Bekleyen göçler uygulanıyor…");
+    await database.Database.MigrateAsync();
+}
+
 // --- Demo verisi ---------------------------------------------------------
 // Üretimde hiçbir koşulda çalışmaz: tohum kullanıcıların şifresi bilinen bir
 // değer olduğu için ortam kontrolü burada bir güvenlik sınırıdır.
-if (app.Environment.IsDevelopment())
+using (var seedScope = app.Services.CreateScope())
 {
-    using var seedScope = app.Services.CreateScope();
     var seedOptions = seedScope.ServiceProvider
         .GetRequiredService<IOptions<SeedOptions>>().Value;
 
-    if (seedOptions.Enabled)
-        await seedScope.ServiceProvider
-            .GetRequiredService<DevDataSeeder>()
-            .SeedAsync(seedOptions.Password);
+    if (app.Environment.IsDevelopment())
+    {
+        if (seedOptions.Enabled)
+            await seedScope.ServiceProvider
+                .GetRequiredService<DevDataSeeder>()
+                .SeedAsync(seedOptions.Password);
+    }
+    else if (seedOptions.Enabled)
+    {
+        // Ortam kontrolü sınırı tutuyor ama yapılandırmada kalmış bir "true"
+        // sessizce geçmemeli: dağıtımı yapan kişi bunu görüp .env'den silmeli.
+        app.Logger.LogError(
+            "Seed:Enabled açık ama ortam {Environment} — tohum verisi YAZILMADI. "
+            + "T3_Seed__Enabled değerini üretim yapılandırmasından kaldırın.",
+            app.Environment.EnvironmentName);
+    }
+    else
+    {
+        app.Logger.LogInformation(
+            "Tohum verisi kapalı (ortam: {Environment}). Arayüz sunumu: {Frontend}.",
+            app.Environment.EnvironmentName, servesFrontend ? "açık" : "yok");
+    }
 }
 
 app.Run();

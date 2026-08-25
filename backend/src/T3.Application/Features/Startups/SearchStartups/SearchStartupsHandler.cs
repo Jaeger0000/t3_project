@@ -3,7 +3,6 @@ using T3.Application.Common.Interfaces;
 using T3.Application.Common.Paging;
 using T3.Application.Common.Rbac;
 using T3.Application.Common.Results;
-using T3.Application.Common.Text;
 using T3.Domain.Achievements;
 
 namespace T3.Application.Features.Startups.SearchStartups;
@@ -24,18 +23,12 @@ public sealed class SearchStartupsHandler(
     {
         var query = scope.Apply(db.Startups.AsNoTracking());
 
+        // Yüklem StartupSearch'te: küçültme + aksan katlaması iki tarafta da
+        // uygulanıyor ve aynı kural CSV aktarımı ile pano istatistiğinde de
+        // geçerli. Contains kullanılıyor çünkü kullanıcının girdiği % ve _
+        // karakterlerini EF tarafında kaçırıyor.
         if (!string.IsNullOrWhiteSpace(request.Q))
-        {
-            // Küçük harfe indirip Contains kullanıyoruz: Npgsql'e özel ILIKE
-            // Application katmanında yok (sağlayıcıyı bilmiyoruz) ve Contains,
-            // kullanıcının girdiği % ile _ karakterlerini EF tarafında kaçırır.
-            // Normalize, .NET ile PostgreSQL'in küçültme farkını kapatır.
-            var term = SearchText.Normalize(request.Q);
-            query = query.Where(s =>
-                s.Name.ToLower().Contains(term)
-                || (s.ProductDescription != null && s.ProductDescription.ToLower().Contains(term))
-                || (s.City != null && s.City.ToLower().Contains(term)));
-        }
+            query = query.Where(StartupSearch.Matches(request.Q));
 
         if (request.Sector is { } sector)
             query = query.Where(s => s.Sector == sector);
@@ -44,10 +37,7 @@ public sealed class SearchStartupsHandler(
             query = query.Where(s => s.Status == status);
 
         if (!string.IsNullOrWhiteSpace(request.City))
-        {
-            var city = SearchText.Normalize(request.City);
-            query = query.Where(s => s.City != null && s.City.ToLower() == city);
-        }
+            query = query.Where(StartupSearch.InCity(request.City));
 
         if (request.ProgramId is { } programId)
             query = query.Where(s => s.Participations

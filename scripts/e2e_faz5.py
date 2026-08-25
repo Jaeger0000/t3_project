@@ -336,9 +336,17 @@ check("karar vericinin özeti yine de içerik taşıyor",
       len(kv_summary["highlights"]) >= 2,
       json.dumps(kv_summary["highlights"], ensure_ascii=False)[:200])
 
-out_of_scope = by_name["Toros Uzay Bileşenleri"]
-st, _, _ = call("GET", f"/api/ai/startups/{out_of_scope}/summary", kul)
-check("kapsam dışı girişimin özeti 404", st == 404, str(st))
+# Kapsam dışı kayıt ada göre değil **kapsamdan** seçiliyor: sabit ad, önceki
+# betiklerin (faz3 soft delete zinciri) o kaydı pasife almasıyla kırılıyordu ve
+# kontrol ürünü değil veri durumunu ölçüyordu.
+st, kul_page, _ = call("GET", "/api/startups?pageSize=100", kul)
+kul_scope = {s["id"] for s in kul_page["items"]}
+out_of_scope = next((sid for sid in by_name.values() if sid not in kul_scope), None)
+check("kapsam dışı bir girişim bulundu", out_of_scope is not None,
+      f"kapsam={len(kul_scope)} / toplam={len(by_name)}")
+if out_of_scope:
+    st, _, _ = call("GET", f"/api/ai/startups/{out_of_scope}/summary", kul)
+    check("kapsam dışı girişimin özeti 404", st == 404, str(st))
 
 # --------------------------------------------------------------- 6. MCP ucu
 section("6. MCP sunucusu")

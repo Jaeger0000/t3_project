@@ -1,8 +1,9 @@
 """Bağımlılıksız minimal Chrome DevTools Protocol istemcisi.
 
 Amaç: kimlik doğrulaması gereken ekranları gerçek tarayıcıda render edip
-metnini okumak. `--dump-dom` tek başına yetmiyor çünkü jeton localStorage'da
-duruyor ve dışarıdan yazılamıyor.
+metnini okumak. `--dump-dom` tek başına yetmiyor: oturum jetonu artık HttpOnly
+çerezde duruyor (Dalga 2), yani sayfadaki JavaScript onu ne okuyabiliyor ne de
+yazabiliyor — çerezi yalnızca CDP yazabilir (bkz. Browser.set_session).
 """
 
 import base64
@@ -96,6 +97,12 @@ class Browser:
         self.ws = WebSocket(target["webSocketDebuggerUrl"])
         self.next_id = 0
 
+        # Headless tarayıcı pencereyi "odakta değil" saydığı için `:focus`
+        # seçicisi hiç eşleşmiyor: element document.activeElement olsa bile
+        # odak stilleri uygulanmıyordu ve klavye erişilebilirliği ölçülemiyordu.
+        # Bu emülasyon sayfayı her zaman odakta gösteriyor.
+        self.call("Emulation.setFocusEmulationEnabled", enabled=True)
+
     def call(self, method, **params):
         self.next_id += 1
         request_id = self.next_id
@@ -106,6 +113,31 @@ class Browser:
                 if "error" in message:
                     raise RuntimeError(f"{method}: {message['error']}")
                 return message.get("result", {})
+
+    def set_session(self, token, origin="http://localhost:5173"):
+        """Oturumu çerezle kurar (giriş formunu doldurmadan).
+
+        Jeton HttpOnly çerezde olduğu için `localStorage.setItem` yolu kapandı:
+        script erişemiyor — güvenlik kazancının kendisi bu. CDP tarayıcının
+        kendi çerez deposuna yazdığı için kurulum yine tek satır.
+
+        CSRF çerezi de yazılıyor: yazma istekleri çift-gönderim jetonu istiyor
+        ve değer bir sır değil, yalnızca çerez ile başlığın eşleşmesi aranıyor.
+        """
+        self.call("Network.enable")
+        self.call("Network.setCookie", name="t3.session", value=token,
+                  url=origin, path="/", httpOnly=True, sameSite="Strict")
+        self.call("Network.setCookie", name="t3.csrf", value="render-kontrolu",
+                  url=origin, path="/", httpOnly=False, sameSite="Strict")
+        # Arayüz "daha önce oturum açıldı mı" bilgisini bu işaretten okuyor;
+        # yokken 401 alan ziyaretçiye "süre doldu" demiyor (bkz. AuthProvider).
+        self.evaluate("localStorage.setItem('t3.session.active', '1')")
+
+    def clear_session(self):
+        """Çerezleri ve yerel işareti siler: oturumsuz durumu sınamak için."""
+        self.call("Network.enable")
+        self.call("Network.clearBrowserCookies")
+        self.evaluate("localStorage.clear()")
 
     def evaluate(self, expression):
         result = self.call("Runtime.evaluate", expression=expression,

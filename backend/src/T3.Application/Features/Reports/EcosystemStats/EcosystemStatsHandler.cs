@@ -114,10 +114,7 @@ public sealed class EcosystemStatsHandler(
             query = query.Where(s => s.Sector == sector);
 
         if (!string.IsNullOrWhiteSpace(request.City))
-        {
-            var city = SearchText.Normalize(request.City);
-            query = query.Where(s => s.City != null && s.City.ToLower() == city);
-        }
+            query = query.Where(StartupSearch.InCity(request.City));
 
         return query;
     }

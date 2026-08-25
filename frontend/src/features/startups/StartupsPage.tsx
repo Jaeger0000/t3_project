@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import { formatCompactMoney, formatYear } from '@/lib/format'
@@ -8,42 +8,87 @@ import { defaultFilters, useStartups, usePrograms } from './queries'
 import StartupForm from './StartupForm'
 import ParticipationForm from './ParticipationForm'
 import type { StartupFilters } from './queries'
-import type { Sector, StartupListItem, StartupSort, StartupStatus } from '@/api/types'
+import type { StartupListItem, StartupSort } from '@/api/types'
 import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 export default function StartupsPage() {
   useDocumentTitle('Girişimler')
   const { session } = useAuth()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [creating, setCreating] = useState(false)
   // Yeni kayıt Program Yöneticisi'nin kapsamına ancak bir program dönemine
   // bağlanınca girer (kapsam tanımı: "programlarımdan geçmiş girişimler").
   // Bu yüzden kaydetmeden sonra kart yerine katılım adımı gösteriliyor.
   const [created, setCreated] = useState<{ id: string; name: string } | null>(null)
 
-  // Programlar sayfası buraya ?program=<id> ile bağlanıyor; filtre o değerle
-  // başlatılır, sonrasını kullanıcı açılırdan yönetir.
-  const [filters, setFilters] = useState<StartupFilters>(() => ({
-    ...defaultFilters,
-    programId: searchParams.get('program') ?? '',
-  }))
-  const [searchText, setSearchText] = useState('')
+  /*
+   * Filtre, sıralama ve sayfa numarası URL'de duruyor — bileşende ikinci bir
+   * kopya yok. Kazanç üç yerde görülüyor: geri tuşu bir önceki filtreye
+   * dönüyor, "şu listeye bak" diye paylaşılan bağlantı karşı tarafta aynı
+   * listeyi açıyor ve sayfa yenilenince seçim kaybolmuyor. Programlar sayfası
+   * zaten ?program=<id> ile buraya bağlanıyordu; artık tüm filtreler aynı dili
+   * konuşuyor.
+   */
+  const filters = useMemo<StartupFilters>(
+    () => ({
+      ...defaultFilters,
+      q: searchParams.get('q') ?? '',
+      sector: (searchParams.get('sektor') ?? '') as StartupFilters['sector'],
+      status: (searchParams.get('durum') ?? '') as StartupFilters['status'],
+      programId: searchParams.get('program') ?? '',
+      sort: (searchParams.get('sirala') ?? defaultFilters.sort) as StartupSort,
+      // Elle kurcalanmış ?sayfa=abc değeri listeyi bozmasın.
+      page: Math.max(1, Number(searchParams.get('sayfa')) || 1),
+    }),
+    [searchParams],
+  )
+
+  const setParam = useCallback(
+    (key: string, value: string) => {
+      setSearchParams(
+        (previous) => {
+          const next = new URLSearchParams(previous)
+
+          if (value) next.set(key, value)
+          else next.delete(key)
+
+          // Filtre değişince ilk sayfaya dönülür: 4. sayfada duran kullanıcı
+          // filtreyi daralttığında boş liste görürdü.
+          if (key !== 'sayfa') next.delete('sayfa')
+
+          return next
+        },
+        // Arama her tuş vuruşunda geçmişe satır eklemesin; geri tuşu filtreden
+        // filtreye atlamalı, harften harfe değil.
+        { replace: key === 'q' },
+      )
+    },
+    [setSearchParams],
+  )
+
+  const [searchText, setSearchText] = useState(filters.q)
+  const [syncedTerm, setSyncedTerm] = useState(filters.q)
+
+  // Geri/ileri tuşu ya da paylaşılan bağlantı URL'yi değiştirdiğinde kutu da
+  // onunla gelsin. Bu iş effect'te değil **render sırasında** yapılıyor: React'in
+  // "dışarıdan gelen değer değişince state'i düzelt" kalıbı. Effect'le yazmak
+  // fazladan bir tur render üretiyor ve kutu bir kare eski değeri gösteriyor.
+  if (syncedTerm !== filters.q) {
+    setSyncedTerm(filters.q)
+    setSearchText(filters.q)
+  }
 
   // Her tuş vuruşunda istek atmamak için arama terimi geciktirilir.
   useEffect(() => {
-    const timer = setTimeout(
-      () => setFilters((current) => ({ ...current, q: searchText, page: 1 })),
-      350,
-    )
+    if (searchText === filters.q) return
+
+    const timer = setTimeout(() => setParam('q', searchText), 350)
     return () => clearTimeout(timer)
-  }, [searchText])
+  }, [searchText, filters.q, setParam])
 
   const startups = useStartups(filters)
   const programs = usePrograms()
-
-  const update = <K extends keyof StartupFilters>(key: K, value: StartupFilters[K]) =>
-    setFilters((current) => ({ ...current, [key]: value, page: 1 }))
 
   return (
     <div className="flex flex-col gap-6">
@@ -123,7 +168,7 @@ export default function StartupsPage() {
           <Select
             label="Sektör"
             value={filters.sector}
-            onChange={(event) => update('sector', event.target.value as Sector | '')}
+            onChange={(event) => setParam('sektor', event.target.value)}
           >
             <option value="">Tümü</option>
             {Object.entries(sectorLabels).map(([value, label]) => (
@@ -136,7 +181,7 @@ export default function StartupsPage() {
           <Select
             label="Durum"
             value={filters.status}
-            onChange={(event) => update('status', event.target.value as StartupStatus | '')}
+            onChange={(event) => setParam('durum', event.target.value)}
           >
             <option value="">Tümü</option>
             {Object.entries(startupStatusLabels).map(([value, label]) => (
@@ -149,7 +194,7 @@ export default function StartupsPage() {
           <Select
             label="Program"
             value={filters.programId}
-            onChange={(event) => update('programId', event.target.value)}
+            onChange={(event) => setParam('program', event.target.value)}
           >
             <option value="">Tümü</option>
             {(programs.data ?? []).map((program) => (
@@ -162,7 +207,7 @@ export default function StartupsPage() {
           <Select
             label="Sırala"
             value={filters.sort}
-            onChange={(event) => update('sort', event.target.value as StartupSort)}
+            onChange={(event) => setParam('sirala', event.target.value)}
           >
             <option value="Name">Ada göre</option>
             <option value="Newest">En yeni kayıt</option>
@@ -194,7 +239,7 @@ export default function StartupsPage() {
               <Button
                 variant="outline"
                 disabled={filters.page <= 1}
-                onClick={() => setFilters((c) => ({ ...c, page: c.page - 1 }))}
+                onClick={() => setParam('sayfa', String(filters.page - 1))}
               >
                 ← Önceki
               </Button>
@@ -204,7 +249,7 @@ export default function StartupsPage() {
               <Button
                 variant="outline"
                 disabled={!startups.data.hasNext}
-                onClick={() => setFilters((c) => ({ ...c, page: c.page + 1 }))}
+                onClick={() => setParam('sayfa', String(filters.page + 1))}
               >
                 Sonraki →
               </Button>

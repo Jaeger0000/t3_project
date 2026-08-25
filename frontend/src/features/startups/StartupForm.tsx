@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { Sector, StartupCard, StartupStatus, StartupWriteModel } from '@/api/types'
 import { sectorLabels, startupStatusLabels } from '@/lib/labels'
 import { Button, Card, ErrorState, Input, Select } from '@/components/ui'
+import UnsavedChangesGuard from '@/lib/UnsavedChangesGuard'
 import { useSubmitChangeRequest } from '@/features/approvals/queries'
 import { useCreateStartup, useUpdateStartup } from './queries'
 
@@ -116,6 +117,10 @@ export default function StartupForm({
     )
   }
 
+  // Kirli form: kullanıcının girdiği hiçbir değer kaydedilmemişse uyarı
+  // gerekmiyor; başarıyla gönderildiyse de (sent) artık kayıp riski yok.
+  const dirty = sent === null && JSON.stringify(form) !== JSON.stringify(initial)
+
   const busy = propose.isPending || create.isPending || update.isPending
   const error = propose.error ?? create.error ?? update.error
   const areas = (form.technologyAreas ?? []).join(', ')
@@ -166,6 +171,12 @@ export default function StartupForm({
             ? 'Değişiklik kaydedildiği anda karta ve raporlara yansır.'
             : 'Zorunlu alanlar girişim adı ve sektör; kalanı sonradan tamamlanabilir.'}
       </p>
+
+      {dirty ? (
+        <div className="mt-4">
+          <UnsavedChangesGuard dirty={dirty} />
+        </div>
+      ) : null}
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <Input

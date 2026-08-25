@@ -250,7 +250,7 @@ Videoda telefon görüntüsü kullanılacaksa bu görünür.
 
 > **Durum: tamamlandı (24 Ağustos).** Altı maddenin hepsi kapandı. Doğrulama:
 > 185 birim testi, 307 uçtan uca kontrol, 287 render kontrolü — sonuncusu
-> `scripts/render_faz7.py` (yeni, 86 kontrol) dâhil. Tek kalan kayıt teknik
+> `scripts/render_faz7.py` (yeni, 86 kontrol; Dalga 2'de 91'e çıktı) dâhil. Tek kalan kayıt teknik
 > değil: **1.5'in metinleri hukuki onay bekliyor** ve ekranda görünür biçimde
 > "taslak" işaretli. Aşağıdaki her maddenin altında ne yapıldığı ve nerede
 > doğrulandığı yazıyor.
@@ -469,7 +469,68 @@ ekranını gösterecek biçimde koru.
 
 ## Dalga 2 — Gerçek canlıya çıkış (Demo Day sonrası)
 
+> **Durum: tamamlandı (24 Ağustos).** Üç maddenin hepsi kapandı. Doğrulama:
+> 191 birim testi, 310 uçtan uca kontrol, 346 render kontrolü — sonuncusu
+> `scripts/render_faz8.py` (yeni, 54 kontrol) dâhil. Yeni betik **iki origin'e**
+> karşı koşuyor: davranış kontrolleri Vite'ta (5173), barındırma ve güvenlik
+> başlıkları API'nin kendi sunduğu derlenmiş arayüzde (5080).
+>
+> Dalga 2'de planda olmayan iki bulgu daha kapandı; ikisi de doğrulama
+> zincirinin kendisiyle ilgili:
+> - **Arayüz derlenmiyordu.** Dalga 1'in son düzeltmesinde `AppShell.tsx` içine
+>   konan JSX yorumu geçersiz konumdaydı. `npx tsc --noEmit` bunu *yakalamıyor*:
+>   kök `tsconfig.json` yalnızca referans dosyası, hiçbir kaynağı kontrol
+>   etmiyor. Gerçek kontrol `npm run build` (`tsc -b`). Dalga 1'in son render
+>   koşusunun asılı kalmasının sebebi de buydu.
+> - **Çıkış ekranda etkisizdi.** Jeton çereze taşındıktan sonra oturumu düşürme
+>   işi `queryClient.clear()`'a bırakılmıştı; clear önbelleği boşaltıyor ama
+>   bileşenlere yeni durum bildirmiyor. Aynı boşluk 401'de de vardı (React Query
+>   hata durumunda eldeki `data`'yı koruyor), yani süresi dolmuş oturum ekranda
+>   açık kalırdı. Çözüm: açık `signedOut` durumu (bkz. `AuthProvider`).
+> - **Bir kontrol tohum düzenini ölçüyordu.** `e2e_faz4`'ün "zincir dokümanları
+>   da kapatıyor" kontrolü, silinecek girişimin tohumda dosyası olduğunu
+>   varsayıyordu; kapsam sırası değişince ürün doğru çalışırken kontrol
+>   düşüyordu. Betik artık kaydı başarı sayısına bakarak seçiyor ve silmeden
+>   önce kendi dosyasını yüklüyor (+1 kontrol, e2e_faz4 = 125).
+>
+> **25 Ağustos:** zincirin tamamı tur başına ayrı, temiz tohum verili
+> veritabanlarında yeniden koşuldu — dört turda **310 uçtan uca + 346 render
+> kontrolü, tek düşen yok**.
+
 ### 2.1 · Üretim dağıtım yolu — **~1 gün** `[B-07]`
+> **Yapıldı — tercih edilen yol seçildi: API statik dosyaları kendisi sunuyor.**
+> `SpaHosting` (statik dosyalar + SPA geri dönüşü), kök `Dockerfile` (üç aşama:
+> arayüzü derle → API'yi yayınla → kök olmayan çalışma zamanı),
+> `docker-compose.prod.yml` (postgres portu yayımlamıyor, API yalnızca
+> loopback'e bağlanıyor), `.dockerignore` (sırlar ve yerel yüklemeler imaja
+> girmiyor), `.env.prod.example`.
+>
+> Ayrıntılar ve gerekçeleri:
+> - **API önekleri geri dönüşün dışında** (`/api`, `/health`, `/mcp`,
+>   `/swagger`): `/api/olmayan-uc` için index.html döndürmek 404 sözleşmesini
+>   bozar, istemci JSON beklerken HTML ayrıştırır.
+> - **Önbellek başlıkları asimetrik**: özet adlı varlıklar `immutable`,
+>   `index.html` `no-cache`. Tersi yapılsa dağıtımdan sonra eski paket adlarını
+>   isteyen bir sayfa kalırdı.
+> - **Göç uygulaması seçmeli** (`Database:MigrateOnStartup`, varsayılan kapalı;
+>   compose'da açık): "tek komutla kalkan yığın" bunu gerektiriyor ama bir
+>   uygulama sürümünün üretim şemasını haberimiz olmadan değiştirmesi
+>   varsayılan olamaz.
+> - **TLS**: `Hosting:RequireHttps` açıkken HSTS + HTTP→HTTPS yönlendirmesi
+>   uygulamada; kapalıyken (ters vekil kurulumu) üretimde **uyarı log'u**
+>   düşüyor. Sessiz bir "TLS yok" durumu bırakılmadı.
+> - **`X-Forwarded-*` yalnızca güvenilen vekil adına**
+>   (`Hosting:TrustedProxies`; boşsa yalnızca loopback). `HttpClientContext`
+>   artık başlığı elle okumuyor — Dalga 1'de okuyordu ve denetim izindeki IP
+>   istemcinin uydurabildiği bir değerdi.
+> - **`Seed:Enabled` üretimde açıkça doğrulanıyor**: kapalıysa bilgi log'u,
+>   yanlışlıkla açık bırakılmışsa hata log'u (ve tohumlama yine çalışmaz).
+>
+> Doğrulama: `render_faz8.py` derlenmiş arayüzü 5080'den açıp giriş yapıyor,
+> derin bağlantının index.html'e düştüğünü ve `/api/olmayan-uc`'un JSON 404
+> döndüğünü sınıyor. Konteyner imajı bu makinede **derlenmedi** (aşağıdaki
+> "kalan" notu).
+
 
 Frontend tüm isteklerini göreli `/api/...` yoluna atıyor; bu yolu backend'e
 taşıyan tek şey [vite.config.ts](../frontend/vite.config.ts) içindeki
@@ -488,6 +549,39 @@ tanımlıyor. Yani `npm run build` çıktısı hiçbir API'ye ulaşamaz.
 giriş yapılır ve girişim listesi görülür; karışık içerik uyarısı çıkmaz.
 
 ### 2.2 · Jetonu çerezine taşı ve CSP ekle — **~1 gün** `[Y-05]`
+> **Yapıldı.** Jeton artık `HttpOnly` + `SameSite=Strict` çerezde
+> (`SessionCookie`); `Secure` isteğin şemasına bağlı (geliştirmede düz HTTP,
+> üretimde TLS zorunlu). Yeni uç: `POST /api/auth/logout` — çerezi yalnızca
+> sunucu geçersiz kılabilir, istemcinin "unutması" yetmez.
+>
+> **Başlık yolu bilinçli olarak kaldırılmadı:** `Authorization: Bearer` hâlâ
+> geçerli, çünkü MCP istemcileri, doğrulama betikleri ve Swagger çerez
+> taşımıyor. `JwtBearerEvents.OnMessageReceived` başlığı önceliyor, yoksa çerezi
+> okuyor. Bu ayrım CSRF kararının da temeli: **çerezle** kimliklenen yazma
+> istekleri çift-gönderim jetonu istiyor (`t3.csrf` çerezi + `X-CSRF-Token`
+> başlığı, sabit süreli karşılaştırma), **başlıkla** gelenler istemiyor — başka
+> bir sitenin sayfası bizim jetonumuzu başlığa koyamaz. Çıkış ucu kuralın
+> dışında: zorlanmış çıkışın zararı yeniden giriş yapmak, karşı taraftaki risk
+> ise "çerezini temizleyemeyen kullanıcı".
+>
+> CSP `default-src 'self'` üzerine kurulu (tek origin kararı bunu mümkün kıldı);
+> `script-src 'self'` sıkı, `style-src`'de `'unsafe-inline'` var çünkü grafikler
+> ölçüleri element `style` özniteliğine yazıyor — XSS'in tehlikeli kolu script
+> tarafı ve orası açık değil. Swagger yalnızca geliştirmede ve kendi script
+> bloklarını gömdüğü için CSP'den muaf. Yanıtlara ayrıca `nosniff`,
+> `Referrer-Policy`, `X-Frame-Options`, `Permissions-Policy`,
+> `Cross-Origin-Opener-Policy` ve **API yolunda `Cache-Control: no-store`**
+> ekleniyor (O-06'nın indirme maddesi de bununla kapandı).
+>
+> İstemci tarafında `localStorage`'da artık jeton yok; yalnızca `t3.session.active`
+> işareti duruyor (sır değil): siteye ilk gelen ziyaretçiye "oturum süreniz
+> doldu" dememek ve sekmeler arası senkron için.
+>
+> **Doğrulama betikleri de bu yüzden değişti:** jeton artık script'in
+> erişemediği bir yerde, dolayısıyla `localStorage.setItem` ile oturum kurma
+> yolu kapandı. `cdp.py`'ye `set_session`/`clear_session` eklendi (çerezi CDP
+> yazıyor) ve beş render betiği buna geçti — kapanan açığın kendisi bu.
+
 
 Erişim jetonu `localStorage`'da ([apiClient.ts:21](../frontend/src/lib/apiClient.ts#L21));
 CSP başlığı yok. Süper Yönetici jetonu çalınırsa 32 girişimin vergi numarası,
@@ -501,13 +595,50 @@ iletişim bilgisi ve finansalları dışarı taşınır.
 
 ### 2.3 · Kalan orta öncelikli maddeler
 
-| # | İş | Efor |
-|---|---|---|
-| `[O-01]` | Filtre/sıralama/sayfa durumunu URL'ye yaz (`setSearchParams`); geri tuşu ve paylaşılan bağlantı çalışsın | Düşük |
-| `[O-04]` | `SearchText.Normalize` aksanları katlasın (ç→c, ğ→g, ı/İ→i, ö→o, ş→s, ü→u); "saglik" → "Sağlık" bulsun. Gösterim etiketleri değişmez | Düşük |
-| `[O-05]` | Kirli formdan çıkışta uyarı (`useBlocker`); `storage` olayıyla sekmeler arası oturum senkronu | Orta |
-| `[O-06]` | Hata izleme (Sentry), rota bazlı `lazy` kod bölme (bugün tek parça 362 kB), indirme yanıtına `Cache-Control: no-store` | Orta |
-| `[D-01]` | Girdi odak halkası `brand-500/20` → en az `/60`; gövde başına "İçeriğe atla" bağlantısı | Düşük |
+| # | İş | Efor | Durum |
+|---|---|---|---|
+| `[O-01]` | Filtre/sıralama/sayfa durumunu URL'ye yaz (`setSearchParams`); geri tuşu ve paylaşılan bağlantı çalışsın | Düşük | ✅ |
+| `[O-04]` | `SearchText.Normalize` aksanları katlasın (ç→c, ğ→g, ı/İ→i, ö→o, ş→s, ü→u); "saglik" → "Sağlık" bulsun. Gösterim etiketleri değişmez | Düşük | ✅ |
+| `[O-05]` | Kirli formdan çıkışta uyarı (`useBlocker`); `storage` olayıyla sekmeler arası oturum senkronu | Orta | ✅ |
+| `[O-06]` | Hata izleme (Sentry), rota bazlı `lazy` kod bölme (bugün tek parça 362 kB), indirme yanıtına `Cache-Control: no-store` | Orta | ⚠️ kısmen |
+| `[D-01]` | Girdi odak halkası `brand-500/20` → en az `/60`; gövde başına "İçeriğe atla" bağlantısı | Düşük | ✅ |
+
+**O-01.** Filtre, sıralama ve sayfa `useSearchParams` ile URL'de duruyor;
+bileşende ikinci bir kopya **yok** (iki kaynak birbirinden kayardı). Arama
+terimi geçmişe satır eklemiyor (`replace: true`) — geri tuşu filtreden filtreye
+atlamalı, harften harfe değil. Filtre değişince sayfa numarası düşüyor.
+
+**O-04.** Katlama `SearchText.Normalize`'a **eklenmedi**, ayrı bir
+`SearchText.Fold` olarak yazıldı. Sebep: Normalize'ın çıktısı veritabanındaki
+*katlanmamış* kolonla karşılaştırılıyor (e-posta eşitliği, isim tekilliği);
+katlamayı oraya koymak terimi "oguz" yaparken kolonu "oğuz" bırakır ve girişi
+sessizce bozardı. Sorgu tarafında katlama `StartupSearch` içindeki
+`Expression` yüklemlerinde, SQL `replace()` zincirine çevrilerek yapılıyor —
+`unaccent` uzantısı ve `ILIKE` sağlayıcıya özel olurdu. Liste, CSV aktarımı ve
+pano istatistiği aynı yüklemi kullanıyor: ekranda görülen satırların CSV'de
+farklı çıkması en sinsi rapor hatası olurdu.
+
+**O-05.** `useBlocker` veri yönlendiricisi istiyor; yönlendirici kurulumu
+`createBrowserRouter` + `createRoutesFromElements`'e taşındı (rota ağacı JSX
+olarak kaldı). Uyarı form doldurulurken değil **ayrılırken** çıkıyor. Sekmeler
+arası senkron `storage` olayıyla: bir sekmede çıkış yapılınca diğeri de giriş
+ekranına dönüyor.
+
+**O-06 — kısmen.** Rota bazlı kod bölme yapıldı (tek parça 400 kB → 323 kB
+ana parça + 14 rota parçası; veri yönlendiricisi ana parçayı ~55 kB büyüttü,
+bilinçli takas). İndirme/API yanıtlarına `Cache-Control: no-store` eklendi.
+**Sentry bağlanmadı:** hesap, DSN ve KVKK tarafında bir yurt dışı aktarım
+kararı gerektiriyor — üçü de bu depoda kararlaştırılamaz. Yerine
+`ErrorBoundary` eklendi (beyaz ekran yerine Türkçe açıklama + yenile) ve
+raporlama tek bir `console.error` noktasına toplandı: sağlayıcı geldiğinde
+değişecek tek yer orası.
+
+**D-01.** Odak halkası `brand-500/20` → `/60` (ölçüldü: `oklab(… / 0.6)`),
+düğmelere `focus-visible` halkası eklendi (klavye odağı hiç görünmüyordu),
+`AppShell`'e "İçeriğe atla" bağlantısı ve `<main id="icerik">`. Bu maddenin
+doğrulanabilmesi için `cdp.py`'de `Emulation.setFocusEmulationEnabled`
+açıldı: headless tarayıcı pencereyi odakta saymadığı için `:focus` seçicisi
+hiç eşleşmiyordu ve odak stilleri ölçülemiyordu.
 
 ---
 
@@ -516,18 +647,34 @@ iletişim bilgisi ve finansalları dışarı taşınır.
 Sırayı bozma — bu proje bugüne kadarki hataların çoğunu son adımda yakaladı:
 
 ```bash
+# Temiz tohum verisiyle başla: betikler veriyi değiştiriyor.
+docker compose down -v && docker compose up -d postgres
+
 cd backend && dotnet build && dotnet test
+cd frontend && npm run build && npm run lint   # tsc --noEmit bu repoda hiçbir şeyi kontrol etmez
+
 python3 scripts/e2e_faz3.py && python3 scripts/e2e_faz4.py && python3 scripts/e2e_faz5.py
 python3 scripts/render_faz3.py && python3 scripts/render_faz4.py && python3 scripts/render_faz5.py
+python3 scripts/render_faz6.py   # Dalga 0
+python3 scripts/render_faz7.py   # Dalga 1  (arada ~1 dk: giriş kovası boşalsın)
+python3 scripts/render_faz8.py   # Dalga 2  (öncesinde derlenmiş arayüz wwwroot'a kopyalanır)
 ```
 
-`index.html`'in 200 dönmesi uygulamanın açıldığını göstermez. **Dalga 0.5 ve
-Dalga 1.1 için yeni render kontrolleri yazılmalı** — yeni yazma ekranları
-mevcut betiklerin kapsamında değil.
+`index.html`'in 200 dönmesi uygulamanın açıldığını göstermez — ama arayüzün
+**derlendiğini** de `npx tsc --noEmit` göstermez (kök tsconfig yalnızca referans
+dosyası; komut sessizce geçer). Dalga 2'de arayüz bir süre derlenmez hâldeydi ve
+bunu ancak `npm run build` ortaya çıkardı.
+
+Betikler birbirinin verisini yiyor (girişim pasife alma, kullanıcı oluşturma):
+tam yeşil bir zincir **sıfırlanmış veritabanı** ister. Sabit sayıya/ada bağlı
+kontroller bu yüzden kapsamdan türetilenlere çevrildi, ama sıfırlama gereği
+ortadan kalkmadı.
 
 Denetimde kullanılan rol × rota matrisi ve mutlu yol dışı senaryolar
 (ağ kesintisi, jeton silme, bozuk jeton, mobil taşma, klavye turu)
-tekrarlanabilir; her dalga sonunda yeniden koşulmalı.
+tekrarlanabilir; her dalga sonunda yeniden koşulmalı. Dalga 2'den sonra "jeton
+silme" senaryosu **çerez silme** demek: jeton artık script'in erişemediği bir
+yerde ve betikler oturumu CDP ile kuruyor (`cdp.Browser.set_session`).
 
 ---
 

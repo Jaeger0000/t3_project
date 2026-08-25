@@ -7,6 +7,7 @@ yakalamıştı.
 
 import json
 import sys
+import time
 import urllib.request
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
@@ -76,15 +77,14 @@ browser = Browser()
 def as_user(role, path, wait_for=None):
     """Jetonu yerleştirip hedef rotayı açar ve görünen metni döner."""
     browser.goto(f"{APP}/giris")
-    browser.evaluate(
-        f"localStorage.setItem('t3.accessToken', {json.dumps(tokens[role])})")
+    browser.set_session(tokens[role])
     return browser.goto(f"{APP}{path}", wait_for=wait_for)
 
 
 try:
     print("\n=== Giriş ekranı ===")
     browser.goto(f"{APP}/giris")
-    browser.evaluate("localStorage.clear()")
+    browser.clear_session()
     text = browser.goto(f"{APP}/giris", wait_for="posta")
     check("giriş ekranı render oluyor", "posta" in text.lower(), text[:200])
     check("React uygulaması açıldı (boş gövde değil)", len(text.strip()) > 20, repr(text[:80]))
@@ -156,6 +156,16 @@ try:
 
     text = as_user("admin", "/denetim", wait_for="Denetim")
     check("denetim izi render oluyor", "Denetim izi" in text, text[:200])
+
+    # Satırlar ayrı bir istekle geliyor: başlığın gelmesi tabloların geldiğini
+    # göstermiyor. Rota bazlı kod bölmeyle (Dalga 2) araya bir de parça indirme
+    # girdi ve tek seferlik okuma boş tabloya denk gelebiliyor.
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        if any(marker in text for marker in ("ChangeRequest.", "Startup.", "User.")):
+            break
+        time.sleep(0.4)
+        text = browser.text()
     check("eylem satırları görünüyor",
           "ChangeRequest." in text or "Startup." in text or "User." in text, text[:400])
 

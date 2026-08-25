@@ -172,8 +172,7 @@ def fill(fields):
 def as_user(role, path, wait_for=None):
     """Jetonu yerleştirip hedef rotayı açar ve görünen metni döner."""
     browser.goto(f"{APP}/giris")
-    browser.evaluate(
-        f"localStorage.setItem('t3.accessToken', {json.dumps(tokens[role])})")
+    browser.set_session(tokens[role])
     return browser.goto(f"{APP}{path}", wait_for=wait_for)
 
 

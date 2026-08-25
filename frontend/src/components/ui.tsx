@@ -69,7 +69,10 @@ export function Button({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed ${styles} ${className}`}
+      // Klavye odağı düğmelerde hiç görünmüyordu: tarayıcının varsayılan
+      // halkası `transition-colors` ile birlikte fark edilmiyor, renk değişimi
+      // de yalnızca hover'da vardı. `focus-visible` fare tıklamasında çıkmaz.
+      className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:cursor-not-allowed ${styles} ${className}`}
     >
       {children}
     </button>
@@ -84,7 +87,7 @@ export function Input({ label, ...props }: { label?: string } & InputHTMLAttribu
       ) : null}
       <input
         {...props}
-        className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none placeholder:text-stone-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100"
+        className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none placeholder:text-stone-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/60 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100"
       />
     </label>
   )
@@ -102,7 +105,7 @@ export function Select({
       ) : null}
       <select
         {...props}
-        className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100"
+        className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/60 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100"
       >
         {children}
       </select>

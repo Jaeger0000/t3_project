@@ -20,6 +20,7 @@ değerlendirme aşamasına geçemez — **önce MVP, sonra güzellik**.
 | [docs/Gelistirme_Kararlari.md](docs/Gelistirme_Kararlari.md) | Yerleşik teknik kararlar, reddedilen alternatifler, ortam tuzakları |
 | [README.md](README.md) | Kurulum, demo hesapları, komutlar, mevcut durum |
 | [scripts/README.md](scripts/README.md) | Çalışan sisteme karşı doğrulama betikleri ve çalıştırma sırası |
+| [docs/Is_Modeli_Kanvasi.md](docs/Is_Modeli_Kanvasi.md) · [docs/Demo_Senaryosu.md](docs/Demo_Senaryosu.md) | 26 Ağustos teslimi: kanvas, video çekim planı, pitch iskeleti, jüri soruları (taslak) |
 
 ## Takvim
 
@@ -64,12 +65,19 @@ değerlendirme aşamasına geçemez — **önce MVP, sonra güzellik**.
 - **Maskeleme yazma yolunda da tutulur:** maskeli alan istemciye `null` gittiği
   için tam değiştirmeli `PUT` onu sessizce siler
   (`StartupWriteModel.ApplyTo(startup, visibility)`).
+- **Kimlik iki yolla taşınır, biri kaldırılamaz:** tarayıcı jetonu `HttpOnly`
+  çerezde kullanır, `Authorization: Bearer` yolu MCP istemcileri, doğrulama
+  betikleri ve Swagger için durur. Çerezle kimliklenen yazma isteği
+  `X-CSRF-Token` ister; Bearer isteği istemez (başka origin başlık koyamaz).
 - **MCP araçları REST ile aynı Application handler'larını sarar** — asla paralel veri yolu.
 - **Girişim kullanıcısı hiçbir tabloya doğrudan yazmaz** — yalnızca `ChangeRequest` üretir.
 
 ## Sık çarpılan tuzaklar (ayrıntı: [Gelistirme_Kararlari.md](docs/Gelistirme_Kararlari.md))
 
 - Postgres **5433**, API **5080**, Vite **5173**.
+- **`npx tsc --noEmit` bu repoda hiçbir dosyayı kontrol etmez** (kök tsconfig
+  yalnızca referans dosyası). Arayüzün derlendiğini yalnızca `npm run build`
+  (`tsc -b`) söyler — geçersiz JSX bu yüzden bir kez depoya girdi.
 - `.env` değerleri **çift tırnaklı** kalmalı (bağlantı dizesinde `;` var).
 - Application katmanında **sağlayıcıya özel EF API'si yok**: `EF.Functions.ILike`,
   `AsSplitQuery`, `ExecuteUpdate/Delete` kullanılamaz.

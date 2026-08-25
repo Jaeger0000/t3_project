@@ -317,17 +317,22 @@ Karar Verici rolü finansalları **yalnızca agregat** görür: "12 girişim top
 
 ## 5. API Yüzeyi
 
-> **Uygulanan yüzey ile fark (Dalga 1, 24 Ağustos):** `POST /api/auth/refresh`
-> **yazılmadı** — yenileme jetonu HttpOnly çereze taşıma kararına bağlı ve o
-> karar tek origin dağıtımını bekliyor (Dalga 2). Yerine erişim jetonunun ömrü
-> bir iş günü yapıldı. Bunun karşılığında planda olmayan üç uç eklendi:
+> **Uygulanan yüzey ile fark (Dalga 1–2, 24 Ağustos):** `POST /api/auth/refresh`
+> **yazılmadı**. Dalga 2'de jetonun tamamı `HttpOnly` + `SameSite=Strict` çereze
+> taşındı ve ömrü bir iş günü kaldı; yenileme jetonu ayrı bir çerez olarak
+> eklenmedi çünkü tek jetonun iş günü ömrü aynı sorunu (kullanıcının çalışırken
+> atılması) daha az hareketli parçayla çözüyor. Onun yerine `POST
+> /api/auth/logout` eklendi: çerezi yalnızca sunucu geçersiz kılabilir.
+> Çerezle kimliklenen yazma istekleri `X-CSRF-Token` başlığı istiyor;
+> `Authorization: Bearer` yolu (MCP, betikler, Swagger) değişmedi. Bunun karşılığında planda olmayan üç uç eklendi:
 > `forgot-password`, `reset-password`, `change-password`. Program tarafında
 > plandaki `POST /api/programs` ve `/api/programs/{id}/terms` uçları eklendi,
 > yanlarına güncelleme/kapatma ve katılım düzeltme uçları geldi. Güncel liste:
 > [README — API yüzeyi](../README.md#api-yüzeyi).
 
 ```
-POST   /api/auth/login                          → JWT (yenileme jetonu Dalga 2'de)
+POST   /api/auth/login                          → JWT: HttpOnly çerez + gövde
+POST   /api/auth/logout                         → oturum ve CSRF çerezlerini siler
 POST   /api/auth/forgot-password                → sıfırlama bağlantısı (yanıt adresi doğrulamaz)
 POST   /api/auth/reset-password                 → tek kullanımlık jetonla yeni şifre
 POST   /api/auth/change-password                → oturum içi, mevcut şifre doğrulamalı
@@ -445,6 +450,7 @@ Bugün **20 Ağustos**. İlk teslim **26 Ağustos 10.00** (iş modeli canvası +
 | **5 — Dashboard & AI** ✅ | 24 Ağu | EcosystemStats + ekosistem panosu, el yazımı SVG grafikler, CSV dışa aktarma (maskeli hücreler dâhil), JSON-RPC MCP sunucusu, AI karar destek paneli ve yönetici özeti (model yoksa yerel planlayıcı), 32 girişimlik gerçekçi tohum verisi | karar destek |
 | **Denetim Dalga 0** ✅ | 24 Ağu | Ürün denetiminin videodan önce kapanması gereken bulguları: girişim/ekip/katılım yazma yolları arayüze, hız sınırı bölümlemesi, sekme başlığı/dil, 404 ekranı, mobil taşma, yazma yolunda maskeleme | **#1–#4 bütünlüğü** |
 | **Denetim Dalga 1** ✅ | 24 Ağu | Program ve dönem yönetimi, şifre kurtarma/değiştirme, oturum ömrü ve ağ hatası ayrımı, giriş olaylarının denetim izi, KVKK metinleri, Karar Verici'nin onay ekranı | MVP + KVKK |
+| **Denetim Dalga 2** ✅ | 24 Ağu | Canlıya çıkış altyapısı: derlenmiş arayüzü API sunuyor (tek origin) + `Dockerfile`/`docker-compose.prod.yml`, jeton `HttpOnly` çerezde + CSRF çift-gönderimi + CSP ve güvenlik başlıkları, `X-Forwarded-*` yalnızca güvenilen vekilden, kalan orta maddeler (URL'de filtre durumu, aksan katlaması, kirli form uyarısı, kod bölme, erişilebilirlik) | dağıtılabilirlik |
 | **Teslim** | 26 Ağu | Canvas + prototip videosu + sunum | — |
 | **Creathon** | 5-6 Eyl | Cilalama, AI genişletme, testler, Demo Day sunumu | — |
 

@@ -11,6 +11,9 @@ T3 Vakfı Bursiyer Yapay Zekâ Creathonu — **Problem 7** çözümü.
 | [docs/Problem7_T3_Girisim_Ekosistemi_Proje_Brifi.md](docs/Problem7_T3_Girisim_Ekosistemi_Proje_Brifi.md) | Ürün gereksinimleri, roller, zorunlu MVP maddeleri, program kuralları |
 | [docs/Problem7_Teknik_Plan.md](docs/Problem7_Teknik_Plan.md) | Mimari, veri modeli, yetki matrisi, API yüzeyi, faz planı |
 | [docs/Gelistirme_Kararlari.md](docs/Gelistirme_Kararlari.md) | Yerleşik teknik kararlar, reddedilen alternatifler, ortam tuzakları |
+| [docs/Denetim_Duzeltme_Plani.md](docs/Denetim_Duzeltme_Plani.md) | Ürün denetiminin bulguları, üç dalgalık düzeltme planı ve her maddenin nerede doğrulandığı |
+| [docs/Is_Modeli_Kanvasi.md](docs/Is_Modeli_Kanvasi.md) | İş modeli kanvası (26 Ağustos teslimi) — **taslak**, ekip onayı bekliyor |
+| [docs/Demo_Senaryosu.md](docs/Demo_Senaryosu.md) | Prototip videosu çekim planı, 5 dk pitch iskeleti, jüri soruları — **taslak** |
 | [CLAUDE.md](CLAUDE.md) | Yapay zekâ asistanı için kısa proje sözleşmesi — kurallar ve belge dizini |
 | [scripts/README.md](scripts/README.md) | Uçtan uca ve render doğrulama betikleri, çalıştırma sırası |
 
@@ -129,7 +132,8 @@ demoda gerçek veriyle görünsün diye.
 
 | Uç | Yetki |
 |---|---|
-| `POST /api/auth/login` | herkese açık — **IP + e-posta başına** dakikada 10 istek |
+| `POST /api/auth/login` | herkese açık — **IP + e-posta başına** dakikada 10 istek; jetonu `HttpOnly` çerezde ve gövdede döner |
+| `POST /api/auth/logout` | herkese açık — oturum ve CSRF çerezlerini siler |
 | `POST /api/auth/forgot-password` | herkese açık — yanıt adresin kayıtlı olup olmadığını **söylemez** |
 | `POST /api/auth/reset-password` | herkese açık — jeton tek kullanımlık ve 2 saat geçerli |
 | `POST /api/auth/change-password` | kimlik doğrulanmış — mevcut şifre yeniden doğrulanır |
@@ -243,9 +247,30 @@ python3 scripts/render_faz4.py
 python3 scripts/render_faz5.py
 python3 scripts/render_faz6.py   # Dalga 0: yazma yolları, 404, mobil taşma
 python3 scripts/render_faz7.py   # Dalga 1: program/dönem, şifre kurtarma, KVKK, iz
+python3 scripts/render_faz8.py   # Dalga 2: çerez/CSP/CSRF, tek origin, URL durumu
 
-# Veritabanını sıfırla
+# Veritabanını sıfırla (betikler temiz tohum verisi bekliyor)
 docker compose down -v && docker compose up -d postgres
+```
+
+### Üretim benzeri yığın
+
+Arayüzü artık API'nin kendisi sunuyor (tek origin: CORS yok, vekil yok):
+
+```bash
+cp .env.prod.example .env.prod          # değerleri doldurun
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+# → http://127.0.0.1:8080 (dışa açan yüz, TLS sonlandıran vekil olmalı)
+```
+
+Konteyner şemayı kendisi kuruyor (`T3_Database__MigrateOnStartup=true`) ve tohum
+verisi **çalışmıyor** — ortam `Production`. Yığını kurmadan aynı yolu yerelde
+denemek için:
+
+```bash
+cd frontend && npm run build
+rm -rf ../backend/src/T3.Api/wwwroot && cp -r dist ../backend/src/T3.Api/wwwroot
+# API yeniden başlatılır; derlenmiş arayüz http://localhost:5080 adresinden gelir
 ```
 
 ## Durum
@@ -398,25 +423,56 @@ gereken bulguları ([plan](docs/Denetim_Duzeltme_Plani.md)):
   yayımlanıyor ve harici ajan kendi jetonuyla bağlanıyor. Panel bunu kalıcı bir
   bilgi notuyla söylüyor — ayrıntı: [AI katmanı](#ai-katmanı).
 
-**Doğrulama:** 185 birim testi, API'ye gerçek rollerle vuran 307 uçtan uca
-kontrol (81 + 123 + 103) ve headless Chrome'da 287 render kontrolü
-(32 + 41 + 53 + 75 + 86) — hepsi temiz veritabanında geçiyor. Render adımı yine iş gördü:
-Faz 5'te panelin `data-testid`'sini yutan `Card` bileşenini ve Karar Verici'ye
-tekil tutar sızdıran ilk maskeleme sürümünü bu adım yakaladı. Betikler ve
-çalıştırma sırası: [scripts/](scripts/).
+**Dalga 2 tamamlandı** — canlıya çıkış altyapısı:
+
+- **Tek origin dağıtım:** derlenmiş arayüzü API'nin kendisi sunuyor (SPA geri
+  dönüşü API öneklerini dışarıda bırakıyor), kök `Dockerfile` (kök olmayan
+  kullanıcı) ve `docker-compose.prod.yml` (postgres portu yayımlamıyor, API
+  yalnızca loopback'e bağlanıyor, şemayı kendisi kuruyor, tohum verisi kapalı).
+- **Jeton `HttpOnly` + `SameSite=Strict` çerezde**, `localStorage`'da değil;
+  yeni `POST /api/auth/logout` çerezi sunucu tarafında siliyor. Çerezle
+  kimliklenen yazma istekleri **CSRF** çift-gönderim jetonu istiyor; başlıkla
+  gelen istekler (betik, MCP, Swagger) eskisi gibi çalışıyor.
+- **Güvenlik başlıkları:** `default-src 'self'` CSP (script tarafı sıkı),
+  `nosniff`, `Referrer-Policy`, `X-Frame-Options`, `Permissions-Policy` ve API
+  yolunda `Cache-Control: no-store`. `X-Forwarded-*` yalnızca güvenilen vekil
+  adına kabul ediliyor — denetim izindeki IP artık istemcinin uydurabildiği bir
+  değer değil.
+- **Kalan orta maddeler:** filtre/sıralama/sayfa URL'de (paylaşılabilir
+  bağlantı, çalışan geri tuşu), aksansız arama aksanlı kaydı buluyor
+  ("saglik" → "Sağlık"), kaydedilmemiş formdan çıkışta uyarı, sekmeler arası
+  oturum senkronu, rota bazlı kod bölme (tek parça 400 kB → 323 kB + 14 parça),
+  odak halkası %60 opaklık ve "İçeriğe atla" bağlantısı. Sentry **bağlanmadı**
+  (hesap/DSN/KVKK aktarım kararı gerekiyor); yerine `ErrorBoundary` var.
+
+**Doğrulama:** 191 birim testi, API'ye gerçek rollerle vuran 310 uçtan uca
+kontrol (81 + 125 + 104) ve headless Chrome'da 346 render kontrolü
+(32 + 41 + 53 + 75 + 91 + 54) — **temiz tohum verisiyle**. Betikler veriyi
+değiştirdiği için (girişim pasife alma, kullanıcı oluşturma) tam yeşil bir zincir
+sıfırlanmış veritabanı ister; ayrıntı [scripts/](scripts/). Render adımı yine iş
+gördü: Faz 5'te panelin `data-testid`'sini yutan `Card` bileşenini, Karar
+Verici'ye tekil tutar sızdıran ilk maskeleme sürümünü ve Dalga 2'de hem
+derlenmeyen bir `AppShell`'i hem ekranda etkisiz kalan "Çıkış" düğmesini bu adım
+yakaladı.
 
 Sıradaki: **Creathon haftası** — cilalama, sunum ve Demo Day. Faz listesi için
 bkz. [teknik plan](docs/Problem7_Teknik_Plan.md#8-faz-planı).
 
 ### Bilinen açık işler
 
-Denetim raporunun **Dalga 2** maddeleri açık
-([plan](docs/Denetim_Duzeltme_Plani.md)): üretim dağıtım yolu yok (`npm run
-build` çıktısını API'ye bağlayan tek şey Vite dev proxy'si; tek origin statik
-sunum + `docker-compose.prod.yml` yazılacak), erişim jetonu `localStorage`'da ve
-CSP başlığı yok (jeton HttpOnly çereze taşınacak — sıra üretim kararına bağlı),
-filtre durumu URL'ye yazılmıyor, `SearchText.Normalize` aksanları katlamıyor,
-kirli formdan çıkış uyarısı ve rota bazlı kod bölme yok.
+Denetim planının üç dalgası da kapandı ([plan](docs/Denetim_Duzeltme_Plani.md)).
+Geriye teknik olmayan ya da bu depoda karara bağlanamayan kalemler kaldı:
+
+- **KVKK metinlerinin hukuki içeriği onaylanmadı** — sayfalar görünür biçimde
+  "Taslak" işaretli (Dalga 1.5).
+- **Sentry bağlanmadı** — hesap, DSN ve yurt dışı aktarım kararı gerekiyor
+  (Dalga 2.3 / O-06). Kod tarafında bağlanacak yer hazır.
+- **Konteyner imajı bu makinede derlenmedi**: `Dockerfile` ve
+  `docker-compose.prod.yml` yazıldı, tek origin sunum yerelde (API + `wwwroot`)
+  uçtan uca doğrulandı, ancak `docker compose -f docker-compose.prod.yml build`
+  henüz koşulmadı.
+- **Gerçek SMTP yok:** şifre sıfırlama e-postaları sunucunun diskindeki
+  geliştirme kutusuna yazılıyor (`IEmailSender` arkasında sağlayıcı değişir).
 
 - **KVKK metinlerinin hukuki içeriği onaylanmadı** — teknik iş bitti, metin
   taslak olarak işaretli.
