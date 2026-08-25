@@ -505,6 +505,32 @@ Kaynak: [Denetim_Duzeltme_Plani.md](Denetim_Duzeltme_Plani.md) Dalga 1.
 
 ---
 
+## 3h. Canlı demo dağıtımı kararları (VPS)
+
+- **Demo verisi tohumlayıcıyla değil `pg_dump` ile taşındı.** Canlı kopyayı
+  `Development` yapıp tohumlatmak en kolay yoldu ve tam olarak reddedilen yol:
+  tohumlayıcının ortam kontrolü bir güvenlik sınırı, "demo olsun" diye
+  gevşetilmez. Ayrıca `Development` ortamı ayrıntılı hata sayfalarını ve
+  Swagger'ı da açardı. Yerelde temiz bir veritabanı tohumlanıp dökümü taşındı;
+  sunucuda uygulama `Production` + `Seed:Enabled=false`.
+- **İmaj yerelde derlenip `docker save | docker load` ile taşındı.** Sunucuda
+  5 GB boş disk ve 3 GB kullanılabilir RAM var; .NET SDK imajı + `npm ci` +
+  NuGet önbelleği oradaki beş yığını riske atardı. Bedeli tek seferlik ~230 MB
+  transfer.
+- **Diğer yığınlara dokunmama biçimi:** ayrı compose projesi (`t3ekosistem`),
+  ayrı ağ/hacim, `container_name` çakışmayan adlar (`t3-ekosistem-api`,
+  `t3-ekosistem-postgres`), kullanılmayan tek port (8090). `docker system prune`
+  **çalıştırılmadı** — 3.8 GB "geri kazanılabilir" imaj başka projelerin
+  yeniden derlemesini yavaşlatabilirdi ve disk yetiyordu.
+- **Sırlar sunucuda üretildi** (`openssl rand`, `.env` `chmod 600`): bu makineden
+  geçmediler, depoya da girmediler. `PUBLIC_BASE_URL` şifre sıfırlama
+  bağlantısının kaynağı — istek `Host` başlığından okumak istemcinin
+  uydurabildiği bir adrese bağlantı üretmek olurdu.
+- **TLS bilinçli olarak yok** (port doğrudan dinliyor): alan adı ve vekil kararı
+  ekipte. Çerezin `Secure` bayrağı isteğin şemasına bağlı olduğu için HTTP'de
+  oturum çalışıyor, HTTPS'e geçilince kendiliğinden sıkılaşıyor —
+  `Hosting:RequireHttps` o gün açılır.
+
 ## 4. Ortam tuzakları — tekrar çarpılacak olanlar
 
 ### Faz 0

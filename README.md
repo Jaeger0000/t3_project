@@ -272,6 +272,50 @@ başlıkları yerindeydi. `docker buildx` kurulu değilse `DOCKER_BUILDKIT=0`
 gerekir; docker köprüsü `DOWN` ise derleme `--network host` ister (yoksa
 `npm ci` ağsız kalır).
 
+### Canlı demo dağıtımı (VPS)
+
+Sistem 25 Ağustos'ta bir Ubuntu 24.04 VPS'e kuruldu ve **http://193.35.154.237:8090**
+adresinde çalışıyor. Sunucuda başka beş compose projesi olduğu için dağıtım
+onlardan tamamen ayrı duruyor: kendi compose projesi (`t3ekosistem`), kendi ağı
+ve hacimleri, kullanılmayan bir port (8090). Diğer yığınların portlarına
+(6540/8080/8081/3001/5246/5341/12000/12001) ve dosyalarına dokunulmadı.
+
+Dosyalar sunucuda `/opt/t3ekosistem/`: `docker-compose.yml` (imajı derlemez,
+yükler), `.env` (sırlar **sunucuda** üretildi, `chmod 600`, depoya girmez).
+
+İki karar açıklama istiyor:
+
+- **İmaj yerelde derlenip taşındı** (`docker save | ssh 'docker load'`).
+  Sunucuda 5 GB boş disk var; .NET SDK imajı + `npm ci` + NuGet önbelleği bunu
+  yiyip diğer projeleri riske atardı.
+- **Demo verisi tohumlayıcıyla değil veritabanı dökümüyle geldi.** Tohumlayıcı
+  `IsDevelopment()` ile korunuyor ve bu bir güvenlik sınırı — canlı kopyayı
+  "Development" yapıp tohumlamak o sınırı gevşetmek olurdu. Yerelde temiz bir
+  veritabanı tohumlanıp `pg_dump` ile taşındı (23 KB); uygulama `Production`
+  ortamında, `Seed:Enabled=false` ile çalışıyor.
+
+```bash
+# Güncelleme (kod değiştiğinde): imajı yeniden derle, taşı, konteyneri yenile
+DOCKER_BUILDKIT=0 docker build --network host -t t3-ekosistem:vps .
+docker save t3-ekosistem:vps | gzip -1 | ssh root@SUNUCU 'gunzip | docker load'
+ssh root@SUNUCU 'cd /opt/t3ekosistem && docker compose -p t3ekosistem up -d'
+
+# Doğrulama (gerçek tarayıcıda, dağıtılan kopyaya karşı)
+T3_VPS_BASE=http://193.35.154.237:8090 python3 scripts/render_vps.py
+```
+
+Doğrulandı (11 render kontrolü, 0 başarısız): giriş ekranı ve KVKK onay kapısı,
+CSP'nin kendi paketini engellemediği, 32 girişimin listelenmesi, panonun
+çizilmesi, Karar Verici'nin denetim izine girememesi, konsolda sıfır hata.
+Ayrıca `/api/olmayan-uc` JSON 404 dönüyor, `Auth.KvkkConsent` izi düşüyor,
+güvenlik başlıkları yerinde.
+
+> ⚠️ **TLS yok:** port doğrudan dinleniyor, önde vekil durmuyor — giriş bilgileri
+> ağda açık gider. Demo/inceleme için kabul edilmiş bir takas; alan adı
+> bağlanınca `Hosting:RequireHttps` açılıp ters vekil devreye girmeli. Oturum
+> çerezinin `Secure` bayrağı isteğin şemasına bağlı olduğu için HTTP'de de
+> çalışıyor, HTTPS'e geçilince kendiliğinden sıkılaşır.
+
 Yığını kurmadan aynı yolu yerelde denemek için:
 
 ```bash
