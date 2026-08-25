@@ -531,6 +531,28 @@ Kaynak: [Denetim_Duzeltme_Plani.md](Denetim_Duzeltme_Plani.md) Dalga 1.
   oturum çalışıyor, HTTPS'e geçilince kendiliğinden sıkılaşıyor —
   `Hosting:RequireHttps` o gün açılır.
 
+### VPS / nginx tuzakları
+
+- **certbot kurulu olması yenilemenin kurulu olduğu anlamına gelmiyor.**
+  Sunucuda certbot `/opt/certbot` altında venv olarak duruyordu; systemd
+  zamanlayıcısı da cron kaydı da yoktu ve makinedeki başka bir projenin
+  sertifikası bu sessizlik yüzünden dolmuştu. `certbot renew --dry-run`
+  başarılı çıkması yalnızca "yenileyebilir" demek, "yeniliyor" demek değil —
+  `systemctl list-timers | grep certbot` sorulacak soru.
+- **certbot `--nginx` 80 bloğuna `return 404` bırakıyor.** Alan adı için
+  301 üretiyor, geri kalan her `Host` (IP dâhil) 404 alıyor. Kanonik adrese
+  yönlendiren bir `location /` elle eklendi.
+- **nginx'in `client_max_body_size` varsayılanı 1 MB.** Uygulamanın 20 MB'lık
+  doküman sınırı vekil arkasında görünmez oluyor: yükleme daha uygulamaya
+  varmadan 413 ile ölüyor.
+- **Vekil arkasında `TrustedProxies` boş kalırsa** denetim izindeki IP ve giriş
+  hız sınırı kovası vekilin adresine sabitlenir — bütün istemciler tek kovaya
+  düşer ve iz kanıt değerini kaybeder.
+- **`default_server` mevcut siteyi bozmadan devralmanın yolu.** Aynı portta
+  `server_name` eşleşmesi her zaman önce gelir; başka projenin alan adı kendi
+  bloğunda kalırken IP ve tanımsız `Host` bizim bloğa düşüyor. Dosya silmek,
+  yeniden adlandırmak ya da `sites-enabled` bağını kaldırmak gerekmedi.
+
 ## 4. Ortam tuzakları — tekrar çarpılacak olanlar
 
 ### Faz 0

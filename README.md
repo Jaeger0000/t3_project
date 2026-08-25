@@ -274,8 +274,9 @@ gerekir; docker köprüsü `DOWN` ise derleme `--network host` ister (yoksa
 
 ### Canlı demo dağıtımı (VPS)
 
-Sistem 25 Ağustos'ta bir Ubuntu 24.04 VPS'e kuruldu ve **http://193.35.154.237**
-adresinde çalışıyor (80 portu; konteyner 8090'da dinliyor, önünde host'taki nginx var). Sunucuda başka beş compose projesi olduğu için dağıtım
+Sistem 25 Ağustos'ta bir Ubuntu 24.04 VPS'e kuruldu ve
+**https://t3girisimportali.com** adresinde çalışıyor (Let's Encrypt sertifikası;
+konteyner 8090'da dinliyor, önünde host'taki nginx TLS'i sonlandırıyor). Sunucuda başka beş compose projesi olduğu için dağıtım
 onlardan tamamen ayrı duruyor: kendi compose projesi (`t3ekosistem`), kendi ağı
 ve hacimleri, kullanılmayan bir port (8090). Diğer yığınların portlarına
 (6540/8080/8081/3001/5246/5341/12000/12001) ve dosyalarına dokunulmadı.
@@ -301,7 +302,7 @@ docker save t3-ekosistem:vps | gzip -1 | ssh root@SUNUCU 'gunzip | docker load'
 ssh root@SUNUCU 'cd /opt/t3ekosistem && docker compose -p t3ekosistem up -d'
 
 # Doğrulama (gerçek tarayıcıda, dağıtılan kopyaya karşı)
-T3_VPS_BASE=http://193.35.154.237 python3 scripts/render_vps.py
+T3_VPS_BASE=https://t3girisimportali.com python3 scripts/render_vps.py
 ```
 
 Doğrulandı (11 render kontrolü, 0 başarısız): giriş ekranı ve KVKK onay kapısı,
@@ -323,12 +324,25 @@ vekilin adresi değil gerçek istemci IP'si düşüyor. `client_max_body_size 25
 gerekliydi — nginx'in 1 MB varsayılanı 20 MB'lık doküman sınırını görünmez kılar
 ve yükleme daha uygulamaya varmadan 413 alırdı.
 
-> ⚠️ **TLS hâlâ yok:** trafik 80'de düz HTTP. Geçerli bir sertifika alan adı
-> ister (Let's Encrypt çıplak IP'ye standart sertifika vermiyor). Alan adı
-> bağlandığı gün `certbot --nginx` + `Hosting:RequireHttps=true` yeter; oturum
-> çerezinin `Secure` bayrağı isteğin şemasına bağlı olduğu için HTTPS'e
-> geçildiğinde kendiliğinden sıkılaşır. ACME HTTP-01 doğrulaması için
-> `/.well-known/acme-challenge/` yolu nginx bloğunda şimdiden açık.
+**TLS (25 Ağustos akşamı).** `t3girisimportali.com` sunucuya yönlendirildi ve
+sertifika `certbot --nginx` ile alındı (`t3girisimportali.com` +
+`www.t3girisimportali.com`, 23 Kasım'a kadar geçerli). Uygulama tarafında
+`Hosting:RequireHttps=true` açıldı: HSTS geliyor ve oturum çerezi artık `secure`
+bayraklı — çerezin bayrağı isteğin şemasına bağlı olduğu için kod değişmedi,
+şema değişti. TLS'i vekil sonlandırdığı için karar `X-Forwarded-Proto` ile
+geliyor ve o başlık yalnızca güvenilen vekilden kabul ediliyor; ikisi birlikte
+olmasa uygulama ya sonsuz yönlendirmeye girerdi ya da HTTP'yi HTTPS sanardı.
+
+Alan adı dışından gelen istekler (IP, tanımsız `Host`) kanonik adrese 301 ile
+gidiyor: certbot 80 bloğuna `return 404` bırakıyor ve IP ile aranan bir demo
+adresinin boşluğa düşmesi iyi görünmüyordu.
+
+> ⚠️ **Sunucuda sertifika yenileme otomasyonu yoktu.** certbot `/opt/certbot`
+> altında elle (venv) kurulmuş; ne systemd zamanlayıcısı ne cron kaydı vardı —
+> aynı makinedeki başka bir projenin sertifikası bu yüzden Temmuz'da dolmuş.
+> Kendi sertifikamız için `certbot-renew.timer` kuruldu (günde iki kez,
+> rastgele gecikmeli, `--cert-name t3girisimportali.com` ile **yalnızca** bizim
+> sertifika). Kuru koşu başarılı.
 
 Yığını kurmadan aynı yolu yerelde denemek için:
 

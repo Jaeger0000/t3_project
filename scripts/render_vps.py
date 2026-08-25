@@ -15,7 +15,7 @@ sys.path.insert(0, __file__.rsplit("/", 1)[0])
 from cdp import Browser  # noqa: E402
 
 # Adres ortamdan geliyor: dağıtımın IP'si/portu değişince betik değişmemeli.
-BASE = os.environ.get("T3_VPS_BASE", "http://193.35.154.237:8090").rstrip("/")
+BASE = os.environ.get("T3_VPS_BASE", "https://t3girisimportali.com").rstrip("/")
 PW = "T3.Creathon!2026"
 
 ok = 0
