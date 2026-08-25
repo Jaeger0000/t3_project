@@ -23,4 +23,5 @@ export const UsersPage = lazy(() => import('@/features/users/UsersPage'))
 export const AuditPage = lazy(() => import('@/features/audit/AuditPage'))
 export const PrivacyNoticePage = lazy(() => import('@/features/legal/PrivacyNoticePage'))
 export const TermsPage = lazy(() => import('@/features/legal/TermsPage'))
+export const BrandKitPage = lazy(() => import('@/features/brand/BrandKitPage'))
 

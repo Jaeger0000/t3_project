@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TGM Logo Paketi</title>
+<link rel="stylesheet" href="_ds/styles.css">
+<style>
+  body { margin: 0; background: var(--color-bg); }
+  a { color: var(--color-accent-700); text-decoration: none; }
+  a:hover { color: var(--color-accent-900); }
+  :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+  .page { min-height: 100vh; color: var(--color-text); font-family: var(--font-body); padding: 27px 20px 54px; }
+  .wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 44px; }
+  .kicker { font-family: var(--font-heading); letter-spacing: .18em; text-transform: uppercase; font-size: 13px; color: var(--color-accent-700); }
+  .rule { border-bottom: 1px solid var(--color-neutral-300); padding-bottom: 17px; }
+  .meta { font-size: 13px; color: var(--color-neutral-700); }
+  .h2 { font-family: var(--font-heading); text-transform: uppercase; margin: 0; }
+  .cell { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--color-neutral-300); padding-top: 10px; }
+  .cell b { font-family: var(--font-heading); text-transform: uppercase; font-size: 12px; letter-spacing: .14em; color: var(--color-accent-700); font-weight: 400; }
+  .cell span { font-size: 15px; }
+  .swatch-btn { border: 0; padding: 0; margin: 0; cursor: pointer; height: 132px; display: block; width: 100%; }
+  dl { margin: 0; display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
+  dl div { display: flex; justify-content: space-between; gap: 10px; }
+  dl dt { color: var(--color-neutral-700); }
+  dl dd { margin: 0; font-variant-numeric: tabular-nums; }
+  @media (max-width: 900px) { .two-col { grid-template-columns: 1fr !important; } }
+  @media (max-width: 640px) { .stack { flex-direction: column; align-items: flex-start !important; } .stack .meta { text-align: left !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+<div class="wrap">
+
+  <header class="rule stack" style="display:flex;justify-content:space-between;align-items:flex-end;gap:20px">
+    <div style="display:flex;flex-direction:column;gap:7px">
+      <span class="kicker">Kurumsal İletişim / Logo Paketi</span>
+      <h1 style="font-family:var(--font-heading);font-size:clamp(34px,4.4vw,56px);line-height:1.02;margin:0;text-transform:uppercase;letter-spacing:.01em">Türkiye Teknoloji Takımı Vakfı<br>Girişim Merkezi</h1>
+    </div>
+    <div class="meta" style="display:flex;flex-direction:column;gap:6px;text-align:right;white-space:nowrap">
+      <span>Sürüm 1.0</span>
+      <span>Renk paleti &amp; arka plan kullanımı</span>
+    </div>
+  </header>
+
+  <section class="two-col" style="display:grid;grid-template-columns:minmax(300px,1fr) 1.25fr;gap:24px;align-items:start">
+    <figure class="blueprint" style="margin:0;padding:24px;display:flex;align-items:center;justify-content:center;background:#ffffff;position:relative;min-height:320px">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <img src="assets/tgm-logo.png" alt="TGM logosu" style="width:100%;max-width:240px;height:auto;display:block">
+    </figure>
+    <div style="display:flex;flex-direction:column;gap:17px">
+      <h2 class="h2" style="font-size:22px;letter-spacing:.06em">Ana marka işareti</h2>
+      <p style="margin:0;font-size:17px;line-height:1.6;max-width:52ch;text-wrap:pretty">TGM işareti dört renkli tek bir bloktur. Harf kompozisyonu, renk sırası ve blok oranları değiştirilemez; işaret her zaman bir bütün olarak yerleştirilir.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px">
+        <div class="cell"><b>Minimum boyut</b><span>Dijital 32 px · Baskı 12 mm</span></div>
+        <div class="cell"><b>Net alan</b><span>İşaret yüksekliğinin %25'i</span></div>
+        <div class="cell"><b>Dosya</b><span>SVG tercih edilir, PNG yedek</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:17px">
+    <div class="rule" style="display:flex;justify-content:space-between;align-items:baseline;gap:17px;flex-wrap:wrap">
+      <h2 class="h2" style="font-size:26px;letter-spacing:.05em">01 — Renk paleti</h2>
+      <span class="meta" id="copyHint">Kodu kopyalamak için renk alanına tıklayın</span>
+    </div>
+    <div id="swatches" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:17px"></div>
+    <div style="display:flex;flex-direction:column;gap:14px;margin-top:7px">
+      <h3 style="font-family:var(--font-heading);text-transform:uppercase;font-size:15px;letter-spacing:.14em;margin:0;color:var(--color-accent-700)">Degrade eşleri — yalnızca işaret içinde</h3>
+      <div id="grads" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px"></div>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:17px">
+    <div class="rule" style="display:flex;justify-content:space-between;align-items:baseline;gap:17px;flex-wrap:wrap">
+      <h2 class="h2" style="font-size:26px;letter-spacing:.05em">02 — Arka plan kullanımı</h2>
+      <div class="seg" id="seg" role="group"></div>
+    </div>
+    <div class="two-col" style="display:grid;grid-template-columns:1.35fr 1fr;gap:20px;align-items:start">
+      <figure class="blueprint" id="stage" style="margin:0;position:relative;padding:0;overflow:hidden;min-height:360px;display:flex;align-items:center;justify-content:center">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      </figure>
+      <div style="display:flex;flex-direction:column;gap:17px">
+        <p id="stageText" style="margin:0;font-size:17px;line-height:1.6;text-wrap:pretty"></p>
+        <ul id="stageRules" style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px"></ul>
+      </div>
+    </div>
+    <div id="donts" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:17px;margin-top:10px"></div>
+  </section>
+
+  <footer class="meta" style="border-top:1px solid var(--color-neutral-300);padding-top:17px;display:flex;justify-content:space-between;gap:17px;flex-wrap:wrap">
+    <span>Kullanım soruları ve dosya talepleri için kurumsal iletişim ekibine yazın.</span>
+    <span>Türkiye Teknoloji Takımı Vakfı Girişim Merkezi · İç kullanım</span>
+  </footer>
+</div>
+</div>
+
+<script>
+const corners = '<i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>';
+
+const colors = [
+  { name: "Antrasit", role: "Ana kurumsal ton, tipografi", hex: "#303C48", rgb: "48 60 72", cmyk: "33 17 0 72", pantone: "7545 C" },
+  { name: "Kırmızı", role: "Vurgu, uyarı ve enerji", hex: "#E43C24", rgb: "228 60 36", cmyk: "0 74 84 11", pantone: "179 C" },
+  { name: "Turuncu", role: "Vurgu, girişim ve hareket", hex: "#F99B1C", rgb: "249 155 28", cmyk: "0 38 89 2", pantone: "1375 C" },
+  { name: "Mavi", role: "Kurumsal derinlik, veri", hex: "#0C4878", rgb: "12 72 120", cmyk: "90 40 0 53", pantone: "301 C" }
+];
+
+const gradients = [
+  { label: "#E43C24 → #B32A1C", css: "linear-gradient(135deg,#E43C24,#B32A1C)" },
+  { label: "#303C48 → #1E2833", css: "linear-gradient(135deg,#303C48,#1E2833)" },
+  { label: "#F9A81C → #F08A14", css: "linear-gradient(135deg,#F9A81C,#F08A14)" },
+  { label: "#1878A8 → #0C4878", css: "linear-gradient(135deg,#1878A8,#0C4878)" }
+];
+
+const stages = [
+  { label: "Açık zemin", bg: "#ffffff", white: false, photo: false,
+    text: "Birincil kullanım. İşaret beyaz veya çok açık nötr zeminde, kendi renkleriyle yer alır.",
+    rules: [["Zemin","Beyaz ya da %0–8 gri; renkli açık zeminlerde kullanılmaz."],["Kontrast","Zemin ile işaret arasında en az 4,5:1 kontrast korunur."],["Dosya","tgm-logo-renkli.svg"]] },
+  { label: "Koyu zemin", bg: "#1E2833", white: false, photo: false,
+    text: "Koyu zeminde işaret renkleri korunur; antrasit blok zeminde kaybolursa tek renk beyaz versiyon kullanılır.",
+    rules: [["Zemin","Antrasit #303C48 veya daha koyu tonlar."],["Uyarı","Kırmızı ve lacivert zeminlerde yalnızca beyaz versiyon."],["Dosya","tgm-logo-beyaz.svg"]] },
+  { label: "Fotoğraf üzerinde", bg: "#1E2833", white: true, photo: true,
+    text: "Fotoğraf üzerinde yalnızca tek renk beyaz versiyon kullanılır. Görsel, işaretin oturduğu alanda sakin ve koyu olmalıdır.",
+    rules: [["Katman","Gerekirse %40–50 koyu örtü eklenir."],["Alan","İşaret, detaylı veya yüksek kontrastlı bölgeye yerleştirilmez."],["Dosya","tgm-logo-beyaz.svg"]] }
+];
+
+const donts = [
+  { bg: "#F99B1C", opacity: 1, filter: "none", blend: "normal", text: "Doygun kurumsal renk zeminde renkli işaret kullanmayın." },
+  { bg: "#ffffff", opacity: 1, filter: "hue-rotate(140deg) saturate(1.4)", blend: "normal", text: "İşaretin renklerini değiştirmeyin veya yeniden renklendirmeyin." },
+  { bg: "#9aa3ab", opacity: 0.4, filter: "none", blend: "multiply", text: "Şeffaflık, gölge veya karışım efekti uygulamayın." }
+];
+
+let copyTimer;
+document.getElementById('swatches').innerHTML = colors.map(c => `
+  <div class="blueprint" style="position:relative;display:flex;flex-direction:column;background:transparent">${corners}
+    <button type="button" class="swatch-btn" data-hex="${c.hex}" aria-label="${c.hex} kodunu kopyala" style="background:${c.hex}"></button>
+    <div style="padding:14px;display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--color-neutral-300)">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font-family:var(--font-heading);text-transform:uppercase;font-size:17px;letter-spacing:.08em">${c.name}</span>
+        <span style="font-size:12px;color:var(--color-neutral-700)">${c.role}</span>
+      </div>
+      <dl>
+        <div><dt>HEX</dt><dd>${c.hex}</dd></div>
+        <div><dt>RGB</dt><dd>${c.rgb}</dd></div>
+        <div><dt>CMYK</dt><dd>${c.cmyk}</dd></div>
+        <div><dt>Pantone</dt><dd>${c.pantone}</dd></div>
+      </dl>
+    </div>
+  </div>`).join('');
+
+document.getElementById('swatches').addEventListener('click', e => {
+  const btn = e.target.closest('.swatch-btn');
+  if (!btn) return;
+  const hex = btn.dataset.hex;
+  try { navigator.clipboard && navigator.clipboard.writeText(hex); } catch (err) {}
+  const hint = document.getElementById('copyHint');
+  hint.textContent = hex + ' kopyalandı';
+  clearTimeout(copyTimer);
+  copyTimer = setTimeout(() => { hint.textContent = 'Kodu kopyalamak için renk alanına tıklayın'; }, 1400);
+});
+
+document.getElementById('grads').innerHTML = gradients.map(g => `
+  <div style="display:flex;flex-direction:column;gap:7px">
+    <div style="height:44px;border:1px solid var(--color-neutral-300);background:${g.css}"></div>
+    <span style="font-size:12px;color:var(--color-neutral-700);font-variant-numeric:tabular-nums">${g.label}</span>
+  </div>`).join('');
+
+document.getElementById('donts').innerHTML = donts.map(d => `
+  <div class="blueprint" style="position:relative;padding:17px;display:flex;flex-direction:column;gap:14px;background:transparent">${corners}
+    <div style="height:110px;display:flex;align-items:center;justify-content:center;background:${d.bg};position:relative;overflow:hidden">
+      <img src="assets/tgm-logo-trans.png" alt="" style="width:96px;height:auto;display:block;opacity:${d.opacity};filter:${d.filter};mix-blend-mode:${d.blend}">
+    </div>
+    <div style="display:flex;gap:10px;align-items:baseline">
+      <span style="font-family:var(--font-heading);font-size:18px;color:var(--color-accent-700);line-height:1">✕</span>
+      <span style="font-size:14px;line-height:1.5">${d.text}</span>
+    </div>
+  </div>`).join('');
+
+const seg = document.getElementById('seg');
+seg.innerHTML = stages.map((s, i) => `<button type="button" class="seg-opt" data-i="${i}" aria-pressed="false">${s.label}</button>`).join('');
+
+function render(i) {
+  const s = stages[i];
+  seg.querySelectorAll('.seg-opt').forEach((b, j) => {
+    b.classList.toggle('is-active', i === j);
+    b.setAttribute('aria-pressed', i === j ? 'true' : 'false');
+  });
+  const stage = document.getElementById('stage');
+  stage.style.background = s.bg;
+  const art = (s.photo
+    ? `<img src="assets/photo.jpg" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1) brightness(.55)">
+       <div style="position:absolute;inset:0;background:rgba(30,40,51,.45)"></div>` : '')
+    + `<img src="assets/${s.white ? 'tgm-logo-beyaz.png' : 'tgm-logo-trans.png'}" alt="TGM logosu yerleşimi" style="width:210px;height:auto;display:block;position:relative;z-index:2">`;
+  stage.innerHTML = corners + art;
+  document.getElementById('stageText').textContent = s.text;
+  document.getElementById('stageRules').innerHTML = s.rules.map(([tag, text]) => `
+    <li style="display:flex;gap:10px;align-items:baseline;border-top:1px solid var(--color-neutral-300);padding-top:10px;font-size:15px;line-height:1.5">
+      <span style="font-family:var(--font-heading);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-accent-700);min-width:52px">${tag}</span>
+      <span>${text}</span>
+    </li>`).join('');
+}
+seg.addEventListener('click', e => {
+  const b = e.target.closest('.seg-opt');
+  if (b) render(Number(b.dataset.i));
+});
+render(0);
+</script>
+</body>
+</html>

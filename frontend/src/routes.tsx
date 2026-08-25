@@ -12,6 +12,7 @@ import {
   ApprovalDetailPage,
   ApprovalsPage,
   AuditPage,
+  BrandKitPage,
   ChangePasswordPage,
   DashboardPage,
   ForgotPasswordPage,
@@ -41,6 +42,11 @@ export const appRoutes = createRoutesFromElements(
         veri vermeden önce başlar. */}
     <Route path="/kvkk-aydinlatma" element={<PublicPage><PrivacyNoticePage /></PublicPage>} />
     <Route path="/kullanim-sartlari" element={<PublicPage><TermsPage /></PublicPage>} />
+
+    {/* Logo paketi: sponsor ve partnerler de doğru kullanımı görebilmeli, o
+        yüzden oturum istemiyor. Geniş kabuk — sayfanın ızgarası 1180 piksele
+        kadar açılıyor, KVKK metinlerinin 3xl kolonu bunu sıkıştırırdı. */}
+    <Route path="/marka" element={<PublicPage wide><BrandKitPage /></PublicPage>} />
 
     <Route element={<RequireAuth />}>
       <Route element={<AppShell />}>

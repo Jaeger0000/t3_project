@@ -1,83 +1,54 @@
 /**
- * Logo.
+ * TGM işareti.
  *
- * Biçim neden bu: üç yükselen çubuk girişimin program yolculuğunu (ön kuluçka →
- * kuluçka → hızlandırma) ve büyümeyi anlatıyor, altlarındaki tek zemin çizgisi
- * "hepsi aynı ekosistemde" demek — ürünün tek cümlelik özeti bu. En yüksek
- * çubuğun tepesindeki altın nokta başarı/ödül kaydı; paletteki altın tam olarak
- * bu iş için ayrılmıştı (bkz. index.css).
+ * Kurumun gerçek logosu (`design_handoff_logo_paketi/`): dört renkli tek blok —
+ * kırmızı T, antrasit işaret, turuncu G, mavi M. Handoff kuralı net: harf
+ * kompozisyonu, renk sırası ve blok oranları değiştirilmez, işaret her zaman bir
+ * bütün olarak yerleştirilir. Bu yüzden burada çizim yok, dosya var.
  *
- * Kısıtlar tasarımı belirledi:
- * - **16 pikselde okunmalı** (sekme simgesi). Bu yüzden üç kalın çubuk ve tek
- *   vurgu var; ince çizgi ve küçük harf yok.
- * - **Yazı SVG içinde değil.** Harfleri path'e çevirmek dosyayı şişirir,
- *   `<text>` bırakmak ise sunucuda olmayan bir yazı tipine güvenmek olurdu.
- *   Kelime markası HTML tarafında duruyor, logo yalnızca simge.
- * - **Tek renk zemin, iki renk vurgu.** Koyu temada da aynı görünüyor: zemin
- *   markanın turuncusu, üstündeki her şey beyaz — tema değişince kontrast
- *   kaybolmuyor.
- * - **Harici dosya yok.** Satır içi SVG, çünkü CSP `default-src 'self'` ve
- *   `<img>` yerine simgeyi doğrudan gömmek bir istek daha tasarruf ediyor.
+ * İki dosya iki tema için: renkli sürüm açık zeminde, tek renk beyaz sürüm koyu
+ * zeminde. Handoff bunu "antrasit blok zeminde kaybolursa beyaz versiyon" diye
+ * yazıyor ve arayüzün koyu teması `stone-950`, yani tam o durum. Seçim CSS ile
+ * yapılıyor (`dark:` sınıfları), JavaScript'e sorulmuyor: tema değişince ikinci
+ * bir render beklemeden doğru dosya görünüyor.
+ *
+ * PNG, SVG değil — çünkü elimizdeki kaynak PNG. Handoff da bunu söylüyor:
+ * vektör aslından `tgm-logo-renkli.svg` / `tgm-logo-beyaz.svg` üretilip
+ * bunların yerine konmalı.
+ *
+ * Arayüzde kullanılan dosyalar (`*-isaret*.png`) özgün 447×447 karenin şeffaf
+ * kenar boşluğu kırpılmış hâli (333×232). İşaret değişmedi; yalnızca dosyanın
+ * içindeki boşluk kalktı, çünkü o boşluk 40 piksellik bir kutuda işareti
+ * gereksiz küçültüyordu. Handoff'un "net alan" kuralı (işaret yüksekliğinin
+ * %25'i) artık CSS tarafında, düzenin kendi boşluğuyla veriliyor.
  */
 export function LogoMark({ className = '', label }: { className?: string; label?: string }) {
   return (
-    <svg
-      viewBox="0 0 32 32"
-      className={className}
-      // Etiket verilmediyse simge süs: yanında zaten adı yazıyor ve ekran
-      // okuyucunun aynı şeyi iki kez söylemesi gürültü.
-      role={label ? 'img' : undefined}
-      aria-label={label}
-      aria-hidden={label ? undefined : true}
-      focusable="false"
-      data-testid="logo"
-    >
-      <defs>
-        <linearGradient id="t3-logo-zemin" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#f76f4b" />
-          <stop offset="0.55" stopColor="#e73a13" />
-          <stop offset="1" stopColor="#b52205" />
-        </linearGradient>
-      </defs>
-
-      <rect width="32" height="32" rx="8" fill="url(#t3-logo-zemin)" />
-
-      {/* Yolculuk çizgisi: çubukların tepelerini birleştiriyor. Çubuklar bunun
-          üstüne çiziliyor, yani yalnızca aralarda görünüyor — 16 pikselde
-          ayrıntı değil yükselen bir hat olarak okunuyor. */}
-      <path
-        d="M9.5 17 16 13 22.5 9.5"
-        fill="none"
-        stroke="#fff"
-        strokeOpacity="0.45"
-        strokeWidth="1.5"
-        strokeLinecap="round"
+    <span className={`relative block shrink-0 ${className}`} data-testid="logo">
+      <img
+        src="/marka/tgm-logo-isaret.png"
+        alt={label ?? ''}
+        aria-hidden={label ? undefined : true}
+        className="block size-full object-contain dark:hidden"
       />
-
-      <g fill="#fff">
-        <rect x="7.5" y="17" width="4" height="7" rx="2" />
-        <rect x="14" y="13" width="4" height="11" rx="2" />
-        <rect x="20.5" y="9.5" width="4" height="14.5" rx="2" />
-      </g>
-
-      {/* Ortak zemin: üç çubuk da aynı çizgiden yükseliyor. */}
-      <rect x="7" y="24" width="18" height="2" rx="1" fill="#fff" fillOpacity="0.65" />
-
-      {/* Başarı kaydı. Çubukla arasında bilinçli bir boşluk var: değmesi
-          küçük boyutta çubuğun devamı gibi okunuyordu. */}
-      <circle cx="22.5" cy="6" r="2.4" fill="#ffb900" />
-    </svg>
+      <img
+        src="/marka/tgm-logo-isaret-beyaz.png"
+        alt={label ?? ''}
+        aria-hidden={label ? undefined : true}
+        className="hidden size-full object-contain dark:block"
+      />
+    </span>
   )
 }
 
 /**
- * Simge + kelime markası. Başlıkta ve giriş ekranında aynı hizalama kullanılıyor;
+ * İşaret + kelime markası. Başlıkta ve giriş ekranında aynı hizalama kullanılıyor;
  * iki yerde elle kurulunca biri diğerinden kayıyordu.
  */
 export function LogoLockup({ compact = false }: { compact?: boolean }) {
   return (
     <span className="flex items-center gap-3">
-      <LogoMark className={compact ? 'size-9' : 'size-12'} />
+      <LogoMark className={compact ? 'h-9 w-[52px]' : 'h-12 w-[69px]'} />
       <span className="leading-tight">
         <span className="block text-sm font-semibold text-stone-900 dark:text-stone-50">
           Girişim Ekosistemi

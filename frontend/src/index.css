@@ -28,6 +28,13 @@
   --color-brand-900: #6b1706;
   --color-brand-950: #3d0c03;
 
+  /* Marka/logo paketi sayfasının tipografisi (handoff: başlıklar Barlow
+     Condensed, gövde Barlow). Yalnızca o sayfada kullanılıyor, yani yazı tipi
+     dosyaları başka hiçbir ekranda indirilmiyor. Yüzler kendi sunucumuzda:
+     public/fonts/barlow.css. */
+  --font-marka: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+  --font-marka-baslik: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif;
+
   /* T3KYS'in sarısı: yalnızca ikincil vurgu (grafik serisi, ödül rozeti).
      Üzerine beyaz yazı gelmez — sarıda beyaz 1.7:1. */
   --color-gold-100: #fff3d1;

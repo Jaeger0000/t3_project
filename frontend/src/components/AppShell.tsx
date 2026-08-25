@@ -133,6 +133,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           >
             Kullanım şartları
           </Link>
+          <Link to="/marka" className="text-brand-700 hover:underline dark:text-brand-200">
+            Logo paketi
+          </Link>
           <a
             href="mailto:kvkk@t3vakfi.org.tr"
             className="text-brand-700 hover:underline dark:text-brand-200"

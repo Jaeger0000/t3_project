@@ -531,6 +531,23 @@ Kaynak: [Denetim_Duzeltme_Plani.md](Denetim_Duzeltme_Plani.md) Dalga 1.
   oturum çalışıyor, HTTPS'e geçilince kendiliğinden sıkılaşıyor —
   `Hosting:RequireHttps` o gün açılır.
 
+### Render kontrollerinde Türkçe ve CSS tuzakları
+
+- **`innerText` CSS'in `text-transform`'unu uyguluyor.** Marka sayfasının
+  başlıkları büyük harfe çevrildiği için "Renk paleti" araması hiç eşleşmedi ve
+  `wait_for` zaman aşımına düştü. Beklenen metin gövde cümlesinden alınır
+  (render_faz5'te aynı not var: "beklemeyi metne değil öğeye bağla").
+- **Türkçe büyük/küçük dönüşümü karşılaştırmada kullanılamaz.**
+  `"TÜRKİYE".lower()` birleşik noktalı bir `i̇` üretiyor, `"TAKIMI".lower()`
+  ise `takimi` veriyor — iki kontrol bu yüzden düştü. Betiklerde artık sunucu
+  tarafındaki `SearchText.Fold` ile aynı katlama var (`katla()`).
+- **Beklemeyi "yükleniyor" metnine bağlamayın.** İlk çözüm markör olarak
+  "yükleniyor" arıyordu; ekranda "Yükleniyor…" büyük Y ile yazıyor, panoda ise
+  ifade bambaşka ("Karne hesaplanıyor…"). Eşleşmeyen markör beklemeyi sessizce
+  atlıyor ve kontrol yine veri gelmeden ölçüyor. `render_vps.py` artık
+  **beklenen içeriğin kendisini** bekliyor (`bekle_metin("₺")`): gelmezse kontrol
+  zaten düşmeli.
+
 ### VPS / nginx tuzakları
 
 - **certbot kurulu olması yenilemenin kurulu olduğu anlamına gelmiyor.**
@@ -552,6 +569,35 @@ Kaynak: [Denetim_Duzeltme_Plani.md](Denetim_Duzeltme_Plani.md) Dalga 1.
   `server_name` eşleşmesi her zaman önce gelir; başka projenin alan adı kendi
   bloğunda kalırken IP ve tanımsız `Host` bizim bloğa düşüyor. Dosya silmek,
   yeniden adlandırmak ya da `sites-enabled` bağını kaldırmak gerekmedi.
+
+## 3i. Marka ve logo paketi kararları
+
+Kaynak: `design_handoff_logo_paketi/` (handoff README + preview.html).
+
+- **Logo çizilmedi, dosya kullanıldı.** Daha önce arayüzde kurumsal palete göre
+  çizilmiş bir simge vardı; kurumun gerçek işareti gelince o simge silindi.
+  Handoff "harf kompozisyonu, renk sırası ve blok oranları değiştirilemez"
+  diyor — yeniden çizmek bu kuralı kaçınılmaz olarak ihlal ederdi.
+- **Prototip HTML'i kopyalanmadı.** Handoff'un kendi talimatı bu: tasarım hedef
+  kod tabanının desenleriyle yeniden kurulmalı. Sayfa Tailwind yardımcılarıyla,
+  projenin `lazy` rota kaydı, `useDocumentTitle` ve `PublicPage` desenleriyle
+  yazıldı; prototipin `support.js` runtime'ı taşınmadı.
+- **Koyu tema sapması bilinçli ve sınırlı.** Handoff tek bir açık zemin veriyor.
+  Sayfanın kabuğu (zemin, yazı, saç çizgileri) koyu temada karşılığına geçiyor
+  ama **marka değerleri hiç kaymıyor**: swatch renkleri, degradeler ve logo
+  dosyaları iki temada birebir aynı. Marka kartındaki rengin temaya göre
+  değişmesi sayfanın amacını yok ederdi.
+- **Yazı tipleri kendi sunucumuzda.** CSP `font-src 'self'`; Google Fonts için o
+  sınırı gevşetmek Dalga 2'de kazanılanı geri vermek olurdu ve her ziyaretçinin
+  IP'si yurt dışına giderdi (Sentry'yi reddetme gerekçesinin aynısı). Yalnızca
+  latin + latin-ext alt kümeleri ve gerçekten kullanılan dört ağırlık indirildi;
+  kullanılmayan `@font-face` bırakmak 404 üretir.
+- **Arayüzdeki logo dosyaları kırpıldı** (447×447 → 333×232). Şeffaf kenar
+  boşluğu 40 piksellik bir başlık kutusunda işareti gereksiz küçültüyordu;
+  işaretin kendisine dokunulmadı, "net alan" kuralı CSS boşluğuyla veriliyor.
+- **PNG kabul edildi, SVG borç yazıldı.** Elimizdeki kaynak PNG ve handoff da
+  vektör aslından SVG üretilmesini istiyor. Kararı gizlemek yerine README'ye
+  açık borç olarak yazıldı.
 
 ## 4. Ortam tuzakları — tekrar çarpılacak olanlar
 

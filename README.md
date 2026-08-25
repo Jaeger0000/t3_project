@@ -272,6 +272,40 @@ başlıkları yerindeydi. `docker buildx` kurulu değilse `DOCKER_BUILDKIT=0`
 gerekir; docker köprüsü `DOWN` ise derleme `--network host` ister (yoksa
 `npm ci` ağsız kalır).
 
+### Marka ve logo
+
+İşaret kurumun kendi logosu: TGM — dört renkli tek blok (kırmızı T, antrasit
+işaret, turuncu G, mavi M). Kaynak `design_handoff_logo_paketi/` altındaki
+handoff paketi; arayüzdeki dosyalar `frontend/public/marka/`. Handoff'un kuralı
+kodda da geçerli: harf kompozisyonu, renk sırası ve blok oranları
+değiştirilmiyor, işaret bir bütün olarak yerleştiriliyor — bu yüzden
+[Logo.tsx](frontend/src/components/Logo.tsx) çizim değil dosya kullanıyor.
+
+- **İki dosya, iki tema:** renkli sürüm açık zeminde, tek renk beyaz sürüm koyu
+  zeminde (`dark:` sınıfları). Seçim CSS'te; tema değişince ikinci bir render
+  beklenmiyor.
+- **Arayüz dosyaları kırpılmış** (`*-isaret*.png`, 333×232): özgün 447×447
+  karenin şeffaf kenar boşluğu, 40 piksellik bir kutuda işareti gereksiz
+  küçültüyordu. İşaret değişmedi; "net alan" kuralı düzenin kendi boşluğuyla
+  veriliyor.
+- **Sekme simgesi** aynı işaretten üretildi (`favicon-32.png`,
+  `apple-touch-icon.png`). Önceki simge Vite'ın mor şimşeğiydi.
+- **`/marka`** — logo paketi sayfası ([BrandKitPage.tsx](frontend/src/features/brand/BrandKitPage.tsx)):
+  ana işaret kuralları, dört rengin HEX/RGB/CMYK/Pantone değerleri (renk alanına
+  tıklayınca HEX panoya kopyalanıyor), üç zemin modu (açık / koyu / fotoğraf
+  üzerinde) ve üç yanlış kullanım örneği. Oturum istemiyor: sponsor ve
+  partnerler de doğru kullanımı görebilmeli.
+- **Barlow ve Barlow Condensed kendi sunucumuzda** (`frontend/public/fonts/`,
+  yalnızca latin + latin-ext, 164 kB). CSP `font-src 'self'` diyor; Google
+  Fonts'a bağlanmak o sınırı gevşetmek **ve** her ziyaretçinin IP'sini yurt
+  dışına göndermek olurdu. Yüzler yalnızca `/marka` sayfasında kullanıldığı için
+  başka hiçbir ekranda indirilmiyor.
+
+> Vektör aslı geldiğinde `tgm-logo-renkli.svg` ve `tgm-logo-beyaz.svg` üretilip
+> PNG'lerin yerine konmalı (handoff da bunu söylüyor): şeffaf ve beyaz sürümler
+> PNG'den türetildiği için kenarları tam keskin değil. `/marka` sayfasındaki
+> örnek fotoğraf da yer tutucu — kurumun gerçek görseliyle değişecek.
+
 ### Canlı demo dağıtımı (VPS)
 
 Sistem 25 Ağustos'ta bir Ubuntu 24.04 VPS'e kuruldu ve

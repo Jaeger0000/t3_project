@@ -21,7 +21,10 @@ export default function AuthLayout({
     <div className="flex min-h-screen items-center justify-center px-6 py-12">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <LogoMark className="mx-auto mb-4 size-12" label="T3 Girişim Ekosistemi" />
+          <LogoMark
+            className="mx-auto mb-4 h-14 w-[80px]"
+            label="Türkiye Teknoloji Takımı Vakfı Girişim Merkezi"
+          />
           <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-50">{title}</h1>
           <p className="mt-2 text-sm text-stone-500">{description}</p>
         </div>
@@ -38,6 +41,10 @@ export default function AuthLayout({
           <span className="text-stone-400">·</span>
           <Link to="/kullanim-sartlari" className="text-brand-700 hover:underline dark:text-brand-200">
             Kullanım şartları
+          </Link>
+          <span className="text-stone-400">·</span>
+          <Link to="/marka" className="text-brand-700 hover:underline dark:text-brand-200">
+            Logo paketi
           </Link>
         </p>
       </div>

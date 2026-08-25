@@ -32,11 +32,31 @@ def check(label, cond, detail=""):
         print(f"  FAIL {label} — {str(detail)[:300]}")
 
 
-def wait_loaded(text, marker="yükleniyor", timeout=15):
-    """Satırlar sorgudan sonra basılıyor: beklemeyen kontrol ürünü değil
-    zamanlamayı ölçer."""
+# Türkçe büyük/küçük dönüşümü karşılaştırma için güvenli değil: "TÜRKİYE".lower()
+# birleşik noktalı bir "i̇" üretiyor, "TAKIMI".lower() ise "takimi" veriyor. Sunucu
+# tarafında aynı iş `SearchText.Fold` ile yapılıyor; betik de aynı katlamayı
+# kullanıyor ki kontroller CSS'in büyük harfe çevirdiği başlıklarda da çalışsın.
+_KATLAMA = str.maketrans({
+    "İ": "i", "I": "i", "ı": "i", "Ş": "s", "ş": "s", "Ğ": "g", "ğ": "g",
+    "Ü": "u", "ü": "u", "Ö": "o", "ö": "o", "Ç": "c", "ç": "c",
+})
+
+
+def katla(metin):
+    return (metin or "").translate(_KATLAMA).lower()
+
+
+def bekle_metin(beklenen, timeout=25):
+    """Satırlar sorgudan sonra basılıyor; beklemeden yapılan kontrol ürünü değil
+    zamanlamayı ölçer.
+
+    Beklemeyi "yükleniyor" metnine bağlamak kırılgan çıktı: her ekranın kendi
+    ifadesi var (pano "Karne hesaplanıyor…" diyor) ve eşleşmeyen bir markör
+    beklemeyi sessizce atlıyor. Bu yüzden beklenen **içeriğin kendisi**
+    bekleniyor: gelmezse kontrol zaten düşmeli."""
     deadline = time.time() + timeout
-    while marker in (text or "") and time.time() < deadline:
+    text = browser.text()
+    while beklenen not in (text or "") and time.time() < deadline:
         time.sleep(0.3)
         text = browser.text()
     return text
@@ -75,23 +95,74 @@ try:
     admin = token_of("admin@t3ekosistem.test")
     browser.set_session(admin, origin=BASE)
 
-    text = wait_loaded(browser.goto(f"{BASE}/girisimler", wait_for="Girişimler"))
+    browser.goto(f"{BASE}/girisimler", wait_for="Girişimler")
+    text = bekle_metin("32 girişim")
     check("girişim listesi açılıyor", "Girişimler" in text, text[:300])
-    check("tohumlanan 32 kayıt listede", "32 girişim" in text or "32 kayıt" in text,
-          text[:800])
+    check("tohumlanan 32 kayıt listede", "32 girişim" in text, text[:800])
 
-    text = wait_loaded(browser.goto(f"{BASE}/pano", wait_for="Ekosistem panosu"))
+    browser.goto(f"{BASE}/pano", wait_for="Ekosistem panosu")
+    text = bekle_metin("₺")
     check("pano ve grafikler çiziliyor", "Ekosistem panosu" in text, text[:300])
     check("panoda toplam yatırım görünüyor", "₺" in text, text[:600])
 
     # --- Karar Verici: maskeleme dağıtılan kopyada de duruyor ------------
     karar = token_of("karar.verici@t3ekosistem.test")
     browser.set_session(karar, origin=BASE)
-    text = wait_loaded(browser.goto(f"{BASE}/pano", wait_for="Ekosistem panosu"))
+    browser.goto(f"{BASE}/pano", wait_for="Ekosistem panosu")
+    text = bekle_metin("Ekosistem panosu")
     check("Karar Verici panoyu görüyor", "Ekosistem panosu" in text, text[:300])
 
     text = browser.goto(f"{BASE}/denetim", wait_for=None)
     check("Karar Verici denetim izine giremiyor", "yetkiniz yok" in text, text[:400])
+
+    # --- Marka / logo paketi sayfası ------------------------------------
+    # Oturumsuz açılmalı: sponsor ve partnerler de doğru kullanımı görecek.
+    browser.clear_session()
+    # Başlıklar CSS ile büyük harfe çevriliyor ve innerText bu dönüşümü
+    # uyguluyor: beklenen metin gövde cümlesinden alınıyor, karşılaştırmalar
+    # harf duyarsız (aynı tuzak render_faz5'te de yazılı).
+    text = browser.goto(f"{BASE}/marka", wait_for="TGM işareti dört renkli")
+    katli = katla(text)
+    check("logo paketi oturumsuz açılıyor",
+          "turkiye teknoloji takimi vakfi" in katli and "ana marka isareti" in katli,
+          text[:300])
+    check("dört marka rengi de ekranda",
+          all(h in katli for h in ("#303c48", "#e43c24", "#f99b1c", "#0c4878")), text[:600])
+    check("Pantone ve CMYK değerleri var",
+          "7545 c" in katli and "0 74 84 11" in katli, text[:600])
+    # Yazı tipleri kendi sunucumuzdan geliyor; CSP font-src 'self' yüzünden
+    # harici bir kaynaktan gelseydi sessizce sistem yazı tipine düşerdi.
+    browser.evaluate("document.fonts.ready")
+    time.sleep(0.6)
+    check("Barlow Condensed yüklendi",
+          browser.evaluate("document.fonts.check('600 26px \"Barlow Condensed\"')") is True,
+          browser.evaluate("[...document.fonts].map(f => f.family + ' ' + f.status).join(', ')"))
+    check("TGM işareti gerçekten indirildi (kırpılmış 333 px kaynak)",
+          browser.evaluate(
+              "(() => { const i = [...document.images].find(x => x.src.includes('tgm-logo'));"
+              "  return i ? i.naturalWidth : 0; })()") in (333, 447))
+    check("blueprint köşe işaretleri duruyor",
+          (browser.evaluate("document.querySelectorAll('.absolute.size-\\[11px\\]').length") or 0) >= 16
+          or (browser.evaluate("document.querySelectorAll('i[aria-hidden=\"true\"]').length") or 0) >= 16)
+
+    # Renk kopyalama: ipucu metni değişiyor (pano izni headless'ta yoksa da
+    # görsel geri bildirim gösterilmeli — kontrol tam olarak bunu ölçüyor).
+    browser.evaluate("document.querySelector('[data-testid=\"swatch-E43C24\"]').click()")
+    time.sleep(0.4)
+    check("renk alanına tıklayınca kopyalandı bildirimi çıkıyor",
+          "kopyalandı" in (browser.evaluate(
+              "document.querySelector('[data-testid=\"kopya-ipucu\"]').textContent") or ""))
+
+    # Zemin seçici: üç mod logo dosyasını, açıklamayı ve kuralları birlikte
+    # değiştiriyor.
+    browser.evaluate("document.querySelector('[data-testid=\"zemin-2\"]').click()")
+    time.sleep(0.4)
+    check("fotoğraf modunda tek renk beyaz sürüm kullanılıyor",
+          "beyaz" in (browser.evaluate(
+              "document.querySelector('[data-testid=\"zemin-logosu\"]').getAttribute('src')") or ""))
+    check("fotoğraf modunun kuralları ekranda",
+          "koyu örtü" in (browser.evaluate(
+              "document.querySelector('[data-testid=\"zemin-aciklama\"]').parentElement.textContent") or ""))
 
     # --- Konsol hatası -------------------------------------------------
     errors = [m for m in browser.console_errors()] if hasattr(browser, "console_errors") else []
