@@ -274,8 +274,8 @@ gerekir; docker köprüsü `DOWN` ise derleme `--network host` ister (yoksa
 
 ### Canlı demo dağıtımı (VPS)
 
-Sistem 25 Ağustos'ta bir Ubuntu 24.04 VPS'e kuruldu ve **http://193.35.154.237:8090**
-adresinde çalışıyor. Sunucuda başka beş compose projesi olduğu için dağıtım
+Sistem 25 Ağustos'ta bir Ubuntu 24.04 VPS'e kuruldu ve **http://193.35.154.237**
+adresinde çalışıyor (80 portu; konteyner 8090'da dinliyor, önünde host'taki nginx var). Sunucuda başka beş compose projesi olduğu için dağıtım
 onlardan tamamen ayrı duruyor: kendi compose projesi (`t3ekosistem`), kendi ağı
 ve hacimleri, kullanılmayan bir port (8090). Diğer yığınların portlarına
 (6540/8080/8081/3001/5246/5341/12000/12001) ve dosyalarına dokunulmadı.
@@ -301,7 +301,7 @@ docker save t3-ekosistem:vps | gzip -1 | ssh root@SUNUCU 'gunzip | docker load'
 ssh root@SUNUCU 'cd /opt/t3ekosistem && docker compose -p t3ekosistem up -d'
 
 # Doğrulama (gerçek tarayıcıda, dağıtılan kopyaya karşı)
-T3_VPS_BASE=http://193.35.154.237:8090 python3 scripts/render_vps.py
+T3_VPS_BASE=http://193.35.154.237 python3 scripts/render_vps.py
 ```
 
 Doğrulandı (11 render kontrolü, 0 başarısız): giriş ekranı ve KVKK onay kapısı,
@@ -310,11 +310,25 @@ CSP'nin kendi paketini engellemediği, 32 girişimin listelenmesi, panonun
 Ayrıca `/api/olmayan-uc` JSON 404 dönüyor, `Auth.KvkkConsent` izi düşüyor,
 güvenlik başlıkları yerinde.
 
-> ⚠️ **TLS yok:** port doğrudan dinleniyor, önde vekil durmuyor — giriş bilgileri
-> ağda açık gider. Demo/inceleme için kabul edilmiş bir takas; alan adı
-> bağlanınca `Hosting:RequireHttps` açılıp ters vekil devreye girmeli. Oturum
-> çerezinin `Secure` bayrağı isteğin şemasına bağlı olduğu için HTTP'de de
-> çalışıyor, HTTPS'e geçilince kendiliğinden sıkılaşır.
+**80 portu ve nginx.** Sunucuda zaten bir nginx ve bir site vardı
+(`mesutyesiloren.com` → `localhost:3001`). Hiçbir dosya silinmedi: kendi
+bloğumuz (`/etc/nginx/sites-available/t3ekosistem`) **`default_server`** olarak
+eklendi, yani IP ile ya da tanınmayan `Host` başlığıyla gelen istek bize düşüyor,
+o alan adıyla gelen istek eskisi gibi kendi sitesine gidiyor (nginx önce
+`server_name` eşleşmesine bakar). Eski yapılandırmanın kopyası
+`/root/nginx-yedek-20260825/` altında. Vekil `X-Forwarded-For`/`-Proto`
+gönderiyor ve uygulama bu başlıkları **yalnızca** güvenilen vekilden kabul
+ediyor (`Hosting:TrustedProxies` = docker ağ geçidi); doğrulandı: denetim izine
+vekilin adresi değil gerçek istemci IP'si düşüyor. `client_max_body_size 25m`
+gerekliydi — nginx'in 1 MB varsayılanı 20 MB'lık doküman sınırını görünmez kılar
+ve yükleme daha uygulamaya varmadan 413 alırdı.
+
+> ⚠️ **TLS hâlâ yok:** trafik 80'de düz HTTP. Geçerli bir sertifika alan adı
+> ister (Let's Encrypt çıplak IP'ye standart sertifika vermiyor). Alan adı
+> bağlandığı gün `certbot --nginx` + `Hosting:RequireHttps=true` yeter; oturum
+> çerezinin `Secure` bayrağı isteğin şemasına bağlı olduğu için HTTPS'e
+> geçildiğinde kendiliğinden sıkılaşır. ACME HTTP-01 doğrulaması için
+> `/.well-known/acme-challenge/` yolu nginx bloğunda şimdiden açık.
 
 Yığını kurmadan aynı yolu yerelde denemek için:
 

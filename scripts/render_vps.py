@@ -74,14 +74,14 @@ try:
     check("tohumlanan 32 kayıt listede", "32 girişim" in text or "32 kayıt" in text,
           text[:800])
 
-    text = browser.goto(f"{BASE}/pano", wait_for="Ekosistem panosu")
+    text = wait_loaded(browser.goto(f"{BASE}/pano", wait_for="Ekosistem panosu"))
     check("pano ve grafikler çiziliyor", "Ekosistem panosu" in text, text[:300])
     check("panoda toplam yatırım görünüyor", "₺" in text, text[:600])
 
     # --- Karar Verici: maskeleme dağıtılan kopyada de duruyor ------------
     karar = token_of("karar.verici@t3ekosistem.test")
     browser.set_session(karar, origin=BASE)
-    text = browser.goto(f"{BASE}/pano", wait_for="Ekosistem panosu")
+    text = wait_loaded(browser.goto(f"{BASE}/pano", wait_for="Ekosistem panosu"))
     check("Karar Verici panoyu görüyor", "Ekosistem panosu" in text, text[:300])
 
     text = browser.goto(f"{BASE}/denetim", wait_for=None)
