@@ -42,3 +42,23 @@ export function useAuth(): AuthState {
   if (!context) throw new Error('useAuth, AuthProvider içinde kullanılmalı.')
   return context
 }
+
+/**
+ * "Bu tarayıcıda oturum açılmıştı" izi. Jeton **değil** — jeton HttpOnly
+ * çerezde ve JavaScript onu göremiyor. Buradaki tek bilgi bir bayrak ve üç işi
+ * var: (1) ilk kez gelen ziyaretçiye "oturum süresi doldu" demeyi engellemek,
+ * (2) sekmeler arası senkron için `storage` olayını tetiklemek, (3) açılış
+ * sayfasının, /api/me cevabı gelmeden önce, tanıtımı mı yoksa panoyu mu
+ * göstereceğini bilmesi.
+ *
+ * Sağlayıcının değil bu dosyanın içinde: bileşen ihraç eden bir modüle yardımcı
+ * eklenince Vite'ın fast refresh'i o dosya için kapanıyor.
+ */
+const SESSION_MARKER = 't3.session.active'
+
+export const oturumIzi = {
+  exists: () => localStorage.getItem(SESSION_MARKER) === '1',
+  set: () => localStorage.setItem(SESSION_MARKER, '1'),
+  clear: () => localStorage.removeItem(SESSION_MARKER),
+  anahtar: SESSION_MARKER,
+}

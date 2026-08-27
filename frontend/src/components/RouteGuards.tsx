@@ -17,7 +17,7 @@ import type { SessionPermissions } from '@/api/types'
  * (kullanıcı menüyü kaybetmesin), kapalıyken çıplak — kabuk oturum verisi
  * bekliyor.
  */
-export function PublicPage({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
+export function PublicPage({ children }: { children: ReactNode }) {
   const { session, isResolving } = useAuth()
 
   if (isResolving) {
@@ -29,14 +29,9 @@ export function PublicPage({ children, wide = false }: { children: ReactNode; wi
   }
 
   if (!session) {
-    // Metin sayfaları okunabilir bir kolonda duruyor; marka paketi gibi ızgara
-    // sayfaları kendi genişliğini yönetiyor (`wide`).
+    // Metin sayfaları okunabilir bir kolonda duruyor.
     return (
-      <div
-        className={`mx-auto min-h-screen px-4 py-12 sm:px-6 ${wide ? 'max-w-[1220px]' : 'max-w-3xl'}`}
-      >
-        {children}
-      </div>
+      <div className="mx-auto min-h-screen max-w-3xl px-4 py-12 sm:px-6">{children}</div>
     )
   }
 

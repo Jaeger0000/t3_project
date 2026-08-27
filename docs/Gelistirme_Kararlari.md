@@ -547,6 +547,18 @@ Kaynak: [Denetim_Duzeltme_Plani.md](Denetim_Duzeltme_Plani.md) Dalga 1.
   atlıyor ve kontrol yine veri gelmeden ölçüyor. `render_vps.py` artık
   **beklenen içeriğin kendisini** bekliyor (`bekle_metin("₺")`): gelmezse kontrol
   zaten düşmeli.
+- **`wait_for` kabuktan değil veriden seçilir.** `render_faz3.py` onay
+  kuyruğunu `wait_for="kuyru"`, portalı `wait_for="portal"` ile bekliyordu; iki
+  metin de menüde/başlıkta veri gelmeden duruyor, yani bekleme ilk 0,35 sn'lik
+  yoklamada dönüyor ve kontrol "Kuyruk yükleniyor…" ekranını ölçüyordu. Beş
+  kontrol bu yüzden makinenin hızına göre bazen geçip bazen düşüyordu — hata
+  üründe değil, ölçümdeydi. Artık sekmedeki sayı (`"Bekleyen("`) ve ekranın en
+  altındaki `"Yeni üye öner"` bekleniyor.
+- **Betiğin kendi yan etkisi kontrolü düşürebilir.** Denetim izi kontrolü ilk
+  sayfada `ChangeRequest.` / `Startup.` / `User.` eylemi arıyordu; betik her
+  koşuda beş kez giriş yaptığı için birkaç koşu sonra ilk sayfanın tamamı
+  `Auth.LoginSucceeded` oldu ve kontrol düştü. Ölçülen şey "satır render oluyor
+  mu" olduğu için `Auth.` de kabul ediliyor.
 
 ### VPS / nginx tuzakları
 
@@ -578,26 +590,44 @@ Kaynak: `design_handoff_logo_paketi/` (handoff README + preview.html).
   çizilmiş bir simge vardı; kurumun gerçek işareti gelince o simge silindi.
   Handoff "harf kompozisyonu, renk sırası ve blok oranları değiştirilemez"
   diyor — yeniden çizmek bu kuralı kaçınılmaz olarak ihlal ederdi.
-- **Prototip HTML'i kopyalanmadı.** Handoff'un kendi talimatı bu: tasarım hedef
-  kod tabanının desenleriyle yeniden kurulmalı. Sayfa Tailwind yardımcılarıyla,
-  projenin `lazy` rota kaydı, `useDocumentTitle` ve `PublicPage` desenleriyle
-  yazıldı; prototipin `support.js` runtime'ı taşınmadı.
-- **Koyu tema sapması bilinçli ve sınırlı.** Handoff tek bir açık zemin veriyor.
-  Sayfanın kabuğu (zemin, yazı, saç çizgileri) koyu temada karşılığına geçiyor
-  ama **marka değerleri hiç kaymıyor**: swatch renkleri, degradeler ve logo
-  dosyaları iki temada birebir aynı. Marka kartındaki rengin temaya göre
-  değişmesi sayfanın amacını yok ederdi.
-- **Yazı tipleri kendi sunucumuzda.** CSP `font-src 'self'`; Google Fonts için o
-  sınırı gevşetmek Dalga 2'de kazanılanı geri vermek olurdu ve her ziyaretçinin
-  IP'si yurt dışına giderdi (Sentry'yi reddetme gerekçesinin aynısı). Yalnızca
-  latin + latin-ext alt kümeleri ve gerçekten kullanılan dört ağırlık indirildi;
-  kullanılmayan `@font-face` bırakmak 404 üretir.
+- **`/marka` logo paketi sayfası geri alındı.** Sayfa (renk kartları,
+  Pantone/CMYK, üç zemin modu, yanlış kullanım örnekleri) yazılmıştı ve
+  çalışıyordu; ürün kararıyla kaldırıldı: arayüz bir iş uygulaması, marka
+  kılavuzunun yeri `design_handoff_logo_paketi/`. Arayüzde artık yalnızca
+  işaretin kendisi var. Sayfayla birlikte giden şeyler: `BrandKitPage`, lazy
+  kaydı, `PublicPage`'in yalnızca o sayfa için eklenen `wide` seçeneği,
+  `--font-marka*` belirteçleri, `public/fonts/` altındaki sekiz Barlow dosyası
+  (164 kB — CSP `font-src 'self'` yüzünden kendi sunucumuzdan servis
+  ediliyordu), yalnızca orada kullanılan üç görsel ve `render_vps.py`'nin dokuz
+  kontrolü. Silinen her şeyin aslı handoff paketinde duruyor.
 - **Arayüzdeki logo dosyaları kırpıldı** (447×447 → 333×232). Şeffaf kenar
   boşluğu 40 piksellik bir başlık kutusunda işareti gereksiz küçültüyordu;
   işaretin kendisine dokunulmadı, "net alan" kuralı CSS boşluğuyla veriliyor.
 - **PNG kabul edildi, SVG borç yazıldı.** Elimizdeki kaynak PNG ve handoff da
   vektör aslından SVG üretilmesini istiyor. Kararı gizlemek yerine README'ye
   açık borç olarak yazıldı.
+
+## 3j. Açılış (tanıtım) sayfası kararları
+
+- **Kök adres artık panoya yönlenmiyor, tanıtım sayfası gösteriyor.** Önceki
+  hâlde `/` koşulsuz `/pano`'ya gidiyordu; oturumu olmayan ziyaretçi bir anda
+  giriş formuyla karşılaşıyordu. Bağlantıyı ilk kez açan jüri üyesinin sistemin
+  ne yaptığını form doldurmadan okuyabilmesi gerekiyor.
+- **Yönlendirme kararı `/api/me` beklenmeden veriliyor.** Sayfa, "bu tarayıcıda
+  oturum açılmıştı" izine (`t3.session.active`) bakıyor: iz varsa doğrudan
+  `/pano`, yoksa tanıtım. Cevabı beklemek siteye ilk gelen herkese gereksiz bir
+  yükleniyor çarkı izletirdi; iz yanılırsa zarar yok, `/pano` kendi korumasıyla
+  kullanıcıyı girişe yolluyor. İz bu yüzden sağlayıcıdan `lib/auth.ts` içine
+  taşındı (bileşen ihraç eden modüle yardımcı eklemek fast refresh'i kapatıyor).
+- **Sayfa hiç veri çekmiyor.** API kapalıyken bile açılıyor; tek dış bağımlılığı
+  logo dosyaları. Tanıtımda uydurma istatistik yok — anlatılan dört blok
+  şartnamedeki zorunlu MVP maddelerinin kendisi.
+- **Statik paket, `lazy` değil.** Artık her ziyaretin ilk karesi bu sayfa; giriş
+  ekranı ve 404 ile aynı gerekçeyle ana pakette duruyor.
+- **Logo paketi bağlantısı hiçbir alt bilgide yok.** Önce giriş ekranından
+  alınıp açılış sayfasına taşındı, ardından sayfanın kendisi kaldırıldı
+  (bkz. 3i). Arayüzde marka artık bir bağlantı değil, yalnızca işaretin
+  kendisi.
 
 ## 4. Ortam tuzakları — tekrar çarpılacak olanlar
 

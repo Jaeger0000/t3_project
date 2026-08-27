@@ -42,10 +42,6 @@ export default function AuthLayout({
           <Link to="/kullanim-sartlari" className="text-brand-700 hover:underline dark:text-brand-200">
             Kullanım şartları
           </Link>
-          <span className="text-stone-400">·</span>
-          <Link to="/marka" className="text-brand-700 hover:underline dark:text-brand-200">
-            Logo paketi
-          </Link>
         </p>
       </div>
     </div>

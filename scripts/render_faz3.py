@@ -90,7 +90,11 @@ try:
     check("React uygulaması açıldı (boş gövde değil)", len(text.strip()) > 20, repr(text[:80]))
 
     print("\n=== Onay kuyruğu ===")
-    text = as_user("kulucka", "/onaylar", wait_for="kuyru")
+    # Beklenen metin kabuktan değil **veriden** seçiliyor: "Onay kuyruğu"
+    # başlığı sorgu daha uçuştayken ekranda oluyor ve kontrol o ara kareyi
+    # ölçüyordu (ekranda "Kuyruk yükleniyor…" varken). Sekmedeki sayı ancak
+    # yanıt gelince yazılıyor. Aynı kural render_vps.py'de de yazılı.
+    text = as_user("kulucka", "/onaylar", wait_for="Bekleyen(")
     check("program yöneticisi kuyruğu görüyor", "Onay kuyruğu" in text, text[:200])
     check("durum sekmeleri sayı taşıyor", "Bekleyen(" in text, text[:300])
     check("kuyrukta girişim satırı var", "değişiyor" in text or "bekliyor" in text,
@@ -136,7 +140,9 @@ try:
               "yetkiniz yok" in text.lower() or "bulunamadı" in text.lower(), text[:300])
 
     print("\n=== Girişim portalı ===")
-    text = as_user("portal", "/portal", wait_for="portal")
+    # "Girişim portalı" menüde de yazıyor, yani veri gelmeden eşleşiyor;
+    # beklenen metin ekranın en altındaki ekip bölümünden alınıyor.
+    text = as_user("portal", "/portal", wait_for="Yeni üye öner")
     check("portal ekranı render oluyor", "Girişim portalı" in text, text[:300])
     check("onay uyarısı görünür",
           "onayından sonra yayına girer" in text, text[:400])
@@ -160,14 +166,20 @@ try:
     # Satırlar ayrı bir istekle geliyor: başlığın gelmesi tabloların geldiğini
     # göstermiyor. Rota bazlı kod bölmeyle (Dalga 2) araya bir de parça indirme
     # girdi ve tek seferlik okuma boş tabloya denk gelebiliyor.
+    #
+    # `Auth.` de kabul ediliyor, çünkü betiğin kendisi her koşuda beş kez giriş
+    # yapıyor: birkaç koşudan sonra ilk sayfanın tamamı `Auth.LoginSucceeded`
+    # oluyor ve kontrol kendi yan etkisi yüzünden düşüyordu. Ölçülen şey
+    # "satır render oluyor mu", hangi eylem olduğu değil.
+    EYLEMLER = ("ChangeRequest.", "Startup.", "User.", "Auth.")
     deadline = time.time() + 15
     while time.time() < deadline:
-        if any(marker in text for marker in ("ChangeRequest.", "Startup.", "User.")):
+        if any(marker in text for marker in EYLEMLER):
             break
         time.sleep(0.4)
         text = browser.text()
     check("eylem satırları görünüyor",
-          "ChangeRequest." in text or "Startup." in text or "User." in text, text[:400])
+          any(marker in text for marker in EYLEMLER), text[:400])
 
     text = as_user("kulucka", "/kullanicilar", wait_for="")
     check("program yöneticisi kullanıcı ekranını göremiyor",

@@ -2,22 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, api } from '@/lib/apiClient'
-import { AuthContext } from '@/lib/auth'
+import { AuthContext, oturumIzi as marker } from '@/lib/auth'
 import type { LoginResponse, SessionUser } from '@/api/types'
-
-/**
- * "Bu tarayıcıda oturum açılmıştı" izi. Jeton **değil** — jeton HttpOnly
- * çerezde ve JavaScript onu göremiyor. Buradaki tek bilgi bir bayrak ve iki işi
- * var: (1) ilk kez gelen ziyaretçiye "oturum süresi doldu" demeyi engellemek,
- * (2) sekmeler arası senkron için `storage` olayını tetiklemek.
- */
-const SESSION_MARKER = 't3.session.active'
-
-const marker = {
-  exists: () => localStorage.getItem(SESSION_MARKER) === '1',
-  set: () => localStorage.setItem(SESSION_MARKER, '1'),
-  clear: () => localStorage.removeItem(SESSION_MARKER),
-}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
@@ -122,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // *diğer* sekmelerde tetikleniyor, döngü yok.
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
-      if (event.key !== SESSION_MARKER) return
+      if (event.key !== marker.anahtar) return
 
       // Diğer sekme çıkış yaptıysa işaret gitmiştir; giriş yaptıysa gelmiştir.
       // İki yönde de sunucuya bir kez sormak yerine durumu doğrudan

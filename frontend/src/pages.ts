@@ -6,8 +6,9 @@ import { lazy } from 'react'
  * iki ekranda kullanılıyor: giriş ekranını görmek için ekosistem panosunun
  * grafiklerini indirmek gereksiz.
  *
- * Giriş ekranı ve 404 bilinçli olarak statik: ilki her ziyaretin ilk karesi,
- * ikincisi hata yolunda ek bir ağ isteğine bağlanmamalı.
+ * Açılış (tanıtım) sayfası, giriş ekranı ve 404 bilinçli olarak statik: ilk
+ * ikisi her ziyaretin ilk karesi, sonuncusu hata yolunda ek bir ağ isteğine
+ * bağlanmamalı.
  */
 export const ForgotPasswordPage = lazy(() => import('@/features/auth/ForgotPasswordPage'))
 export const ResetPasswordPage = lazy(() => import('@/features/auth/ResetPasswordPage'))
@@ -23,5 +24,4 @@ export const UsersPage = lazy(() => import('@/features/users/UsersPage'))
 export const AuditPage = lazy(() => import('@/features/audit/AuditPage'))
 export const PrivacyNoticePage = lazy(() => import('@/features/legal/PrivacyNoticePage'))
 export const TermsPage = lazy(() => import('@/features/legal/TermsPage'))
-export const BrandKitPage = lazy(() => import('@/features/brand/BrandKitPage'))
 

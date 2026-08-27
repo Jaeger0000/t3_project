@@ -290,21 +290,16 @@ değiştirilmiyor, işaret bir bütün olarak yerleştiriliyor — bu yüzden
   veriliyor.
 - **Sekme simgesi** aynı işaretten üretildi (`favicon-32.png`,
   `apple-touch-icon.png`). Önceki simge Vite'ın mor şimşeğiydi.
-- **`/marka`** — logo paketi sayfası ([BrandKitPage.tsx](frontend/src/features/brand/BrandKitPage.tsx)):
-  ana işaret kuralları, dört rengin HEX/RGB/CMYK/Pantone değerleri (renk alanına
-  tıklayınca HEX panoya kopyalanıyor), üç zemin modu (açık / koyu / fotoğraf
-  üzerinde) ve üç yanlış kullanım örneği. Oturum istemiyor: sponsor ve
-  partnerler de doğru kullanımı görebilmeli.
-- **Barlow ve Barlow Condensed kendi sunucumuzda** (`frontend/public/fonts/`,
-  yalnızca latin + latin-ext, 164 kB). CSP `font-src 'self'` diyor; Google
-  Fonts'a bağlanmak o sınırı gevşetmek **ve** her ziyaretçinin IP'sini yurt
-  dışına göndermek olurdu. Yüzler yalnızca `/marka` sayfasında kullanıldığı için
-  başka hiçbir ekranda indirilmiyor.
+
+Arayüzde **yalnızca işaretin kendisi** kullanılıyor: kurumsal iletişim amaçlı
+`/marka` logo paketi sayfası (renk kartları, Pantone/CMYK, zemin modları) ve
+onun için indirilen Barlow yazı tipleri kaldırıldı — arayüz bir iş uygulaması,
+marka kılavuzunun yeri handoff paketi. Kurallar `design_handoff_logo_paketi/`
+altında duruyor.
 
 > Vektör aslı geldiğinde `tgm-logo-renkli.svg` ve `tgm-logo-beyaz.svg` üretilip
-> PNG'lerin yerine konmalı (handoff da bunu söylüyor): şeffaf ve beyaz sürümler
-> PNG'den türetildiği için kenarları tam keskin değil. `/marka` sayfasındaki
-> örnek fotoğraf da yer tutucu — kurumun gerçek görseliyle değişecek.
+> PNG'lerin yerine konmalı (handoff da bunu söylüyor): beyaz sürüm PNG'den
+> türetildiği için kenarları tam keskin değil.
 
 ### Canlı demo dağıtımı (VPS)
 

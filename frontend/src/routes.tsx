@@ -1,4 +1,4 @@
-import { Navigate, Route, createRoutesFromElements } from 'react-router-dom'
+import { Route, createRoutesFromElements } from 'react-router-dom'
 import AppShell from '@/components/AppShell'
 import SuspenseLayout from '@/components/SuspenseLayout'
 import {
@@ -7,12 +7,12 @@ import {
   RequireAuth,
   RequirePermission,
 } from '@/components/RouteGuards'
+import LandingPage from '@/features/landing/LandingPage'
 import LoginPage from '@/features/auth/LoginPage'
 import {
   ApprovalDetailPage,
   ApprovalsPage,
   AuditPage,
-  BrandKitPage,
   ChangePasswordPage,
   DashboardPage,
   ForgotPasswordPage,
@@ -43,11 +43,6 @@ export const appRoutes = createRoutesFromElements(
     <Route path="/kvkk-aydinlatma" element={<PublicPage><PrivacyNoticePage /></PublicPage>} />
     <Route path="/kullanim-sartlari" element={<PublicPage><TermsPage /></PublicPage>} />
 
-    {/* Logo paketi: sponsor ve partnerler de doğru kullanımı görebilmeli, o
-        yüzden oturum istemiyor. Geniş kabuk — sayfanın ızgarası 1180 piksele
-        kadar açılıyor, KVKK metinlerinin 3xl kolonu bunu sıkıştırırdı. */}
-    <Route path="/marka" element={<PublicPage wide><BrandKitPage /></PublicPage>} />
-
     <Route element={<RequireAuth />}>
       <Route element={<AppShell />}>
         <Route path="/pano" element={<DashboardPage />} />
@@ -76,8 +71,10 @@ export const appRoutes = createRoutesFromElements(
         </Route>
       </Route>
     </Route>
-    {/* Açılış panoya gider: karar destek ekranı ilk görülen ekran olmalı. */}
-    <Route path="/" element={<Navigate to="/pano" replace />} />
+    {/* Kök adres tanıtım sayfası. Oturumu olan kullanıcıyı sayfanın kendisi
+        panoya yolluyor (bkz. LandingPage) — burada koşulsuz bir yönlendirme
+        olsaydı siteye ilk gelen ziyaretçi doğrudan giriş formuna düşerdi. */}
+    <Route path="/" element={<LandingPage />} />
     <Route path="*" element={<NotFoundRoute />} />
   </Route>,
 )
