@@ -67,6 +67,10 @@ public sealed class UploadDocumentHandler(
 
         var fileName = DocumentUploadRules.SafeFileName(request.FileName)!;
         var contentType = check.Value!;
+        var extension = Path.GetExtension(fileName);
+
+        if (!await DocumentUploadRules.ContentMatchesExtensionAsync(request.Content, extension, ct))
+            return Error.Validation("Dosya içeriği uzantıyla uyuşmuyor.");
 
         // Dosya her iki yolda da önce depoya yazılıyor: yükleme tek seferlik,
         // içeriği onaya kadar bekletecek bir yer yok. Reddedilen öneride

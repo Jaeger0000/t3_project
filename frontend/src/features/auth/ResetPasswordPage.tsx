@@ -64,7 +64,7 @@ export default function ResetPasswordPage() {
           />
 
           {mismatch ? <ErrorState message="İki şifre birbiriyle aynı değil." /> : null}
-          {reset.error ? <ErrorState message={reset.error.message} /> : null}
+          {reset.error ? <ErrorState message={reset.error.message} error={reset.error} /> : null}
 
           <Button
             type="submit"

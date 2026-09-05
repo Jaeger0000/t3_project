@@ -2,6 +2,7 @@ using T3.Api.Filters;
 using T3.Api.Http;
 using T3.Api.RateLimiting;
 using T3.Api.Security;
+using T3.Application.Common.Interfaces;
 using T3.Application.Features.Auth.ChangePassword;
 using T3.Application.Features.Auth.GetSession;
 using T3.Application.Features.Auth.Login;
@@ -40,13 +41,37 @@ public static class AuthEndpoints
         // Çıkış sunucu tarafında çerezi siliyor: istemcinin "unutması" yetmez,
         // çerezi yalnızca sunucu geçersiz kılabilir. Kimlik istemiyor — süresi
         // dolmuş jetonu olan kullanıcı da çerezini temizleyebilmeli.
-        auth.MapPost("/logout", (HttpContext http) =>
+        //
+        // Çerezi silmek başlıkla taşınan bir kopyayı (Authorization: Bearer,
+        // Swagger'da veya betikte saklı) etkilemez. SecurityStamp'i de burada
+        // yenilemek, bu kullanıcıya ait HER jetonu (bu tarayıcı dâhil tüm
+        // cihazlar) geçersiz kılar — ayrı bir oturum/jeton tablosu olmadığı için
+        // bilinçli olarak seçilen kısayol bu (bkz. G-01,
+        // Guvenlik_Denetimi_ve_Iyilestirme_Plani.md).
+        auth.MapPost("/logout", async (
+                HttpContext http,
+                ICurrentUser currentUser,
+                IAppDbContext db,
+                IUserStateProvider userState,
+                CancellationToken ct) =>
             {
                 SessionCookie.Clear(http);
+
+                if (currentUser.UserId is { } userId)
+                {
+                    var user = await db.Users.FindAsync([userId], ct);
+                    if (user is not null)
+                    {
+                        user.SecurityStamp = Guid.NewGuid();
+                        await db.SaveChangesAsync(ct);
+                        userState.Invalidate(userId);
+                    }
+                }
+
                 return Results.NoContent();
             })
             .AllowAnonymous()
-            .WithSummary("Oturum çerezlerini siler.");
+            .WithSummary("Oturum çerezlerini siler ve kullanıcının tüm jetonlarını geçersiz kılar.");
 
         // Kurtarma uçları da giriş kovasında: ikisi de kimlik doğrulamadan önce
         // e-posta alan, kaba kuvvete ve numaralandırmaya açık yüzeyler.
@@ -73,8 +98,19 @@ public static class AuthEndpoints
         auth.MapPost("/change-password", async (
                 ChangePasswordRequest request,
                 ChangePasswordHandler handler,
+                HttpContext http,
                 CancellationToken ct) =>
-            (await handler.Handle(request, ct)).ToHttp())
+            {
+                var result = await handler.Handle(request, ct);
+
+                // Şifre değişince SecurityStamp yenilenir ve bu isteğin kendi
+                // çerezi de dâhil eski jetonlar geçersiz olur — kesintisiz
+                // sürmesi için hemen yeni jetonla çerez tazeleniyor (bkz. G-01).
+                if (result.IsSuccess)
+                    SessionCookie.Issue(http, result.Value!.AccessToken, result.Value.ExpiresAt);
+
+                return result.ToHttp();
+            })
             .RequireRateLimiting(AuthRateLimit.AuthPolicy)
             .WithValidation<ChangePasswordRequest>()
             .WithSummary("Oturum sahibinin şifresini değiştirir; mevcut şifre doğrulanır.");

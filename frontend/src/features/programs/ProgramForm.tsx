@@ -69,7 +69,7 @@ export default function ProgramForm({
 
       {active.error ? (
         <div className="mt-3">
-          <ErrorState message={active.error.message} />
+          <ErrorState message={active.error.message} error={active.error} />
         </div>
       ) : null}
 

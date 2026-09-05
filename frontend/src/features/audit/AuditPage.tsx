@@ -94,7 +94,7 @@ export default function AuditPage() {
         </div>
       </Card>
 
-      {query.error ? <ErrorState message={query.error.message} /> : null}
+      {query.error ? <ErrorState message={query.error.message} error={query.error} /> : null}
       {query.isPending ? <Spinner label="İz yükleniyor…" /> : null}
       {query.data && query.data.items.length === 0 ? (
         <EmptyState title="Bu filtrede kayıt yok" />

@@ -17,7 +17,9 @@ public sealed class ChangePasswordHandler(
     IAppDbContext db,
     ICurrentUser currentUser,
     IPasswordHasher passwordHasher,
-    IAuditWriter audit)
+    IAuditWriter audit,
+    IUserStateProvider userState,
+    ITokenService tokenService)
 {
     public async Task<Result<ChangePasswordResponse>> Handle(
         ChangePasswordRequest request, CancellationToken ct)
@@ -44,6 +46,10 @@ public sealed class ChangePasswordHandler(
         user.PasswordHash = passwordHasher.Hash(request.NewPassword);
         user.MustChangePassword = false;
 
+        // Elindeki her jeton (bu isteği yapan istemcininki dâhil) geçersiz
+        // olur; aşağıda hemen yenisi üretilip döndürülüyor (bkz. G-01).
+        user.SecurityStamp = Guid.NewGuid();
+
         // Açık sıfırlama bağlantıları harcanıyor: şifresini bilen kullanıcı
         // değiştirdiğine göre postadaki bağlantının yaşaması gereksiz risk.
         var pending = await db.PasswordResetTokens
@@ -52,17 +58,21 @@ public sealed class ChangePasswordHandler(
 
         var now = DateTimeOffset.UtcNow;
 
-        foreach (var token in pending)
-            token.UsedAt = now;
+        foreach (var resetToken in pending)
+            resetToken.UsedAt = now;
 
-        await db.SaveChangesAsync(ct);
-
+        // Şifre değişikliği ile izi tek SaveChanges'ta kalıcı olur (bkz. G-09).
         await audit.WriteForActorAsync(
             user.Id, user.Role,
             "Auth.PasswordChanged", nameof(User), user.Id,
             after: new { Email = MaskedEmail.Of(user.Email) },
-            ct: ct);
+            ct: ct, saveChanges: false);
 
-        return new ChangePasswordResponse(now);
+        await db.SaveChangesAsync(ct);
+        userState.Invalidate(user.Id);
+
+        var freshToken = tokenService.CreateAccessToken(user, currentUser.AssignedProgramIds);
+
+        return new ChangePasswordResponse(now, freshToken.Value, freshToken.ExpiresAt);
     }
 }

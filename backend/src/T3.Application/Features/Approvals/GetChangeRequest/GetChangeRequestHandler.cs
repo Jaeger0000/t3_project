@@ -55,6 +55,7 @@ public sealed class GetChangeRequestHandler(
             CanReview: scope.CanReview && request.Status == ChangeRequestStatus.Pending,
             IsReadable: fields.Count > 0,
             ChangedFieldCount: ChangeRequestDiff.ChangedCount(fields),
-            Fields: fields);
+            Fields: fields,
+            RequiresElevation: fields.Any(f => f.Changed && f.Masked));
     }
 }

@@ -77,12 +77,12 @@ export default function ParticipationEditor({
 
       {update.error ? (
         <div className="mt-3">
-          <ErrorState message={update.error.message} />
+          <ErrorState message={update.error.message} error={update.error} />
         </div>
       ) : null}
       {remove.error ? (
         <div className="mt-3">
-          <ErrorState message={remove.error.message} />
+          <ErrorState message={remove.error.message} error={remove.error} />
         </div>
       ) : null}
 

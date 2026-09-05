@@ -5,8 +5,12 @@ namespace T3.Api.Http;
 /// <summary>
 /// Hata gövdesi. Şekli ExceptionHandlingMiddleware ve ValidationFilter ile
 /// birebir aynı: frontend tek bir hata biçimi ayrıştırır.
+///
+/// <see cref="Referans"/> yalnızca beklenmeyen (500) hatalarda dolar — bkz.
+/// ExceptionHandlingMiddleware. Doğrulama hatası kullanıcının kendisinin
+/// düzeltebileceği bir şey; referans numarası orada gürültü olur.
 /// </summary>
-public sealed record ApiErrorBody(int Status, string Title, string[]? Errors = null);
+public sealed record ApiErrorBody(int Status, string Title, string[]? Errors = null, string? Referans = null);
 
 /// <summary>
 /// Handler'ın <see cref="Result{T}"/> dönüşünü HTTP'ye çevirir. Uç noktalar

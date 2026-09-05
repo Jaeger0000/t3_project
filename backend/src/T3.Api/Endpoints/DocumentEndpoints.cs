@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Mvc;
 using T3.Api.Authorization;
 using T3.Api.Http;
+using T3.Api.RateLimiting;
 using T3.Application.Features.Documents.DeleteDocument;
 using T3.Application.Features.Documents.DownloadDocument;
 using T3.Application.Features.Documents.ListDocuments;
@@ -47,10 +49,28 @@ public static class DocumentEndpoints
 
                 return (await handler.Handle(request, ct)).ToHttp();
             })
-            // Antiforgery jetonu kapalı: API çerezle değil Bearer jetonuyla
-            // kimlik doğruluyor, dolayısıyla CSRF yüzeyi yok. Açık bırakmak
-            // yalnızca jetonsuz 400 üretirdi.
+            // Bu, ASP.NET'in form-bound uçlara otomatik uyguladığı YERLEŞİK
+            // antiforgery kontrolünü kapatır — CsrfProtection ara katmanıyla
+            // (çift-gönderim jetonu, X-CSRF-Token) karıştırılmamalı, o ayrı ve
+            // hâlâ devrede. Yanıltıcı olan eski gerekçe şuydu: "API Bearer
+            // jetonuyla kimlik doğruluyor, çerez yok, CSRF yüzeyi yok" — Dalga
+            // 2'den beri tarayıcı **çerezle** kimlik doğruluyor
+            // (bkz. G-21, Guvenlik_Denetimi_ve_Iyilestirme_Plani.md). Bu uç
+            // bugün de korunuyor ama koruyan şey CsrfProtection middleware'i:
+            // çerezle gelen bir yükleme isteği doğru X-CSRF-Token başlığı
+            // olmadan 403 alır (bkz. CsrfProtection.Invoke). Yerleşik
+            // antiforgery'nin kapalı kalmasının sebebi bambaşka: o mekanizma
+            // ayrı bir form-jetonu ister ve Bearer/MCP/betik istemcilerinin
+            // hiçbiri onu taşımaz; açık bırakmak yalnızca onlar için 400 üretirdi.
             .DisableAntiforgery()
+            // DocumentUploadRules.MaxSizeBytes (20 MB) uygulama düzeyinde bir
+            // kural; buradaki 21 MB'lık sunucu sınırı ondan önce devreye girer
+            // — aksi hâlde ASP.NET tüm gövdeyi belleğe/diske aldıktan SONRA
+            // uygulama kuralı reddediyordu (bkz. G-08,
+            // Guvenlik_Denetimi_ve_Iyilestirme_Plani.md). nginx'teki
+            // client_max_body_size bu sınırdan büyük tutulmalı (bkz. ops notu).
+            .WithMetadata(new RequestSizeLimitAttribute(21_000_000))
+            .WithMetadata(new RequestFormLimitsAttribute { MultipartBodyLengthLimit = 21_000_000 })
             .WithSummary("Doküman yükler; yetkiliyse kaydeder, girişim kullanıcısıysa onaya gönderir.");
 
         group.MapDelete("/{documentId:guid}", async (
@@ -84,6 +104,7 @@ public static class DocumentEndpoints
 
                 return Results.File(file.Content, file.ContentType, file.FileName);
             })
+            .RequireRateLimiting(AuthRateLimit.MassExportPolicy)
             .WithTags("Documents")
             .WithSummary("Dokümanı indirir; her indirme denetim izine yazılır.");
 

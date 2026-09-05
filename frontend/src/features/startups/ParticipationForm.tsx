@@ -35,7 +35,7 @@ export default function ParticipationForm({
   const [notes, setNotes] = useState('')
 
   if (programs.isPending) return <Spinner label="Programlar yükleniyor…" />
-  if (programs.error) return <ErrorState message={programs.error.message} />
+  if (programs.error) return <ErrorState message={programs.error.message} error={programs.error} />
 
   const list = programs.data ?? []
   const terms = list.find((p) => p.id === programId)?.terms ?? []
@@ -113,7 +113,7 @@ export default function ParticipationForm({
 
       {add.error ? (
         <div className="mt-3">
-          <ErrorState message={add.error.message} />
+          <ErrorState message={add.error.message} error={add.error} />
         </div>
       ) : null}
 

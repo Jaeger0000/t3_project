@@ -64,7 +64,7 @@ export default function ApprovalsPage() {
         ))}
       </div>
 
-      {error ? <ErrorState message={error.message} /> : null}
+      {error ? <ErrorState message={error.message} error={error} /> : null}
       {isPending ? <Spinner label="Kuyruk yükleniyor…" /> : null}
 
       {data && data.page.items.length === 0 ? (

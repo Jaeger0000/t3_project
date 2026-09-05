@@ -1,4 +1,5 @@
 using T3.Api.Http;
+using T3.Api.RateLimiting;
 using T3.Application.Features.Reports.EcosystemStats;
 using T3.Application.Features.Reports.ExportStartups;
 using T3.Domain.Startups;
@@ -50,6 +51,7 @@ public static class ReportEndpoints
 
                 return Results.File(file.Content, file.ContentType, file.FileName);
             })
+            .RequireRateLimiting(AuthRateLimit.MassExportPolicy)
             .WithSummary("Süzülmüş girişim listesini CSV olarak indirir (maskeleme korunur).");
 
         return app;

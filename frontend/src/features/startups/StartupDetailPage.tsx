@@ -68,7 +68,7 @@ export default function StartupDetailPage() {
             hint="Kayıt silinmiş, adres yanlış yazılmış ya da bu girişim kapsamınızda olmayabilir."
           />
         ) : (
-          <ErrorState message={card.error.message} />
+          <ErrorState message={card.error.message} error={card.error} />
         )}
         <Link to="/girisimler" className="text-sm text-brand-700 hover:underline">
           ← Girişim listesine dön

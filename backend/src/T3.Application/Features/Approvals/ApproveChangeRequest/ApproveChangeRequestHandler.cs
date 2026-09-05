@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using T3.Application.Common.Interfaces;
+using T3.Application.Common.Rbac;
 using T3.Application.Common.Results;
 using T3.Domain.Approvals;
+using T3.Domain.Identity;
 
 namespace T3.Application.Features.Approvals.ApproveChangeRequest;
 
@@ -40,6 +42,20 @@ public sealed class ApproveChangeRequestHandler(
                 changeRequest.Status == ChangeRequestStatus.Approved
                     ? "Bu istek zaten onaylanmış."
                     : "Bu istek zaten reddedilmiş.");
+
+        // Öneri, inceleyicinin REST'te göremediği bir alanı değiştiriyorsa
+        // (ör. Program Yöneticisi'nin göremediği vergi numarası) yalnızca
+        // Süper Yönetici onaylayabilir — aksi hâlde inceleyici hiç görmediği
+        // bir değişikliğe imza atmış olurdu (bkz. G-10,
+        // Guvenlik_Denetimi_ve_Iyilestirme_Plani.md). Diff, GetChangeRequestHandler
+        // ile aynı çözümlemeden geçiyor: ekranda gösterilen "yükseltme gerekir"
+        // uyarısıyla burada uygulanan kural birbirinden kayamaz.
+        var visibility = StartupVisibility.For(currentUser, changeRequest.StartupId);
+        var fields = ChangeRequestBodies.Diff(ChangeRequestBody.Of(changeRequest), visibility);
+
+        if (fields.Any(f => f.Changed && f.Masked) && currentUser.Role != UserRole.SuperAdmin)
+            return Error.Forbidden(
+                "Bu öneri görme yetkiniz olmayan bir alanı değiştiriyor; yalnızca Süper Yönetici onaylayabilir.");
 
         var applied = await applier.ApplyAsync(changeRequest, ct);
         if (!applied.IsSuccess)

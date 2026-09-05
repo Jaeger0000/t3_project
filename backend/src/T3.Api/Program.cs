@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -8,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Serilog;
 using T3.Api.Authorization;
 using T3.Api.Endpoints;
 using T3.Api.Hosting;
@@ -21,9 +23,20 @@ using T3.Application.Common.Interfaces;
 using T3.Domain.Identity;
 using T3.Infrastructure;
 using T3.Infrastructure.Identity;
+using T3.Infrastructure.Logging;
 using T3.Infrastructure.Persistence.Seed;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Log yapılandırması appsettings'ten okunur: sink'i değiştirmek kod değil
+// yapılandırma değişikliği olsun diye. Kişisel veri maskesi (Faz C) her
+// nesne loglanmadan önce devrede — bu yüzden Serilog en başta kuruluyor.
+builder.Host.UseSerilog((context, services, configuration) => configuration
+    .ReadFrom.Configuration(context.Configuration)
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("Uygulama", "T3.Api")
+    .Destructure.With<KisiselVeriMaskesi>());
 
 // --- Yapılandırma ---------------------------------------------------------
 // Sırlar ortam değişkeninden gelir; appsettings.json'a yazılmaz.
@@ -39,9 +52,28 @@ var hosting = builder.Configuration.GetSection(HostingOptions.SectionName)
 if (!string.IsNullOrWhiteSpace(hosting.WebRoot))
     builder.WebHost.UseWebRoot(hosting.WebRoot);
 
+// AllowedHosts üretimde gerçek alan adına bağlanır: appsettings.json'daki "*"
+// her Host başlığını kabul ediyordu (bkz. G-12,
+// Guvenlik_Denetimi_ve_Iyilestirme_Plani.md). Email:AppBaseUrl zaten
+// üretimde zorunlu (PUBLIC_BASE_URL) ve gerçek alan adını taşıyor — ikinci
+// bir yapılandırma değişkeni eklemek yerine ondan türetiliyor.
+if (builder.Environment.IsProduction())
+{
+    var appBaseUrl = builder.Configuration["Email:AppBaseUrl"];
+
+    if (Uri.TryCreate(appBaseUrl, UriKind.Absolute, out var baseUri))
+        builder.Configuration["AllowedHosts"] = baseUri.Host;
+    else
+        // Serilog bu noktada henüz kurulmadı (UseSerilog geri çağrısı Build()
+        // sırasında çalışır); bootstrap hatası bu yüzden doğrudan konsola.
+        Console.Error.WriteLine(
+            $"UYARI: Email:AppBaseUrl geçersiz/tanımsız ('{appBaseUrl}') — " +
+            "AllowedHosts '*' kalıyor, sahte Host başlıklı istekler reddedilmeyecek.");
+}
+
 // --- Servisler -----------------------------------------------------------
 builder.Services.AddApplication();
-builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
@@ -160,6 +192,14 @@ builder.Services.AddRateLimiter(options =>
     options.OnRejected = AuthRateLimit.OnRejected;
     options.AddPolicy(AuthRateLimit.AuthPolicy, AuthRateLimit.PartitionAuth);
     options.AddPolicy(AuthRateLimit.AiPolicy, AuthRateLimit.PartitionAi);
+    options.AddPolicy(AuthRateLimit.MassExportPolicy, AuthRateLimit.PartitionMassExport);
+    options.AddPolicy(AuthRateLimit.McpPolicy, AuthRateLimit.PartitionMcp);
+
+    // Adı konmamış her uca da bir üst sınır: kullanıcı/IP başına dakikada 300
+    // istek (bkz. G-07). İsim verilmiş politikalarla birlikte çalışır —
+    // istek ikisini de geçmek zorunda.
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(
+        AuthRateLimit.PartitionGlobal);
 });
 
 builder.Services.AddEndpointsApiExplorer();
@@ -201,6 +241,26 @@ var app = builder.Build();
 // En başta: sonraki her katman (hız sınırı bölümü, denetim izi IP'si, çerezin
 // Secure bayrağı) isteğin gerçek kaynağına ve şemasına bakıyor.
 app.UseForwardedHeaders();
+
+app.UseMiddleware<RequestIdMiddleware>();
+
+// Her isteğe tek özet satır: yöntem, yol, durum, süre. Gövde loglanmaz —
+// /api/auth/* şifre/jeton, doküman yükleme gövdesi ve Authorization/Cookie
+// başlıkları hiçbir koşulda buradan geçmez.
+app.UseSerilogRequestLogging(options =>
+{
+    options.MessageTemplate =
+        "{RequestMethod} {RequestPath} → {StatusCode} ({Elapsed:0} ms)";
+
+    options.EnrichDiagnosticContext = (diagnostic, http) =>
+    {
+        diagnostic.Set("IstekId", http.TraceIdentifier);
+        diagnostic.Set("Rol", http.User.FindFirst(AppClaims.Role)?.Value ?? "(anonim)");
+        // Kullanıcı kimliği evet, e-posta hayır: Guid kişisel veri değil,
+        // e-posta kişisel veridir ve logun rol kapısı yok.
+        diagnostic.Set("KullaniciId", http.User.FindFirst(AppClaims.UserId)?.Value);
+    };
+});
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
@@ -259,6 +319,11 @@ app.UseCors(FrontendCors);
 // Hız sınırı bölüm anahtarı giriş gövdesindeki e-postayı kullanıyor; gövde
 // sınırlayıcıdan önce tamponlanmak zorunda.
 app.Use(AuthRateLimit.CaptureLoginEmail);
+
+// Yalnızca-IP kovası: e-posta bölümlemesinin kapatamadığı yüzey (parola
+// serpiştirme, bkz. G-05). Named policy'lerden ayrı, elle uygulanıyor.
+app.Use(AuthRateLimit.EnforceIpLimit);
+
 app.UseRateLimiter();
 
 // Çerezle kimliklenen yazma istekleri çift-gönderim jetonu taşımak zorunda.
@@ -266,6 +331,15 @@ app.UseRateLimiter();
 app.Use(CsrfProtection.Invoke);
 
 app.UseAuthentication();
+
+// Jetonun canlı durumla uyuşup uyuşmadığını (IsActive, Role, SecurityStamp)
+// yetki kararından önce doğrular — bkz. G-01, UserStateMiddleware.
+app.UseMiddleware<UserStateMiddleware>();
+
+// MustChangePassword artık sunucu tarafında da zorlanıyor, yalnızca arayüzde
+// değil — bkz. G-06, MustChangePasswordMiddleware.
+app.UseMiddleware<MustChangePasswordMiddleware>();
+
 app.UseAuthorization();
 
 app.MapHealthEndpoints();
@@ -322,9 +396,16 @@ using (var seedScope = app.Services.CreateScope())
     if (app.Environment.IsDevelopment())
     {
         if (seedOptions.Enabled)
+        {
+            if (string.IsNullOrWhiteSpace(seedOptions.Password))
+                throw new InvalidOperationException(
+                    "Seed:Enabled açık ama Seed:Password tanımlı değil. " +
+                    "T3_Seed__Password ortam değişkenini ayarlayın.");
+
             await seedScope.ServiceProvider
                 .GetRequiredService<DevDataSeeder>()
                 .SeedAsync(seedOptions.Password);
+        }
     }
     else if (seedOptions.Enabled)
     {

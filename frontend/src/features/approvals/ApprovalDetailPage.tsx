@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { DiffField } from '@/api/types'
 import { ApiError } from '@/lib/apiClient'
 import { formatDate } from '@/lib/format'
+import { useAuth } from '@/lib/auth'
 import { Badge, Button, Card, ErrorState, Spinner } from '@/components/ui'
 import { useChangeRequest, useReviewChangeRequest } from './queries'
 import { changeStatusLabels, changeStatusTone } from './labels'
@@ -18,6 +19,7 @@ import { useDocumentTitle } from '@/lib/useDocumentTitle'
 export default function ApprovalDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { session } = useAuth()
   const { data, isPending, error } = useChangeRequest(id)
   useDocumentTitle(data ? `${data.startupName} önerisi` : 'Öneri')
 
@@ -30,6 +32,7 @@ export default function ApprovalDetailPage() {
             ? 'Bu öneri bulunamadı ya da görüntüleme yetkiniz yok.'
             : error.message
         }
+        error={error}
       />
     )
   }
@@ -91,6 +94,14 @@ export default function ApprovalDetailPage() {
         ) : null}
       </Card>
 
+      {data.requiresElevation ? (
+        <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+          Bu öneri görme yetkiniz olmayan bir alanı değiştiriyor. Hiç görmediğiniz
+          bir değişikliğe onay verilemez; yalnızca Süper Yönetici bu öneriyi
+          onaylayabilir.
+        </p>
+      ) : null}
+
       {data.isReadable ? (
         <DiffTable fields={data.fields} />
       ) : (
@@ -98,7 +109,10 @@ export default function ApprovalDetailPage() {
       )}
 
       {data.canReview && !decided && data.isReadable ? (
-        <ReviewPanel id={data.id} />
+        <ReviewPanel
+          id={data.id}
+          canApprove={!data.requiresElevation || session?.role === 'SuperAdmin'}
+        />
       ) : null}
     </div>
   )
@@ -210,7 +224,7 @@ function DiffCell({
  * karakter istiyor): gerekçesiz ret, aynı önerinin bir hafta sonra aynen
  * gönderilmesiyle sonuçlanıyor.
  */
-function ReviewPanel({ id }: { id: string }) {
+function ReviewPanel({ id, canApprove }: { id: string; canApprove: boolean }) {
   const navigate = useNavigate()
   const [note, setNote] = useState('')
   const approve = useReviewChangeRequest(id, 'approve')
@@ -242,11 +256,18 @@ function ReviewPanel({ id }: { id: string }) {
         />
       </label>
 
-      {failure ? <div className="mt-3"><ErrorState message={failure.message} /></div> : null}
+      {failure ? <div className="mt-3"><ErrorState message={failure.message} error={failure} /></div> : null}
+
+      {!canApprove ? (
+        <p className="mt-3 text-sm text-amber-700 dark:text-amber-300">
+          Görmediğiniz bir alanı değiştirdiği için bu öneriyi yalnızca Süper
+          Yönetici onaylayabilir; reddedebilirsiniz.
+        </p>
+      ) : null}
 
       <div className="mt-4 flex flex-wrap gap-3">
         <Button
-          disabled={busy}
+          disabled={busy || !canApprove}
           onClick={() => approve.mutate(note.trim() || null, { onSuccess: done })}
         >
           Onayla ve uygula

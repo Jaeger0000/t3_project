@@ -20,6 +20,7 @@ değerlendirme aşamasına geçemez — **önce MVP, sonra güzellik**.
 | [docs/Gelistirme_Kararlari.md](docs/Gelistirme_Kararlari.md) | Yerleşik teknik kararlar, reddedilen alternatifler, ortam tuzakları |
 | [README.md](README.md) | Kurulum, demo hesapları, komutlar, mevcut durum |
 | [scripts/README.md](scripts/README.md) | Çalışan sisteme karşı doğrulama betikleri ve çalıştırma sırası |
+| [.claude/agents/README.md](.claude/agents/README.md) | Projeye özel alt ajanlar: hangi işi hangi ajan yapar, tipik zincirler |
 | [docs/Is_Modeli_Kanvasi.md](docs/Is_Modeli_Kanvasi.md) · [docs/Demo_Senaryosu.md](docs/Demo_Senaryosu.md) | 26 Ağustos teslimi: kanvas, video çekim planı, pitch iskeleti, jüri soruları (taslak) |
 
 ## Takvim

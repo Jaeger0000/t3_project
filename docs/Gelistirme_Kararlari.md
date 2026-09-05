@@ -629,6 +629,203 @@ Kaynak: `design_handoff_logo_paketi/` (handoff README + preview.html).
   (bkz. 3i). Arayüzde marka artık bir bağlantı değil, yalnızca işaretin
   kendisi.
 
+## 3k. Uygulama günlüğü (loglama) kararları
+
+Uygulandı — karar 4 Eylül 2026, aynı gün uygulamaya alındı. Ayrıntılı gerekçe
+ve reddedilen alternatifler için bkz. [Loglama_Plani.md](Loglama_Plani.md)
+(uygulama tamamlandığı için artık yalnızca arşiv niteliğinde).
+
+- **Serilog + Grafana Loki, Seq değil.** Lisans farkı belirleyici: Loki AGPLv3
+  (kullanıcı sınırı yok), Seq'in ücretsiz sürümü tek kişiyle sınırlı. Sistem T3
+  Vakfı'na devredilecek; devredilen bir gözlemleme katmanının "tek kişi
+  bakabilir" olması kabul edilmedi.
+- **Üç kavram ayrı tutuluyor:** `AuditLog` (kim neyi değiştirdi — Postgres, rol
+  kapılı, KVKK kaydı), uygulama günlüğü (bu istekte ne oldu — Serilog, döner ve
+  silinir), hata izleme (hangi hata yeni — açık iş, bkz. Loglama_Plani.md §9).
+  `AuditLog` hiçbir koşulda teşhis logu olarak kullanılmıyor.
+- **Promtail/Alloy kurulmadı.** Serilog Loki'ye doğrudan HTTP ile yazıyor;
+  toplayıcı katmanı gereksiz bir bileşen olurdu.
+- **Kişisel veri maskesi log seviyesinde de var:** `KisiselVeriMaskesi`
+  (`T3.Infrastructure/Logging/`), Serilog `IDestructuringPolicy` — bir nesne
+  `{@...}` ile loglandığında `Email`/`Phone`/`TaxNumber`/`Amount` gibi adlar
+  taşıyan alanlar ham değerle yazılmıyor. E-posta için `MaskedEmail.Of()`
+  tekrar kullanıldı — ikinci bir maskeleme kuralı yazılmadı.
+- **Korelasyon: `RequestIdMiddleware` `HttpContext.TraceIdentifier`'ı
+  `X-Request-Id`'ye eşitliyor.** Bilinçli tasarım: `ExceptionHandlingMiddleware`
+  500 gövdesine `Referans = TraceIdentifier` koyduğu için, ikisi aynı değer
+  olmazsa kullanıcının ekranda gördüğü kod ile Loki'de arayacağı `IstekId`
+  birbirini tutmazdı. 4xx'e `Referans` konmuyor — kullanıcının kendi
+  düzeltebileceği bir hata orada gürültü olur.
+- **Etiket disiplini (Loki):** yalnızca `app`, `env`, `level` etiket.
+  `IstekId`/`RequestPath`/`Rol` etiket **değil**, satırın içinde kalıp
+  `| json | IstekId="…"` ile aranıyor — yüksek kardinaliteli alan etiket
+  olursa Loki'nin akış sayısı patlar.
+- **`compactor.retention_enabled: true` açıkça verildi.** Loki varsayılan
+  olarak hiçbir şeyi silmez; bu satır unutulursa log deposu VPS diskini
+  doldurur ve o makinedeki diğer projeleri de düşürür (~5 GB boş alan, 5 başka
+  compose projesi paylaşıyor).
+- **Loki + Grafana `--profile observability` arkasında, `pgadmin` gibi.**
+  Uygulamanın çalışması için gerekli değil (Serilog konsol + dosyaya yine
+  yazıyor); varsayılan `docker compose up -d postgres` bunları başlatmıyor.
+- **Development ortamında `Serilog:WriteTo` dizisi tam olarak yeniden
+  yazılıyor** (Console + File + GrafanaLoki), tek elemanla eklenmiyor.
+  Sebep: .NET yapılandırma sağlayıcıları JSON dizilerini **indekse göre**
+  birleştiriyor — `appsettings.Development.json`'a yalnızca üçüncü elemanı
+  eklemek, base'teki Console/File elemanlarının yerine geçerdi, yanlarına
+  eklenmezdi.
+
+## 3l. Güvenlik denetimi düzeltmeleri kararları (Faz 0-2)
+
+Uygulandı — 4 Eylül 2026. Bulgu numaraları
+[Guvenlik_Denetimi_ve_Iyilestirme_Plani.md](Guvenlik_Denetimi_ve_Iyilestirme_Plani.md)'ye
+karşılık geliyor.
+
+- **G-01, yenileme jetonu bilinçli olarak eklenmedi.** Jeton ömrü 480 → 60
+  dakikaya indirildi ve her isteği canlı veritabanı durumuyla karşılaştıran
+  `IUserStateProvider`/`UserStateMiddleware` eklendi (`IsActive`, `Role`,
+  `SecurityStamp`; 45 sn önbellek + handler'ların çağırdığı anlık
+  `Invalidate`). Bu, "yetkiyi geri alma" sorununu (asıl bulgu) tamamen çözüyor:
+  pasife alınan/rolü düşürülen/şifresi değişen kullanıcının eski jetonu bir
+  sonraki istekte 401 alıyor. **Reddedilen alternatif:** HttpOnly çerezde ayrı
+  bir yenileme jetonu + rotasyon + istemci tarafı sessiz yenileme akışı — bu,
+  Faz 1'in geri kalanından daha büyük bir yüzey ve rapor sırasında Demo Day'e
+  günler kalmışken riskli. Kullanıcı artık 60 dakikada bir yeniden giriş
+  yapıyor; Dalga 1'in 1.3 maddesinde zaten kabul edilmiş "kısa yol seçildi"
+  deseniyle aynı takas.
+- **Çıkış (`/api/auth/logout`) kullanıcının TÜM jetonlarını iptal ediyor,
+  yalnızca isteği yapan tarayıcıyı değil.** Ayrı bir oturum/jeton tablosu
+  olmadığı için tek jetonu hedefli iptal etmenin yolu yok; `SecurityStamp`'i
+  kullanıcı bazında yenilemek en basit doğru çözüm. Yan etki: bir cihazda
+  çıkış yapmak diğer cihazlardaki oturumları da düşürür. Kabul edildi — karşı
+  taraf (çalınmış bir jetonun çıkıştan sonra da çalışması) daha kötü.
+- **Şifre değiştirme (`ChangePasswordHandler`) kendi SecurityStamp'ini bumpladıktan
+  hemen sonra yeni bir jeton üretip aynı yanıtta çereze yazıyor.** Aksi hâlde
+  kullanıcı kendi isteğiyle şifresini değiştirdiği anda kendi oturumundan da
+  atılırdı — güvenlik doğru ama UX kırık olurdu.
+- **G-05, hesap kilidi mesajı jenerik kalıyor.** 10 başarısız denemeden sonra
+  hesap 15 dakika kilitleniyor ama kullanıcıya hâlâ "e-posta veya şifre
+  hatalı" deniyor — "hesap kilitli" gibi farklı bir mesaj, kilitlenmenin
+  yalnızca gerçek hesaplarda mümkün olması nedeniyle e-posta numaralandırmaya
+  hizmet ederdi. Ayrım yalnızca denetim izinde.
+- **G-04, (a) redaksiyon seçildi, (b) hukuki aktarım kurulumu değil.**
+  `AiRedaction` katmanı (`T3.Application/Features/Assistant/AiRedaction.cs`)
+  modele giden araç sonucundan `ContactEmail`, `ContactPhone`, `TaxNumber`,
+  ekip üyesi `FullName`/`Email`/`Phone`/`LinkedInUrl` alanlarını alan adına
+  bakarak (DTO'dan bağımsız, JSON ağacı gezerek) çıkarıyor; REST ve MCP
+  yolları bundan etkilenmiyor, yalnızca `AskAssistantHandler`'ın model turu
+  bu süzgeçten geçiyor. **Reddedilen alternatif:** veri işleyen sözleşmesi +
+  aktarım mekanizması + envanter kaydı + ilgili kişiye bildirim kurup
+  özelliği olduğu gibi bırakmak — bu, hukuki/organizasyonel bir süreç ve bir
+  kod değişikliğiyle Demo Day'e yetiştirilecek bir iş değil. Aydınlatma metni
+  (`PrivacyNoticePage.tsx`) bu daraltılmış aktarımı dürüstçe anlatacak şekilde
+  güncellendi; kalan aktarım (girişim adı, sektör, program geçmişi,
+  toplulaştırılmış sayılar) hâlâ KVKK m.9 kapsamında ve mekanizması ayrı
+  kurulmalı — bu iş kapanmadı, yalnızca kapsamı daraltıldı.
+- **G-15, PBKDF2 iterasyonu 600.000'e sabit değer olarak yükseltildi**
+  (OWASP'ın PBKDF2-HMAC-SHA256 için önerdiği alt sınır), yapılandırılabilir
+  yapılmadı — tek bir hash algoritması/parametre seti var, ortama göre
+  değişmiyor. `VerifyAndGetRehash` eski (düşük iterasyonlu) hash'leri başarılı
+  girişte sessizce yükseltiyor.
+
+- **G-07, üç ayrı kova.** `MassExportPolicy` (saatte 10, CSV aktarımı +
+  doküman indirme) ve ayrı bir `McpPolicy` (dakikada 100) eklendi — `/mcp`'yi
+  export kovasına sokmak Demo Day'de Claude Desktop'tan birden çok soru
+  sormayı kırardı, o yüzden ayrı ve daha gevşek bir kova. `options.GlobalLimiter`
+  (dakikada 300, kullanıcı/IP başına) tüm uçlara ek olarak uygulanıyor. Eşik
+  aşımında ayrı bir `Security.MassExport` izi düşüyor; `Report.Export` artık
+  satır kimliklerini de taşıyor.
+- **G-09, kısmen.** `IAuditWriter`'a `saveChanges: false` parametresi eklendi
+  (varsayılan `true` — mevcut 30'a yakın çağıran hiç değişmedi) ve bu turda
+  dokunulan kimlik/şifre handler'ları (Login, Deactivate, UpdateUser,
+  SetUserPassword, ChangePassword, ResetPassword) buna geçirildi: iş
+  değişikliği ile iz satırı artık tek `SaveChanges`'ta. **Reddedilen/ertelenen:**
+  geri kalan ~30 handler'ın aynı kalıba geçirilmesi — geniş, mekanik ama riskli
+  bir değişiklik, ayrı bir turda yapılmalı. `RetentionCleanupService` eklendi
+  (günlük): süresi dolan `PasswordResetToken`'ları siler, 10 yıldan eski
+  `AuditLog` satırlarını (IP, istemci, önce/sonra JSON) anonimleştirir — olayın
+  kendisi (`Action`, `EntityType`, `OccurredAt`) kalır. **Yapılmayan:** DB
+  düzeyinde `UPDATE`/`DELETE` yetkisinin uygulama kullanıcısından alınması
+  (ayrı bir DB rolü + migration gerektirir, canlı bir Postgres'e karşı
+  doğrulanmadan güvenle uygulanamaz) ve hash zinciri (yapısal bir değişiklik,
+  ayrı tur).
+- **G-10, tam.** `ChangeRequestDetailResponse.RequiresElevation` (maskeli VE
+  değişen en az bir alan varsa `true`) hem ekranda uyarı hem
+  `ApproveChangeRequestHandler`'da sunucu tarafı 403 — inceleyicinin
+  göremediği bir alanı değiştiren öneriyi yalnızca Süper Yönetici onaylayabilir.
+- **G-11, kısmen.** CSRF jetonu artık rastgele değil, `HMAC(Jwt:Secret,
+  oturum jetonu)` — `SessionCookie.DeriveCsrfToken`. **Reddedilen alternatif:**
+  çerezleri `__Host-` önekiyle yeniden adlandırmak. Bu önek `Secure` bayrağını
+  zorunlu kılıyor; geliştirme makinesi düz HTTP kullanıyor ve `Secure` çerez
+  orada hiç saklanmazdı — yerel geliştirme akışını kırardı. Ayrıca doğrulama
+  betikleri (`cdp.py`) çerez adını sabit string olarak biliyor; adı
+  değiştirmek onları da güncellemeyi gerektirirdi. Üretim zaten HTTPS
+  üzerinde ve `Domain` özniteliği hiç ayarlanmıyor (alt alan adı riski bu
+  yüzden bugün de düşük); önek eklemenin kazancı bu maliyete değmedi.
+- **G-16, ilk adım tamamlandı.** `.github/workflows/ci.yml`: `dotnet build` +
+  `dotnet test` + `dotnet list package --vulnerable` + `npm run build` +
+  `npm run lint` + `npm audit`. Bu hat ilk çalıştırmada gerçek bir bulgu
+  buldu: `xunit` 2.4.2'nin geçişli bağımlılıkları (`System.Net.Http` 4.3.0,
+  `System.Text.RegularExpressions` 4.3.0) yüksek önemli CVE'ler taşıyordu.
+  `xunit` 2.9.3 + `xunit.runner.visualstudio` 3.0.2 + `coverlet.collector`
+  6.0.4'e yükseltildi, 210 test hâlâ yeşil, tarama artık temiz.
+- **G-17, dev `docker-compose.yml` sertleştirildi.** Postgres portu
+  `127.0.0.1`'e bağlandı; pgAdmin `SERVER_MODE=True` + zorunlu (varsayılansız)
+  parola + `127.0.0.1`'e bağlı port + sabit `8.14` imaj etiketi; tüm
+  servislere `cap_drop: [ALL]` + `mem_limit`. **Reddedilen/ertelenen:**
+  `read_only: true` kök dosya sistemi — hangi servisin hangi yola (tmp, run)
+  yazması gerektiği canlı bir konteynerde doğrulanmadan tahminle eklenirse
+  sessizce kırılabilir; bu ortamda docker köprüleri kısmen `DOWN` olduğu için
+  (bkz. §4) canlı doğrulama riskli. `SSL Mode=Require` bağlantı dizesine
+  eklenmedi: postgres imajı TLS'i varsayılan açmıyor, yalnızca loopback'te
+  gezen bir bağlantıya zorunlu kılmak yereldeki geliştirmeyi tamamen kırardı.
+
+**Bu turda hiç ele alınmayan (Faz 3, altyapı/organizasyon kararı):** .NET 10
+geçişi (destek Kasım 2026'da bitiyor), şifreli+makine dışı yedekleme,
+bağımsız sızma testi, KVKK VERBİS/envanter gözden geçirmesi. Bunlar bir kod
+değişikliği turunda güvenle kapatılamayacak kararlar; plan bu şekilde kalıyor.
+
+---
+
+## 3m. E-posta gönderimi kararları (SMTP)
+
+**Kendi mail sunucumuz kurulmadı.** Değerlendirilen alternatif: VPS'e
+mailcow/Mailu. Reddedildi — 25. port çoğu sağlayıcıda kapalı, taze bir IP'nin
+itibarı yokken şifre sıfırlama maili doğrudan spam'e düşer ve sunucu sürekli
+bakım ister. Aynı VPS'te beş başka proje koşuyor; mail sunucusu oraya eklenecek
+en kırılgan bileşen olurdu.
+
+**Gönderme ve alma ayrı servislerde.** Gönderim Brevo SMTP relay'i (günde 300
+mail, süresiz ücretsiz), kutular Zoho Mail Forever Free (5 kullanıcı × 5 GB).
+Tek servisle olmuyor: Zoho'nun ücretsiz planı IMAP/POP/SMTP vermiyor, yani
+uygulama o hesap üzerinden mail atamıyor. MX Zoho'yu gösterirken SPF/DKIM her
+iki servisi de yetkilendiriyor; **SPF tek satır** olmak zorunda (iki ayrı
+`v=spf1` kaydı SPF'i geçersiz kılar ve iki servisin de maili spam'e düşer).
+
+**Gönderici seçimi ortama değil yapılandırmaya bakıyor.** `Email:Smtp` üçlüsü
+(host + kullanıcı + parola) tamsa `SmtpEmailSender`, değilse üretimde
+`ThrowingEmailSender` / geliştirmede `FileOutboxEmailSender`. Ortam koşuluyla
+başlasaydı gerçek gönderim yolu ilk kez canlıda denenmiş olurdu. Yarım
+yapılandırma (parolası boş host) bilinçli olarak "yok" sayılıyor: aksi hâlde
+hata ancak ilk sıfırlama isteğinde, üretimde ortaya çıkardı.
+
+**Gönderim hatası şifre sıfırlama yanıtını değiştirmiyor.** SMTP arızası
+istisnayı yukarı taşısaydı kayıtlı adres 500, kayıtsız adres 200 dönerdi —
+sabit yanıt ve sabit süre için ödenen bedel (G-05) tek bir istisnayla boşa
+giderdi. Hata yutulmuyor: `SmtpEmailSender` maskeli alıcıyla ERROR log'u
+düşürüyor ve denetim izine `Result = "gönderim başarısız"` yazılıyor.
+
+**Log'a gövde yazılmıyor.** Şifre sıfırlama gövdesi ham jeton taşıyor; başarı
+log'u yalnızca maskeli alıcı ve konu içeriyor. Aynı gerekçe `FileOutbox`'ın
+üretimde kayıtlı olmama sebebiyle aynı (G-02): sırrın ikinci kopyası üretilmez.
+
+**MailKit, `System.Net.Mail.SmtpClient` değil.** Microsoft ikincisini yeni kod
+için önermiyor; MailKit STARTTLS'i ve iptal jetonunu doğru işliyor.
+`SecureSocketOptions` açıkça veriliyor (`StartTls`/`SslOnConnect`) — "auto"
+bazı sağlayıcılarda düz metne düşüp parolayı ağa açık yollayabiliyor.
+
+Kurulum adımları, DNS kayıtları ve tuzaklar:
+[Mail_Servisi_Kurulumu.md](Mail_Servisi_Kurulumu.md).
+
 ## 4. Ortam tuzakları — tekrar çarpılacak olanlar
 
 ### Faz 0
@@ -832,6 +1029,29 @@ Kaynak: `design_handoff_logo_paketi/` (handoff README + preview.html).
   İmaj tek başına kalkarken host ağı `--network host` ile veriyor; `.env`
   köprüsündeki 5434 vekili aynı şekilde görülüyor.
 
+### Loglama
+
+- **`HttpResponse.Clear()` gövdeyle birlikte o ana kadar konan başlıkları da
+  siliyor.** `ExceptionHandlingMiddleware` 500 gövdesini yazmadan önce
+  `Response.Clear()` çağırıyor; `RequestIdMiddleware` isteğin başında koyduğu
+  `X-Request-Id` başlığı bu yüzden sessizce kayboluyordu — gövdedeki `Referans`
+  doluydu ama yanıt başlığı boştu. Canlı 500 testiyle yakalandı (curl'de
+  başlık yoktu), `dotnet test` bunu göremezdi çünkü hiçbir birim testi HTTP
+  başlığını doğrulamıyordu. Çözüm: `Clear()`'dan sonra başlık
+  `context.TraceIdentifier`'dan yeniden yazılıyor.
+- **JSON yapılandırma dosyalarında yorum satırı yok.** `Serilog:WriteTo`
+  dizisine ilk yazımda `//` yorumları eklendi; `System.Text.Json` tabanlı
+  `JsonConfigurationProvider` bunları kabul etmiyor (VS Code'un JSONC'siyle
+  karıştırılmasın), uygulama açılışta patlıyordu.
+- **Serilog'un `ExceptionHandlingMiddleware`'den kalan `JsonSerializer.Serialize`
+  çağrısı `Results`/`WriteAsJsonAsync`'ten farklı yol izliyordu.** Eski kod
+  anonim tip kullanarak (`new { status, title, errors }`) küçük harfli alan adı
+  üretiyordu — DI'daki camelCase politikasını hiç görmeden. `ApiErrorBody`
+  record'una geçince aynı satır PascalCase üretmeye başladı (frontend'in
+  beklediği `title`/`errors` alanları `undefined` kaldı). Düzeltme:
+  `context.Response.WriteAsJsonAsync(...)` — CSRF/status-code-pages
+  yollarıyla aynı DI seçeneklerini kullanan tek doğru yol.
+
 ### Kabuk / araç tuzakları
 
 - Bash aracı, ortam bloğu fish dese de **zsh** çalıştırır. `for … end` çalışmaz;
@@ -899,6 +1119,7 @@ kanıtlayan `UnreachableDbContext` — her `DbSet` erişimi istisna fırlatıyor
 | Denetim Dalga 0 | ✅ | Ürün denetiminin videodan önce kapanması gereken altı bulgusu: yazma yolları arayüze, hız sınırı bölümlemesi, sekme başlığı/dil, 404 ekranı, mobil taşma, yazma yolunda maskeleme. Doğrulama: 156 birim testi, 201 render kontrolü (`render_faz6.py` yeni). |
 | Denetim Dalga 1 | ✅ | Program/dönem yönetimi, şifre kurtarma ve değiştirme, oturum ömrü + ağ hatası ayrımı, giriş olaylarının denetim izi, KVKK metinleri, Karar Verici'nin onay ekranı. Doğrulama: 185 birim testi, `render_faz7.py` (yeni). |
 | Denetim Dalga 2 | ✅ | Tek origin dağıtım (API arayüzü sunuyor) + `Dockerfile`/`docker-compose.prod.yml`, jeton `HttpOnly` çerezde + CSRF + CSP ve güvenlik başlıkları, güvenilen vekil listesi, URL'de filtre durumu, aksan katlaması, kirli form uyarısı, kod bölme, erişilebilirlik. Doğrulama: 191 birim testi, 310 uçtan uca kontrol, 352 render kontrolü (`render_faz8.py` yeni, 54 kontrol; KVKK onay kapısıyla `render_faz7.py` 97'ye çıktı). |
+| Loglama altyapısı | ✅ | Serilog (konsol + dosya + Grafana Loki), `KisiselVeriMaskesi` (KVKK redaksiyonu), `RequestIdMiddleware` + `ApiErrorBody.Referans` (hata kodu ↔ `X-Request-Id` ↔ Loki `IstekId` üçlü eşleşmesi), frontend `ErrorState` kopyalanabilir referans satırı, `ops/loki-config.yaml` + `ops/grafana-datasource.yaml` (`--profile observability`), üretimde `docker logs` boyut sınırı. Doğrulama: 192 birim testi (yeni `KisiselVeriMaskesiTests`), canlı 500 testiyle `Referans`/`X-Request-Id` eşleşmesi, Loki'de `{app="t3-api"} | json | IstekId="…"` sorgusu, 81 uçtan uca kontrol (`e2e_faz3.py`, regresyon), render kontrolü (404 ekranı + pano). Ayrıntı: §3k. |
 
 **Faz 1'den bilinçli ertelenen:** kullanıcı yönetimi CRUD'u — girişim kartı buna
 ihtiyaç duymadığı için onay akışıyla birlikte Faz 3'e alındı.

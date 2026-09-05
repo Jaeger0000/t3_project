@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using T3.Api.RateLimiting;
 using T3.Application.Features.Assistant;
 
 namespace T3.Api.Endpoints;
@@ -70,6 +71,7 @@ public static class McpEndpoints
                     _ => Error(id, -32601, $"Bilinmeyen yöntem: {method}")
                 };
             })
+            .RequireRateLimiting(AuthRateLimit.McpPolicy)
             .WithTags("MCP")
             .WithSummary("MCP JSON-RPC ucu: initialize, tools/list, tools/call.");
 

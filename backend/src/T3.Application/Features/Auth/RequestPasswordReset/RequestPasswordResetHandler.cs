@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using T3.Application.Common.Interfaces;
 using T3.Application.Common.Results;
@@ -26,7 +27,29 @@ public sealed class RequestPasswordResetHandler(
     private const string SameAnswer =
         "Adres kayıtlıysa şifre sıfırlama bağlantısı gönderildi. E-postanızı kontrol edin.";
 
+    /// <summary>
+    /// Kayıtlı bir adres jeton üretimi + veritabanı yazımı + e-posta/dosya
+    /// yazımı yapıyor; kayıtsız adres hiçbirini yapmıyordu — yanıt süresi
+    /// adresin kayıtlı olup olmadığını ele veriyordu (bkz. G-05). Yanıt bu
+    /// alt sınırın altına düşemez; gerçek iş daha uzun sürerse ek gecikme
+    /// eklenmez.
+    /// </summary>
+    private static readonly TimeSpan MinimumResponseTime = TimeSpan.FromMilliseconds(200);
+
     public async Task<Result<RequestPasswordResetResponse>> Handle(
+        RequestPasswordResetRequest request, CancellationToken ct)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var result = await HandleCore(request, ct);
+
+        var remaining = MinimumResponseTime - stopwatch.Elapsed;
+        if (remaining > TimeSpan.Zero)
+            await Task.Delay(remaining, ct);
+
+        return result;
+    }
+
+    private async Task<Result<RequestPasswordResetResponse>> HandleCore(
         RequestPasswordResetRequest request, CancellationToken ct)
     {
         var normalized = SearchText.Normalize(request.Email);
@@ -77,29 +100,49 @@ public sealed class RequestPasswordResetHandler(
 
         var link = linkBuilder.Build(rawToken);
 
-        await email.SendAsync(
-            user.Email,
-            "T3 Girişim Ekosistemi — şifre sıfırlama",
-            $"""
-            Sayın {user.FullName},
+        // Gönderim hatası yanıtı değiştirmemeli. Kayıtsız adres 200 dönerken
+        // kayıtlı adreste SMTP arızası 500 döndürseydi, uç "bu e-posta sistemde
+        // var mı" sorusunu cevaplayan bir gösterge hâline gelirdi — sabit yanıt
+        // ve sabit süre için ödenen bedel (bkz. G-05) boşa giderdi.
+        //
+        // Hata yutulmuyor: gönderici ERROR log'u düşürüyor ve denetim izine
+        // "gönderim başarısız" yazılıyor, yani jüriye/operasyona görünür kalıyor.
+        var delivered = true;
 
-            Şifrenizi sıfırlamak için aşağıdaki bağlantıyı açın. Bağlantı
-            {PasswordResetSecrets.Lifetime.TotalHours:0} saat geçerlidir ve yalnızca
-            bir kez kullanılabilir.
+        try
+        {
+            await email.SendAsync(
+                user.Email,
+                "T3 Girişim Ekosistemi — şifre sıfırlama",
+                $"""
+                Sayın {user.FullName},
 
-            {link}
+                Şifrenizi sıfırlamak için aşağıdaki bağlantıyı açın. Bağlantı
+                {PasswordResetSecrets.Lifetime.TotalHours:0} saat geçerlidir ve yalnızca
+                bir kez kullanılabilir.
 
-            Bu isteği siz yapmadıysanız bir şey yapmanıza gerek yok; şifreniz
-            değişmedi.
-            """,
-            ct);
+                {link}
+
+                Bu isteği siz yapmadıysanız bir şey yapmanıza gerek yok; şifreniz
+                değişmedi.
+                """,
+                ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            delivered = false;
+        }
 
         // İzde ham e-posta ve jeton yok: olayın kendisi kayıtlı, sırrın ikinci
         // kopyası üretilmiyor.
         await audit.WriteForActorAsync(
             actorUserId: null, actorRole: null,
             "Auth.PasswordResetRequested", nameof(User), user.Id,
-            after: new { Email = MaskedEmail.Of(user.Email), Result = "bağlantı gönderildi" },
+            after: new
+            {
+                Email = MaskedEmail.Of(user.Email),
+                Result = delivered ? "bağlantı gönderildi" : "gönderim başarısız"
+            },
             ct: ct);
 
         return new RequestPasswordResetResponse(SameAnswer);

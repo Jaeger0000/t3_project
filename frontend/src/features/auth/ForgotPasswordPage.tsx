@@ -55,7 +55,7 @@ export default function ForgotPasswordPage() {
             placeholder="ad.soyad@t3ekosistem.test"
           />
 
-          {request.error ? <ErrorState message={request.error.message} /> : null}
+          {request.error ? <ErrorState message={request.error.message} error={request.error} /> : null}
 
           <Button type="submit" disabled={request.isPending} className="mt-2 w-full">
             {request.isPending ? 'Gönderiliyor…' : 'Sıfırlama bağlantısı gönder'}

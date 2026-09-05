@@ -4,6 +4,7 @@ import type {
   ReactNode,
   SelectHTMLAttributes,
 } from 'react'
+import { ApiError } from '@/lib/apiClient'
 
 /**
  * Kart kabı. Kalan öznitelikler `div`'e geçiriliyor: `data-testid` gibi
@@ -131,10 +132,28 @@ export function EmptyState({ title, hint }: { title: string; hint?: string }) {
   )
 }
 
-export function ErrorState({ message }: { message: string }) {
+/**
+ * `error` yalnızca `ApiError` ise ve sunucu bir `referans` verdiyse (yalnızca
+ * 500'lerde — bkz. backend ApiErrorBody) kopyalanabilir bir referans satırı
+ * eklenir. Diğer tüm hata türlerinde (400/401/403/404, ağ hatası, client-side
+ * doğrulama) yalnızca mesaj görünür — referans numarası orada gürültü olurdu.
+ */
+export function ErrorState({ message, error }: { message: string; error?: unknown }) {
+  const referans = error instanceof ApiError ? error.referans : undefined
+
   return (
     <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
-      {message}
+      <p>{message}</p>
+      {referans ? (
+        <button
+          type="button"
+          onClick={() => navigator.clipboard?.writeText(referans)}
+          title="Kopyalamak için tıklayın"
+          className="mt-1 font-mono text-xs text-red-700 underline decoration-dotted hover:text-red-900 dark:text-red-300 dark:hover:text-red-100"
+        >
+          Hata referansı: {referans}
+        </button>
+      ) : null}
     </div>
   )
 }

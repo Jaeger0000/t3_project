@@ -109,9 +109,12 @@ public sealed class ExportStartupsHandler(
                 StartupMoney.ReportingCurrency);
         }
 
+        // Satır kimlikleri iz'e yazılıyor: bir sızıntı sonrası "hangi girişimler
+        // gitti" sorusu yalnızca satır SAYISIYLA cevaplanamıyordu (bkz. G-07,
+        // Guvenlik_Denetimi_ve_Iyilestirme_Plani.md).
         await audit.WriteAsync(
             "Report.Export", "Startup", null,
-            after: new { Rows = startups.Count, Filter = request },
+            after: new { Rows = startups.Count, Filter = request, StartupIds = ids },
             ct: ct);
 
         // Dosya adı tarihli: aynı klasöre indirilen iki rapor birbirini ezmesin.

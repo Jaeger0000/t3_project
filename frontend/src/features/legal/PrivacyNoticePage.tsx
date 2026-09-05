@@ -5,7 +5,7 @@ export default function PrivacyNoticePage() {
   useDocumentTitle('KVKK aydınlatma metni')
 
   return (
-    <LegalDocument title="KVKK aydınlatma metni" updatedOn="24 Ağustos 2026">
+    <LegalDocument title="KVKK aydınlatma metni" updatedOn="4 Eylül 2026">
       <LegalSection heading="Veri sorumlusu">
         <p>
           T3 Vakfı (Türkiye Teknoloji Takımı Vakfı), 6698 sayılı Kişisel Verilerin
@@ -28,6 +28,12 @@ export default function PrivacyNoticePage() {
           <li>
             <strong>İşlem güvenliği:</strong> giriş denemeleri, IP adresi, istemci
             bilgisi ve yapılan değişikliklerin denetim kaydı.
+          </li>
+          <li>
+            <strong>Teknik kayıt:</strong> her isteğe ait IP adresi, istek
+            kimliği, tarayıcı bilgisi ve yöntem/yol/süre özeti. Bu kayıtlar
+            hataları teşhis etmek için tutulur; e-posta, telefon, vergi
+            numarası ve tutar gibi alanlar bu kayda ham hâliyle yazılmaz.
           </li>
           <li>
             <strong>Girişim verisi:</strong> girişim profili, program geçmişi,
@@ -60,11 +66,20 @@ export default function PrivacyNoticePage() {
 
       <LegalSection heading="Aktarım">
         <p>
-          Kişisel veriler üçüncü taraflarla paylaşılmaz; yurt dışına aktarılmaz.
-          Yapay zekâ destekli soru-cevap özelliği kullanıldığında yalnızca soruyu
-          soran kullanıcının görme yetkisi olan kayıtlar model sağlayıcısına
-          gönderilir; bu özellik kapatılabilir ve anahtar tanımlı değilken
-          sistem tamamen yerel çalışır.
+          Kişisel veriler üçüncü taraflarla paylaşılmaz. Yapay zekâ destekli
+          soru-cevap özelliği bir yönetici tarafından etkin bırakıldığında (bir
+          model erişim anahtarı tanımlıysa) soruyu soran kullanıcının kendi
+          yetkisiyle görebildiği kayıtlar yanıtı üretmek amacıyla yurt dışında
+          yerleşik model sağlayıcısına (Anthropic) gönderilir — ama bu kayıtlar
+          önce ayrı bir süzgeçten geçer: ad soyad, e-posta, telefon, LinkedIn
+          adresi ve vergi numarası gibi kişiye ya da girişime özel kimlik
+          bilgileri modele gitmeden çıkarılır. Giden veri girişimin adı, sektörü,
+          şehri, program geçmişi ve toplulaştırılmış sayılarla sınırlıdır.
+          Bu daraltılmış aktarım da KVKK m.9 kapsamında bir <strong>yurt dışına
+          aktarımdır</strong> ve aktarım mekanizması ile veri işleyen ilişkisi ayrı
+          bir süreçte kurulur. Anahtar tanımlı değilken (varsayılan durum)
+          hiçbir veri sistem dışına çıkmaz; sorular tamamen yerel bir plana göre
+          yanıtlanır ve ekranda hangi modun yanıtladığı açıkça yazar.
         </p>
       </LegalSection>
 
@@ -73,6 +88,13 @@ export default function PrivacyNoticePage() {
           Kayıtlar program ilişkisi sürdüğü ve yasal saklama süreleri boyunca
           tutulur. Silinen kayıtlar "pasife alınır": denetim izinin bütünlüğü
           için kayıt tarihçesi korunur, veriler aktif ekranlarda görünmez.
+          Teknik kayıtlar (yukarıdaki madde) yalnızca 14 gün tutulur ve bu
+          sürenin sonunda otomatik olarak silinir. Denetim izi kayıtları
+          (kim, ne zaman, neyi değiştirdi) oluşturulmalarından itibaren 10 yıl
+          saklanır — Türk Ticaret Kanunu'nun defter/belge saklama süresine
+          kıyasen belirlenmiş bir üst sınırdır — ve bu sürenin sonunda
+          anonimleştirilir. Şifre sıfırlama bağlantıları en fazla 2 saat
+          geçerlidir ve kullanımdan veya süre dolumundan sonra silinir.
         </p>
       </LegalSection>
 
@@ -95,9 +117,23 @@ export default function PrivacyNoticePage() {
 
       <LegalSection heading="Tarayıcıda saklanan veriler">
         <p>
-          Sistem takip çerezi kullanmaz. Oturumun sürmesi için erişim jetonu
-          tarayıcınızın yerel deposunda tutulur; çıkış yaptığınızda silinir.
+          Sistem takip veya reklam amaçlı çerez kullanmaz. Oturumun sürmesi
+          için iki zorunlu çerez yazılır — bunlar açık rıza gerektirmeyen,
+          hizmetin çalışması için gerekli teknik çerezlerdir:
         </p>
+        <ul className="list-disc pl-5">
+          <li>
+            <strong>t3.session:</strong> erişim jetonunuzu taşır. Tarayıcı
+            betiklerinin erişemediği (<code>HttpOnly</code>) ve yalnızca
+            HTTPS üzerinden gönderilen bir çerezdir; oturum kapatıldığında
+            veya süresi dolduğunda geçersiz kılınır.
+          </li>
+          <li>
+            <strong>t3.csrf:</strong> oturum çerezinizle yapılan yazma
+            isteklerinin başka bir siteden tetiklenmediğini doğrulamak için
+            kullanılır, kişisel veri taşımaz.
+          </li>
+        </ul>
       </LegalSection>
     </LegalDocument>
   )

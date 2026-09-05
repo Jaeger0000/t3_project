@@ -11,7 +11,7 @@
  * duruyor (`Auth.KvkkConsent`); istemcideki değeri kullanıcı silebilir ve bu
  * bilinçli olarak sorun değil.
  */
-export const KVKK_ONAY_SURUMU = '2026-08-25'
+export const KVKK_ONAY_SURUMU = '2026-09-04'
 
 const ANAHTAR = 't3.kvkk.onay'
 

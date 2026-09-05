@@ -60,12 +60,23 @@ public sealed class LocalDocumentStorage(IOptions<DocumentStorageOptions> option
         return Task.CompletedTask;
     }
 
-    /// <summary>Çözülen yolun depo kökünün dışına çıkmadığını doğrular.</summary>
+    /// <summary>
+    /// Çözülen yolun depo kökünün dışına çıkmadığını doğrular.
+    ///
+    /// Ayırıcısız <c>StartsWith(_root)</c> "…/documents-yedek" gibi kardeş bir
+    /// klasörü de kök sayardı (bkz. G-13, Guvenlik_Denetimi_ve_Iyilestirme_Plani.md).
+    /// Yol bugün yalnızca sunucu tarafında üretiliyor (<see cref="SaveAsync"/>),
+    /// dolayısıyla bugün sömürülemez — ama bu, girdiye bağlı bir depoya (S3,
+    /// ya da yolun bir gün istemciden geldiği bir senaryo) geçildiğinde
+    /// kırılacak bir derinlemesine savunma katmanı.
+    /// </summary>
     private string ResolveInsideRoot(string storagePath)
     {
         var absolute = Path.GetFullPath(Path.Combine(_root, storagePath));
 
-        if (!absolute.StartsWith(_root, StringComparison.Ordinal))
+        var relative = Path.GetRelativePath(_root, absolute);
+
+        if (relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(relative))
             throw new UnauthorizedAccessException("Geçersiz doküman yolu.");
 
         return absolute;

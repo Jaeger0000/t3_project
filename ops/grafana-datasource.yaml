@@ -1,0 +1,12 @@
+# Grafana'nın açılışta otomatik okuduğu veri kaynağı tanımı. Elle "Add data
+# source" adımını gerektirmez — konteyner ayağa kalktığında Loki zaten bağlı.
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    type: loki
+    access: proxy
+    # Konteyner ağındaki servis adı: docker-compose.yml'deki `loki` servisi.
+    url: http://loki:3100
+    isDefault: true
+    editable: false

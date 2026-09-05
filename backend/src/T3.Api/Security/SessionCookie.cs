@@ -1,4 +1,8 @@
 using System.Security.Cryptography;
+using System.Text;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using T3.Infrastructure.Identity;
 
 namespace T3.Api.Security;
 
@@ -46,7 +50,7 @@ public static class SessionCookie
             IsEssential = true
         });
 
-        AppendCsrf(context, NewCsrfToken(), expiresAt);
+        AppendCsrf(context, DeriveCsrfToken(context, token), expiresAt);
     }
 
     /// <summary>
@@ -56,13 +60,16 @@ public static class SessionCookie
     /// </summary>
     public static void EnsureCsrf(HttpContext context)
     {
-        if (ReadToken(context) is null)
+        if (ReadToken(context) is not { } sessionToken)
             return;
 
         if (!string.IsNullOrEmpty(context.Request.Cookies[CsrfCookieName]))
             return;
 
-        AppendCsrf(context, NewCsrfToken(), expiresAt: null);
+        // Rastgele değil, oturuma bağlı türetilmiş değer: aynı jetonla her
+        // çağrıldığında aynı sonucu üretir, ayrıca bir yerde saklanmaz
+        // (bkz. G-11, Guvenlik_Denetimi_ve_Iyilestirme_Plani.md).
+        AppendCsrf(context, DeriveCsrfToken(context, sessionToken), expiresAt: null);
     }
 
     public static void Clear(HttpContext context)
@@ -89,7 +96,23 @@ public static class SessionCookie
             IsEssential = true
         });
 
-    private static string NewCsrfToken() =>
-        Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
-            .Replace('+', '-').Replace('/', '_').TrimEnd('=');
+    /// <summary>
+    /// CSRF jetonu artık rastgele değil, <c>HMAC(sunucu anahtarı, oturum
+    /// jetonu)</c>: değeri yalnızca sunucu (Jwt:Secret'i bilen taraf)
+    /// üretebilir. Öncesinde iki bağımsız rastgele çerezdi — alt alan
+    /// adından çerez yazabilen bir saldırgan ikisini de kendisi koyup
+    /// çift-gönderim kontrolünü anlamsızlaştırabilirdi (bkz. G-11,
+    /// Guvenlik_Denetimi_ve_Iyilestirme_Plani.md). <c>SameSite=Strict</c>
+    /// bunu bugün zaten kapatıyor; bu, tek savunma olmasın diye ek katman.
+    /// </summary>
+    public static string DeriveCsrfToken(HttpContext context, string sessionToken)
+    {
+        var secret = context.RequestServices
+            .GetRequiredService<IOptions<JwtOptions>>().Value.Secret;
+
+        var hash = HMACSHA256.HashData(
+            Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(sessionToken));
+
+        return Convert.ToBase64String(hash).Replace('+', '-').Replace('/', '_').TrimEnd('=');
+    }
 }

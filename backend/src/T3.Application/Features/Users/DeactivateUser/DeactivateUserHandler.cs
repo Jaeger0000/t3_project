@@ -8,12 +8,15 @@ namespace T3.Application.Features.Users.DeactivateUser;
 /// <summary>
 /// Hesabı erişimden düşürür. Kayıt silinmiyor: kullanıcı denetim izindeki
 /// eylemlerin aktörü ve önerilerin göndericisi; satır giderse iz sahipsiz
-/// kalır. Giriş akışı <c>IsActive</c> kontrol ettiği için erişim anında kesilir.
+/// kalır. Erişim yalnızca yeni girişte değil — <c>SecurityStamp</c>
+/// yenilendiği için <c>UserStateMiddleware</c> üzerinden elindeki jetonu olan
+/// kullanıcının da bir sonraki isteğinde kesilir (bkz. G-01).
 /// </summary>
 public sealed class DeactivateUserHandler(
     IAppDbContext db,
     UserAdminGuard guard,
-    IAuditWriter audit)
+    IAuditWriter audit,
+    IUserStateProvider userState)
 {
     public async Task<Result<bool>> Handle(Guid id, CancellationToken ct)
     {
@@ -34,6 +37,7 @@ public sealed class DeactivateUserHandler(
             return Error.Conflict("Bu hesap zaten pasif.");
 
         user.IsActive = false;
+        user.SecurityStamp = Guid.NewGuid();
 
         // Program atamaları da kaldırılıyor: hesap yeniden açılırsa yetki
         // kapsamı bilinçli olarak tekrar verilsin, eski kapsam sessizce geri
@@ -41,13 +45,17 @@ public sealed class DeactivateUserHandler(
         foreach (var assignment in user.ProgramAssignments.Where(a => !a.IsDeleted))
             assignment.IsDeleted = true;
 
-        await db.SaveChangesAsync(ct);
-
+        // Hesap değişikliği ile denetim izi tek SaveChanges'ta birlikte kalıcı
+        // olur — ikisi ayrı çağrılarda olsaydı süreç arada düşerse veri
+        // değişir ama izi kaybolurdu (bkz. G-09).
         await audit.WriteAsync(
             "User.Deactivate", nameof(User), user.Id,
             before: new { user.Email, IsActive = true },
             after: new { user.Email, user.IsActive },
-            ct: ct);
+            ct: ct, saveChanges: false);
+
+        await db.SaveChangesAsync(ct);
+        userState.Invalidate(user.Id);
 
         return true;
     }

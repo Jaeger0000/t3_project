@@ -41,7 +41,7 @@ export default function DocumentSection({
     )
   }
 
-  if (list.error) return <ErrorState message={list.error.message} />
+  if (list.error) return <ErrorState message={list.error.message} error={list.error} />
   if (!list.data) return null
 
   const items = list.data.items

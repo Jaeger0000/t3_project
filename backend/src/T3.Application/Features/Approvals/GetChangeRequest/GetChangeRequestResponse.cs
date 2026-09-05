@@ -32,4 +32,11 @@ public sealed record ChangeRequestDetailResponse(
     bool IsReadable,
 
     int ChangedFieldCount,
-    IReadOnlyList<DiffFieldResponse> Fields);
+    IReadOnlyList<DiffFieldResponse> Fields,
+
+    /// <summary>
+    /// Öneri, inceleyicinin göremediği en az bir alanı değiştiriyorsa true —
+    /// bu durumda yalnızca Süper Yönetici onaylayabilir (handler'da ayrıca
+    /// zorlanır, bu alan yalnızca arayüzün uyarıyı göstermesi için — bkz. G-10).
+    /// </summary>
+    bool RequiresElevation);

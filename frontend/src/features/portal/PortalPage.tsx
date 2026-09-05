@@ -28,7 +28,7 @@ export default function PortalPage() {
     )
   }
   if (isPending) return <Spinner label="Girişim bilgileri yükleniyor…" />
-  if (error) return <ErrorState message={error.message} />
+  if (error) return <ErrorState message={error.message} error={error} />
   if (!card) return null
 
   return (

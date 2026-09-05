@@ -316,6 +316,8 @@ export type ChangeRequestDetail = {
   isReadable: boolean
   changedFieldCount: number
   fields: DiffField[]
+  /** Görme yetkisi olmayan bir alanı değiştiriyor; yalnızca Süper Yönetici onaylayabilir. */
+  requiresElevation: boolean
 }
 
 export type SubmitChangeRequestBody = {

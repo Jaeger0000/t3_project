@@ -21,10 +21,11 @@ public sealed class AuditWriter(
         Guid? entityId,
         object? before = null,
         object? after = null,
-        CancellationToken ct = default) =>
+        CancellationToken ct = default,
+        bool saveChanges = true) =>
         WriteForActorAsync(
             currentUser.UserId, currentUser.Role,
-            action, entityType, entityId, before, after, ct);
+            action, entityType, entityId, before, after, ct, saveChanges);
 
     public async Task WriteForActorAsync(
         Guid? actorUserId,
@@ -34,7 +35,8 @@ public sealed class AuditWriter(
         Guid? entityId,
         object? before = null,
         object? after = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool saveChanges = true)
     {
         db.AuditLogs.Add(new AuditLog
         {
@@ -54,7 +56,8 @@ public sealed class AuditWriter(
             OccurredAt = DateTimeOffset.UtcNow
         });
 
-        await db.SaveChangesAsync(ct);
+        if (saveChanges)
+            await db.SaveChangesAsync(ct);
     }
 
     private static string? Serialize(object? value) =>

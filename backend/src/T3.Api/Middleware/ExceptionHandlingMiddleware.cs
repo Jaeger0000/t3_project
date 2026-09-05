@@ -1,6 +1,6 @@
 using System.Net;
-using System.Text.Json;
 using FluentValidation;
+using T3.Api.Http;
 
 namespace T3.Api.Middleware;
 
@@ -21,6 +21,7 @@ public sealed class ExceptionHandlingMiddleware(
         catch (ValidationException ex)
         {
             logger.LogWarning(ex, "Doğrulama hatası: {Path}", context.Request.Path);
+            // Referans yok: kullanıcının kendi düzeltebileceği bir hata.
             await WriteAsync(context, HttpStatusCode.BadRequest, "Doğrulama hatası",
                 ex.Errors.Select(e => e.ErrorMessage).ToArray());
         }
@@ -32,26 +33,32 @@ public sealed class ExceptionHandlingMiddleware(
         catch (Exception ex)
         {
             logger.LogError(ex, "İşlenmeyen hata: {Path}", context.Request.Path);
+            // Referans = TraceIdentifier: RequestIdMiddleware bunu X-Request-Id
+            // ile eşitledi, kullanıcı ekranda gördüğü kodu söyleyince log tek
+            // sorguda bulunur.
             await WriteAsync(context, HttpStatusCode.InternalServerError,
-                "Beklenmeyen bir hata oluştu.");
+                "Beklenmeyen bir hata oluştu.", referans: context.TraceIdentifier);
         }
     }
 
     private static async Task WriteAsync(
-        HttpContext context, HttpStatusCode status, string title, string[]? errors = null)
+        HttpContext context, HttpStatusCode status, string title,
+        string[]? errors = null, string? referans = null)
     {
         if (context.Response.HasStarted)
             return;
 
+        // Clear() yalnızca gövdeyi değil, o ana kadar konan tüm başlıkları da
+        // siler — RequestIdMiddleware'in koyduğu X-Request-Id dâhil. Referans
+        // ile yanıt başlığı aynı kalsın diye TraceIdentifier'dan yeniden yazılır.
         context.Response.Clear();
         context.Response.StatusCode = (int)status;
-        context.Response.ContentType = "application/json";
+        context.Response.Headers[RequestIdMiddleware.HeaderName] = context.TraceIdentifier;
 
-        await context.Response.WriteAsync(JsonSerializer.Serialize(new
-        {
-            status = (int)status,
-            title,
-            errors
-        }));
+        // WriteAsJsonAsync (JsonSerializer.Serialize değil): DI'daki JSON
+        // seçenekleri (camelCase) burada da uygulansın — frontend tek bir
+        // gövde şekli (küçük harfli alan adları) bekliyor.
+        await context.Response.WriteAsJsonAsync(
+            new ApiErrorBody((int)status, title, errors, referans));
     }
 }

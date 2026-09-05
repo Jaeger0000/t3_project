@@ -11,7 +11,8 @@ public sealed class SetUserPasswordHandler(
     IAppDbContext db,
     UserAdminGuard guard,
     IPasswordHasher passwordHasher,
-    IAuditWriter audit)
+    IAuditWriter audit,
+    IUserStateProvider userState)
 {
     public async Task<Result<SetUserPasswordResponse>> Handle(
         Guid id, SetUserPasswordRequest request, CancellationToken ct)
@@ -30,15 +31,20 @@ public sealed class SetUserPasswordHandler(
         // başka ekrana geçemez. Aksi hâlde şifreyi kalıcı olarak iki kişi bilir.
         user.MustChangePassword = true;
 
-        await db.SaveChangesAsync(ct);
+        // Elindeki eski jeton (ör. hesap ele geçirilmişse saldırganınki) yeni
+        // şifreyle birlikte geçersiz olsun.
+        user.SecurityStamp = Guid.NewGuid();
 
         // İzde yalnızca olayın kendisi var: ne şifre ne özeti yazılıyor.
         // Denetim izinin amacı "kim değiştirdi" sorusuna cevap vermek;
-        // sırrın ikinci bir kopyasını üretmek değil.
+        // sırrın ikinci bir kopyasını üretmek değil. Tek SaveChanges: bkz. G-09.
         await audit.WriteAsync(
             "User.SetPassword", nameof(User), user.Id,
             after: new { user.Email },
-            ct: ct);
+            ct: ct, saveChanges: false);
+
+        await db.SaveChangesAsync(ct);
+        userState.Invalidate(user.Id);
 
         return new SetUserPasswordResponse(user.Id, user.Email, DateTimeOffset.UtcNow);
     }

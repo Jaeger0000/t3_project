@@ -35,7 +35,7 @@ export default function ProgramsPage() {
   const canManageTerms = session?.permissions.canManageProgramTerms ?? false
 
   if (programs.isPending) return <Spinner label="Programlar yükleniyor…" />
-  if (programs.error) return <ErrorState message={programs.error.message} />
+  if (programs.error) return <ErrorState message={programs.error.message} error={programs.error} />
   if (!programs.data) return null
 
   return (
@@ -301,7 +301,7 @@ function CloseProgramButton({
       <Button variant="ghost" disabled={remove.isPending} onClick={() => setConfirming(false)}>
         Vazgeç
       </Button>
-      {remove.error ? <ErrorState message={remove.error.message} /> : null}
+      {remove.error ? <ErrorState message={remove.error.message} error={remove.error} /> : null}
     </div>
   )
 }
@@ -357,7 +357,7 @@ function CloseTermButton({
           Vazgeç
         </button>
       </div>
-      {remove.error ? <ErrorState message={remove.error.message} /> : null}
+      {remove.error ? <ErrorState message={remove.error.message} error={remove.error} /> : null}
     </div>
   )
 }

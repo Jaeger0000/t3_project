@@ -23,7 +23,8 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : ITokenServic
             new(AppClaims.Role, user.Role.ToString()),
             new(ClaimTypes.Role, user.Role.ToString()),
             new(ClaimTypes.Email, user.Email),
-            new(ClaimTypes.Name, user.FullName)
+            new(ClaimTypes.Name, user.FullName),
+            new(AppClaims.SecurityStamp, user.SecurityStamp.ToString())
         };
 
         if (user.StartupId is { } startupId)

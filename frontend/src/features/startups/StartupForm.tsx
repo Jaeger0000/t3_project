@@ -284,7 +284,7 @@ export default function StartupForm({
 
       {error ? (
         <div className="mt-4">
-          <ErrorState message={error.message} />
+          <ErrorState message={error.message} error={error} />
         </div>
       ) : null}
 

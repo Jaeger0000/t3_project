@@ -22,6 +22,7 @@ T3 Vakfı Bursiyer Yapay Zekâ Creathonu — **Problem 7** çözümü.
 - **Backend:** .NET 8 · Clean Architecture + dikey dilim · Minimal API · EF Core 8
 - **Frontend:** React 19 · TypeScript · Vite · Tailwind CSS 4 · TanStack Query
 - **Veritabanı:** PostgreSQL 16 (Docker)
+- **Loglama:** Serilog (konsol + dosya) — Grafana Loki sink'i opsiyonel (`--profile observability`)
 - **AI:** MCP sunucusu (.NET içinde) — model bağlantısı **MCP üzerinden** kurulur; uygulama içi Claude API anahtarı opsiyonel ve bu kurulumda tanımlı değil
 
 ## Kurulum
@@ -57,6 +58,10 @@ docker compose up -d postgres
 
 # pgAdmin de isterseniz (http://localhost:5050)
 docker compose --profile tools up -d
+
+# Log sorgulama (Loki + Grafana, http://localhost:3300) isterseniz —
+# uygulamanın çalışması için gerekli değil, konsol + dosyaya yine yazar
+docker compose --profile observability up -d
 ```
 
 ### 3. Migration'ları uygula
@@ -505,9 +510,10 @@ gereken bulguları ([plan](docs/Denetim_Duzeltme_Plani.md)):
   kullanımlıktır ve 2 saat geçerlidir; `forgot-password` adresin kayıtlı olup
   olmadığını söylemez. Yöneticinin attığı şifre artık geçici:
   `mustChangePassword` bayrağı düşene kadar kullanıcı başka ekrana geçemez —
-  amaç şifrenin ikinci sahibini ortadan kaldırmak. Gerçek SMTP yok; e-posta
-  sunucunun diskindeki geliştirme kutusuna yazılıyor (`IEmailSender` arkasında),
-  jeton HTTP yanıtında **hiç dönmüyor**.
+  amaç şifrenin ikinci sahibini ortadan kaldırmak. E-posta `IEmailSender`
+  arkasında: SMTP ayarları tanımlıysa gerçek relay üzerinden gidiyor
+  (`SmtpEmailSender`), tanımlı değilse geliştirmede diskteki kutuya yazılıyor,
+  üretimde açık hata veriyor. Jeton HTTP yanıtında **hiç dönmüyor**.
 - **Oturum ömrü ve ağ hatası ayrımı:** jeton 15 dakika yerine bir iş günü
   (yenileme jetonu Dalga 2'deki çerez kararına bağlı). Ağ hatası artık
   `ApiError(0)` olarak normalleşiyor: API kapalıyken kullanıcı oturumda kalıyor,
@@ -578,10 +584,16 @@ Geriye teknik olmayan ya da bu depoda karara bağlanamayan kalemler kaldı:
 - **KVKK metinlerinin hukuki içeriği onaylanmadı** — teknik iş bitti, sayfalar
   görünür biçimde "Taslak" işaretli (Dalga 1.5).
 - **Sentry bağlanmadı** — hesap, DSN ve yurt dışı aktarım kararı gerekiyor
-  (Dalga 2.3 / O-06). Kod tarafında bağlanacak yer hazır.
-- **Gerçek SMTP yok:** şifre sıfırlama e-postaları sunucunun diskindeki
-  geliştirme kutusuna yazılıyor (`IEmailSender` arkasında sağlayıcı değişir).
-  Arayüz akışı ve jeton yaşam döngüsü buna rağmen uçtan uca doğrulanıyor.
+  (Dalga 2.3 / O-06). Uygulama günlüğü (Serilog + Grafana Loki, bkz.
+  [docs/Gelistirme_Kararlari.md §3k](docs/Gelistirme_Kararlari.md)) "ne oldu"yu
+  cevaplıyor; Sentry "hangi hata yeni"yi cevaplar, ikisi birbirinin yerine
+  geçmez. Kod tarafında bağlanacak yer hazır.
+- **SMTP kodu hazır, hesap/DNS kurulumu bekliyor:** `SmtpEmailSender` yazıldı ve
+  `T3_Email__Smtp__*` dolduğunda devreye giriyor; alan adının SPF/DKIM/DMARC
+  kayıtları ve Brevo/Zoho hesapları henüz açılmadı
+  ([docs/Mail_Servisi_Kurulumu.md](docs/Mail_Servisi_Kurulumu.md)). O ana kadar
+  geliştirmede kutuya yazılıyor, üretimde açık hata veriyor — arayüz akışı ve
+  jeton yaşam döngüsü buna rağmen uçtan uca doğrulanıyor.
 
 ### Bilinçli sınırlar
 

@@ -86,6 +86,50 @@ public class DocumentUploadRulesTests
         Assert.False(Check(null).IsSuccess);
     }
 
+    /// <summary>
+    /// Uzantı yalnız yeterli değil: ".pdf" adlı bir HTML dosyası indirmede
+    /// tarayıcıda çalıştırılabilir bir içerik taşırdı (bkz. G-08).
+    /// </summary>
+    [Fact]
+    public async Task Icerik_uzantiyla_uyusmuyorsa_reddedilir()
+    {
+        await using var sahteHtml = new MemoryStream("<script>alert(1)</script>"u8.ToArray());
+
+        var matches = await DocumentUploadRules.ContentMatchesExtensionAsync(sahteHtml, ".pdf", default);
+
+        Assert.False(matches);
+    }
+
+    [Fact]
+    public async Task Gercek_pdf_imzasi_kabul_edilir()
+    {
+        await using var gercekPdf = new MemoryStream("%PDF-1.7 ..."u8.ToArray());
+
+        var matches = await DocumentUploadRules.ContentMatchesExtensionAsync(gercekPdf, ".pdf", default);
+
+        Assert.True(matches);
+    }
+
+    /// <summary>Serbest metin türlerinin imzası yok; her içerik geçer.</summary>
+    [Fact]
+    public async Task Imzasi_olmayan_uzanti_her_zaman_gecer()
+    {
+        await using var herhangi = new MemoryStream("ne olursa olsun"u8.ToArray());
+
+        Assert.True(await DocumentUploadRules.ContentMatchesExtensionAsync(herhangi, ".csv", default));
+        Assert.True(await DocumentUploadRules.ContentMatchesExtensionAsync(herhangi, ".txt", default));
+    }
+
+    [Fact]
+    public async Task Kontrolden_sonra_akis_basa_sarilir()
+    {
+        await using var gercekPng = new MemoryStream([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3]);
+
+        await DocumentUploadRules.ContentMatchesExtensionAsync(gercekPng, ".png", default);
+
+        Assert.Equal(0, gercekPng.Position);
+    }
+
     [Fact]
     public void Boyut_etiketi_okunur_bicimde_uretilir()
     {

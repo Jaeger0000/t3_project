@@ -10,4 +10,7 @@ public static class AppClaims
     public const string Role = "t3:role";
     public const string StartupId = "t3:startup";
     public const string ProgramIds = "t3:programs";
+
+    /// <summary>Bkz. <see cref="T3.Domain.Identity.User.SecurityStamp"/>.</summary>
+    public const string SecurityStamp = "t3:stamp";
 }

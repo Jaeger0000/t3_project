@@ -100,7 +100,7 @@ export default function UsersPage() {
         </div>
       </Card>
 
-      {error ? <ErrorState message={error.message} /> : null}
+      {error ? <ErrorState message={error.message} error={error} /> : null}
       {isPending ? <Spinner label="Kullanıcılar yükleniyor…" /> : null}
       {data && data.items.length === 0 ? (
         <EmptyState title="Bu filtrede kullanıcı yok" />
@@ -177,7 +177,7 @@ function UserCard({ user }: { user: UserRow }) {
 
       {deactivate.error ? (
         <div className="mt-3">
-          <ErrorState message={deactivate.error.message} />
+          <ErrorState message={deactivate.error.message} error={deactivate.error} />
         </div>
       ) : null}
 
@@ -315,7 +315,7 @@ function CreateUserForm({ onDone }: { onDone: () => void }) {
 
       {create.error ? (
         <div className="mt-4">
-          <ErrorState message={create.error.message} />
+          <ErrorState message={create.error.message} error={create.error} />
         </div>
       ) : null}
 
@@ -401,7 +401,7 @@ function EditUserForm({ user, onDone }: { user: UserRow; onDone: () => void }) {
 
       {update.error ? (
         <div className="mt-3">
-          <ErrorState message={update.error.message} />
+          <ErrorState message={update.error.message} error={update.error} />
         </div>
       ) : null}
 
@@ -453,7 +453,7 @@ function PasswordForm({ user, onDone }: { user: UserRow; onDone: () => void }) {
       <Button variant="outline" onClick={onDone}>
         Vazgeç
       </Button>
-      {setPassword.error ? <ErrorState message={setPassword.error.message} /> : null}
+      {setPassword.error ? <ErrorState message={setPassword.error.message} error={setPassword.error} /> : null}
     </div>
   )
 }

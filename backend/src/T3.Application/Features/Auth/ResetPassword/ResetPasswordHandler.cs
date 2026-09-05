@@ -17,7 +17,8 @@ namespace T3.Application.Features.Auth.ResetPassword;
 public sealed class ResetPasswordHandler(
     IAppDbContext db,
     IPasswordHasher passwordHasher,
-    IAuditWriter audit)
+    IAuditWriter audit,
+    IUserStateProvider userState)
 {
     private static readonly Error InvalidToken = Error.Validation(
         "Sıfırlama bağlantısı geçersiz ya da süresi dolmuş. Yeni bir bağlantı isteyin.");
@@ -58,13 +59,19 @@ public sealed class ResetPasswordHandler(
         // Kullanıcı şifresini kendisi belirledi: zorunlu değiştirme bayrağı düşer.
         token.User.MustChangePassword = false;
 
-        await db.SaveChangesAsync(ct);
+        // Hesap ele geçirilmiş ve gerçek sahibi bu yüzden sıfırlıyor olabilir:
+        // saldırganın elindeki oturum da burada geçersiz olsun.
+        token.User.SecurityStamp = Guid.NewGuid();
 
+        // Jeton/şifre değişikliği ile izi tek SaveChanges'ta kalıcı olur (bkz. G-09).
         await audit.WriteForActorAsync(
             token.UserId, token.User.Role,
             "Auth.PasswordReset", nameof(User), token.UserId,
             after: new { Email = MaskedEmail.Of(token.User.Email) },
-            ct: ct);
+            ct: ct, saveChanges: false);
+
+        await db.SaveChangesAsync(ct);
+        userState.Invalidate(token.UserId);
 
         // Yanıtta ham e-posta yok: bağlantıyı ele geçiren biri hangi hesaba
         // ait olduğunu buradan öğrenmesin.

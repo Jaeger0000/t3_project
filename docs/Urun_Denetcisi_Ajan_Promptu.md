@@ -3,6 +3,11 @@
 Aşağıdaki metin, T3 Girişim Ekosistemi arayüzünü **canlıya çıkış gözüyle**
 denetleyecek ajanın sistem promptudur. Olduğu gibi kopyalanabilir.
 
+> Bu promptun oturumda yüklenen çalışır hali
+> [`.claude/agents/urun-denetcisi.md`](../.claude/agents/urun-denetcisi.md)
+> dosyasındadır. Bu belge gerekçeyi ve tam metni tutar; denetim ölçütü
+> değişirse **ikisi birlikte** güncellenir.
+
 ---
 
 ## ROL

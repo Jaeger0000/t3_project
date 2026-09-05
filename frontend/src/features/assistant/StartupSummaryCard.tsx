@@ -43,7 +43,7 @@ export default function StartupSummaryCard({ startupId }: { startupId: string })
       ) : null}
 
       {summary.isPending && requested ? <div className="mt-4"><Spinner label="Özet hazırlanıyor…" /></div> : null}
-      {summary.error ? <div className="mt-4"><ErrorState message={summary.error.message} /></div> : null}
+      {summary.error ? <div className="mt-4"><ErrorState message={summary.error.message} error={summary.error} /></div> : null}
 
       {summary.data ? (
         <div className="mt-4 flex flex-col gap-4">

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using T3.Application.Common.Interfaces;
 using T3.Infrastructure.Ai;
 using T3.Infrastructure.Audit;
@@ -15,7 +16,7 @@ namespace T3.Infrastructure;
 public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(
-        this IServiceCollection services, IConfiguration configuration)
+        this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         var connectionString = configuration.GetConnectionString("Default")
             ?? throw new InvalidOperationException(
@@ -40,15 +41,45 @@ public static class DependencyInjection
         services.AddScoped<ITokenService, JwtTokenService>();
         services.AddScoped<IDocumentStorage, LocalDocumentStorage>();
         services.AddScoped<IAuditWriter, AuditWriter>();
+        // IAppDbContext scoped olduğu için bu da scoped: singleton olsaydı
+        // scoped bağımlılığı istek boyunca yakalardı. Asıl önbellekleme
+        // singleton IMemoryCache üzerinden zaten oturumlar arasında paylaşılıyor.
+        services.AddScoped<IUserStateProvider, UserStateProvider>();
+        services.AddHostedService<RetentionCleanupService>();
 
-        // Gerçek SMTP Creathon kapsamında yok; gönderici e-postayı diske yazan
-        // geliştirme kutusuna düşüyor (bkz. FileOutboxEmailSender).
-        services.AddScoped<IEmailSender, FileOutboxEmailSender>();
+        AddEmailSender(services, configuration, environment);
         services.AddSingleton<IResetLinkBuilder, ResetLinkBuilder>();
 
         AddChatModel(services, configuration);
 
         return services;
+    }
+
+    /// <summary>
+    /// Gönderici seçimi **ortama değil, yapılandırmaya** bakar: SMTP bilgileri
+    /// tamsa (sunucu + kullanıcı + parola) gerçek gönderici kayıtlanır, aksi
+    /// hâlde ortam kararı verir. Sıralamanın böyle olması, SMTP'yi geliştirme
+    /// makinesinde de deneyebilmek için gerekli — "yalnızca üretimde çalışan
+    /// yol" ilk kez canlıda denenmiş olurdu.
+    ///
+    /// SMTP yokken üretimde <see cref="ThrowingEmailSender"/> kalıyor:
+    /// <see cref="FileOutboxEmailSender"/> ham şifre sıfırlama jetonunu
+    /// sunucu diskine ikinci bir düz metin kopyası olarak yazardı
+    /// (bkz. G-02, docs/Guvenlik_Denetimi_ve_Iyilestirme_Plani.md), sessiz bir
+    /// "hiçbir şey yapma" göndericisi ise arızayı görünmez kılardı.
+    /// </summary>
+    private static void AddEmailSender(
+        IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
+    {
+        var email = configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>()
+            ?? new EmailOptions();
+
+        if (email.Smtp.IsConfigured)
+            services.AddScoped<IEmailSender, SmtpEmailSender>();
+        else if (environment.IsProduction())
+            services.AddScoped<IEmailSender, ThrowingEmailSender>();
+        else
+            services.AddScoped<IEmailSender, FileOutboxEmailSender>();
     }
 
     /// <summary>

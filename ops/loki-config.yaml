@@ -1,0 +1,38 @@
+auth_enabled: false          # tek kiracı; port yalnızca loopback'e bağlı (docker-compose.yml)
+
+server:
+  http_listen_port: 3100
+
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore: { store: inmemory }
+
+schema_config:
+  configs:
+    - from: 2026-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index: { prefix: index_, period: 24h }
+
+limits_config:
+  allow_structured_metadata: true
+  retention_period: 336h      # 14 gün — KVKK saklama süresi (bkz. docs/Loglama_Plani.md §6)
+  ingestion_rate_mb: 4
+  ingestion_burst_size_mb: 8
+
+# Loki VARSAYILAN OLARAK HİÇBİR ŞEYİ SİLMEZ. retention_period tek başına
+# yetmez; silmeyi yapan compactor'dır ve retention_enabled açıkça verilmelidir.
+# Bu satır unutulursa log deposu VPS diskini doldurur ve yalnızca T3'ü değil,
+# o makinedeki diğer projeleri de düşürür.
+compactor:
+  working_directory: /loki/compactor
+  retention_enabled: true
+  delete_request_store: filesystem
+  retention_delete_delay: 2h

@@ -1,0 +1,67 @@
+name: CI
+
+# İlk adım: derleme + testler + bilinen zafiyet taraması. Kırılan derleme
+# birleştirmeyi engeller (bkz. G-16, Guvenlik_Denetimi_ve_Iyilestirme_Plani.md).
+# Sızma testi, .NET 10 geçişi ve şifreli yedekleme (Faz 3) bu hattın kapsamı
+# dışında — ayrı, altyapı gerektiren işler.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Bağımlılıkları geri yükle
+        run: dotnet restore
+
+      - name: Derle
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Birim testleri
+        run: dotnet test --no-build --configuration Release
+
+      - name: Bilinen zafiyetli paket taraması
+        # Bulgu varsa çıkış kodu sıfır olmaz — CI kırmızı olur.
+        run: dotnet list package --vulnerable --include-transitive 2>&1 | tee vulnerable.txt
+          && ! grep -q "has the following vulnerable packages" vulnerable.txt
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Bağımlılıkları kur
+        run: npm ci
+
+      - name: Derle (tsc -b + vite build)
+        # npx tsc --noEmit hiçbir dosyayı kontrol etmiyor (kök tsconfig yalnızca
+        # referans dosyası) — gerçek tip kontrolü yalnızca `npm run build` ile.
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint
+
+      - name: npm audit (yüksek ve üzeri)
+        run: npm audit --audit-level=high

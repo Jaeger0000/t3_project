@@ -45,16 +45,29 @@ services:
       # yapılandırmayı okuyan kişi kararı görsün.
       T3_Seed__Enabled: "false"
 
-      # TLS'i önde duran vekil sonlandırıyor: yönlendirme ve HSTS orada.
-      # Vekilin IP'si güvenilen listeye girmeli, yoksa denetim izine ve hız
-      # sınırına vekilin adresi yazılır (herkes tek kovaya düşer).
-      T3_Hosting__RequireHttps: "false"
-      T3_Hosting__TrustedProxies__0: ${TRUSTED_PROXY_IP:-127.0.0.1}
+      # TLS: sunucu t3girisimportali.com üzerinde HTTPS ile hizmet veriyor,
+      # bu yüzden varsayılan artık açık. Ters vekil kurulumuna dönülürse bu
+      # değeri bilinçli olarak "false" yapıp vekilde TLS sonlandırın — sessiz
+      # bir "TLS yok" durumu istemiyoruz (bkz. G-03, Guvenlik_Denetimi raporu).
+      T3_Hosting__RequireHttps: ${REQUIRE_HTTPS:-true}
+      # Vekilin/ağ geçidinin IP'si zorunlu: yanlış ya da eksikse denetim izine
+      # ve hız sınırına gerçek istemci yerine tek bir adres yazılır (herkes
+      # aynı kovaya düşer). Konteyner içinden `docker network inspect
+      # <ağ_adı> | grep Gateway` ile bulunur — bkz. .env.prod.example.
+      T3_Hosting__TrustedProxies__0: ${TRUSTED_PROXY_IP:?TRUSTED_PROXY_IP gerekli — docker network inspect ile bulun}
 
       # Şifre sıfırlama bağlantısı bu adresten kurulur — istekteki Host
       # başlığından değil.
       T3_Email__AppBaseUrl: ${PUBLIC_BASE_URL:?PUBLIC_BASE_URL gerekli}
       T3_Email__From: ${MAIL_FROM:-no-reply@t3ekosistem.test}
+      T3_Email__ReplyTo: ${MAIL_REPLY_TO:-}
+
+      # SMTP bilgileri eksikse gönderici ThrowingEmailSender'a düşer (açık hata),
+      # tam ise gerçek gönderime geçilir — karar ortamda değil bu dört değerde.
+      T3_Email__Smtp__Host: ${SMTP_HOST:-}
+      T3_Email__Smtp__Port: ${SMTP_PORT:-587}
+      T3_Email__Smtp__User: ${SMTP_USER:-}
+      T3_Email__Smtp__Password: ${SMTP_PASSWORD:-}
 
       # Arayüz aynı kökten geldiği için CORS'a gerek yok; liste bilinçli boş.
       T3_Cors__Origins__0: ${PUBLIC_BASE_URL}
@@ -66,6 +79,12 @@ services:
       - "127.0.0.1:${API_PORT:-8080}:8080"
     volumes:
       - api-storage:/app/storage
+    # Bu satır olmadan `docker logs` sınırsız büyür — konsol sink'i (Faz A)
+    # burada koşuyor ve dosya sink'i zaten storage/logs altında kendi
+    # döndürme/saklama sınırına sahip (bkz. appsettings.json, 14 gün).
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
 
 volumes:
   postgres-prod-data:

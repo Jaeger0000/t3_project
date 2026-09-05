@@ -5,7 +5,15 @@ namespace T3.Application.Features.Auth.ChangePassword;
 
 public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 
-public sealed record ChangePasswordResponse(DateTimeOffset ChangedAt);
+/// <summary>
+/// <see cref="AccessToken"/>/<see cref="ExpiresAt"/> yeni bir jetondur: şifre
+/// değişince <c>SecurityStamp</c> yenilenir ve elindeki eski jetonu olan
+/// (bu isteği yapan istemci dâhil) herkes bir sonraki istekte 401 alır. Aynı
+/// oturumun kesintisiz sürmesi için uç bu jetonu hemen çereze yazıyor
+/// (bkz. AuthEndpoints, SessionCookie.Issue) — kullanıcı kendi isteğiyle
+/// şifresini değiştirdiğinde tekrar giriş yapmak zorunda kalmasın.
+/// </summary>
+public sealed record ChangePasswordResponse(DateTimeOffset ChangedAt, string AccessToken, DateTimeOffset ExpiresAt);
 
 public sealed class ChangePasswordValidator : AbstractValidator<ChangePasswordRequest>
 {

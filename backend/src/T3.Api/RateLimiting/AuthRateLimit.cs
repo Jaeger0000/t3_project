@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Caching.Memory;
 using T3.Application.Common.Interfaces;
 using T3.Application.Common.Text;
+using T3.Domain.Identity;
 using T3.Infrastructure.Identity;
 
 namespace T3.Api.RateLimiting;
@@ -19,6 +20,14 @@ public static class AuthRateLimit
 {
     public const string AuthPolicy = "auth";
     public const string AiPolicy = "ai";
+
+    /// <summary>
+    /// Kütlesel veri çekme yüzeyleri: CSV aktarımı, doküman indirme, MCP.
+    /// Ele geçirilmiş tek bir jeton bunlardan biriyle dakikalar içinde
+    /// kapsamındaki her şeyi dışarı taşıyabiliyordu — hiçbir şey yavaşlatmıyor,
+    /// hiçbir şey uyarmıyordu (bkz. G-07, Guvenlik_Denetimi_ve_Iyilestirme_Plani.md).
+    /// </summary>
+    public const string MassExportPolicy = "mass-export";
 
     private const string EmailItemKey = "auth-email";
 
@@ -75,6 +84,119 @@ public static class AuthRateLimit
             });
 
     /// <summary>
+    /// Dakikada 30 deneme, yalnızca IP başına — e-posta bölümlemesinin
+    /// açıkta bıraktığı yüzeyi kapatır: tek bir IP'den 1.000 farklı e-postaya
+    /// dakikada 10.000 deneme (parola serpiştirme) artık bu kovaya takılır.
+    /// <see cref="ChainedAuthLimiter"/> ile <see cref="PartitionAuth"/>'a
+    /// zincirlenmiş durumda — ikisinden biri dolarsa istek reddedilir
+    /// (bkz. G-05, Guvenlik_Denetimi_ve_Iyilestirme_Plani.md).
+    /// </summary>
+    public static RateLimitPartition<string> PartitionAuthIp(HttpContext context) =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            Ip(context),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromMinutes(1),
+                PermitLimit = 30,
+                QueueLimit = 0
+            });
+
+    /// <summary>
+    /// <c>options.AddPolicy</c> tek bir partitioner alıyor; iki bağımsız kovayı
+    /// (hesap+IP ile yalnızca-IP) aynı adlı politika altında birleştirmenin
+    /// yolu yok. Bunun yerine bu limiter <see cref="EnforceIpLimit"/>
+    /// middleware'i içinde <c>UseRateLimiter()</c>'dan bağımsız, elle
+    /// çalıştırılıyor — istek ikisinden birine takılırsa 429 döner.
+    /// </summary>
+    private static readonly PartitionedRateLimiter<HttpContext> IpOnlyLimiter =
+        PartitionedRateLimiter.Create<HttpContext, string>(PartitionAuthIp);
+
+    /// <summary>
+    /// Yalnızca-IP kovasını <c>/api/auth</c> uçları için elle uygular. Named
+    /// policy'lerin (<see cref="AuthPolicy"/>) dışında tutulmasının sebebi
+    /// yukarıdaki not. <see cref="CaptureLoginEmail"/>'den hemen sonra,
+    /// <c>UseRateLimiter()</c>'dan önce çalışır.
+    /// </summary>
+    public static async Task EnforceIpLimit(HttpContext context, RequestDelegate next)
+    {
+        if (!HttpMethods.IsPost(context.Request.Method)
+            || !context.Request.Path.StartsWithSegments("/api/auth"))
+        {
+            await next(context);
+            return;
+        }
+
+        using var lease = await IpOnlyLimiter.AcquireAsync(context, cancellationToken: context.RequestAborted);
+
+        if (lease.IsAcquired)
+        {
+            await next(context);
+            return;
+        }
+
+        var seconds = lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter)
+            ? (int)Math.Ceiling(retryAfter.TotalSeconds)
+            : 60;
+
+        context.Response.Headers.RetryAfter = seconds.ToString(CultureInfo.InvariantCulture);
+        await WriteRateLimitAuditAsync(context, seconds, context.RequestAborted);
+
+        context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        await context.Response.WriteAsJsonAsync(new { status = 429, title = "Çok fazla istek." });
+    }
+
+    /// <summary>
+    /// Saatte 10 kütlesel çekme (CSV aktarımı, doküman indirme, MCP isteği),
+    /// kullanıcı başına. Kimliksiz istek buraya düşmez (uçların hepsi kimlik
+    /// istiyor); yine de düşerse IP'ye bölümlenir.
+    /// </summary>
+    public static RateLimitPartition<string> PartitionMassExport(HttpContext context) =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.User.FindFirst(AppClaims.UserId)?.Value ?? Ip(context),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromHours(1),
+                PermitLimit = 10,
+                QueueLimit = 0
+            });
+
+    /// <summary>
+    /// MCP'ye özel kova: <c>/mcp</c> tek bir uçtan hem sıradan sorular hem
+    /// <c>tools/call</c> döngüleri geçiyor. <see cref="MassExportPolicy"/>'nin
+    /// saatte 10'u burada gerçek kullanımı (Demo Day'de jürinin Claude
+    /// Desktop'tan birden çok soru sorması) kırardı; bunun yerine dakikada
+    /// 100 — sıradan kullanımın çok üstünde, koşan bir betiğin dakikalar
+    /// içinde tüm ekosistemi çekmesinin çok altında.
+    /// </summary>
+    public const string McpPolicy = "mcp";
+
+    public static RateLimitPartition<string> PartitionMcp(HttpContext context) =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.User.FindFirst(AppClaims.UserId)?.Value ?? Ip(context),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromMinutes(1),
+                PermitLimit = 100,
+                QueueLimit = 0
+            });
+
+    /// <summary>
+    /// Genel kova: kimliği olan her kullanıcı için dakikada 300 istek üst
+    /// sınırı. <c>options.GlobalLimiter</c>'a bağlanır ve tüm isteklere
+    /// (isim verilmiş politikalara ek olarak) uygulanır — adı konmamış
+    /// uçlarda bile bir üst sınır olsun diye (bkz. G-07).
+    /// </summary>
+    public static RateLimitPartition<string> PartitionGlobal(HttpContext context) =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.User.FindFirst(AppClaims.UserId)?.Value ?? Ip(context),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromMinutes(1),
+                PermitLimit = 300,
+                QueueLimit = 0
+            });
+
+    /// <summary>
     /// Dakikada 20 soru, kullanıcı başına: model çağrısı ücretli, bir
     /// kullanıcının panelini açık bırakması diğerlerinin kotasını yemesin.
     /// </summary>
@@ -104,6 +226,51 @@ public static class AuthRateLimit
             seconds.ToString(CultureInfo.InvariantCulture);
 
         await WriteRateLimitAuditAsync(context.HttpContext, seconds, ct);
+        await WriteMassExportAuditAsync(context.HttpContext, seconds, ct);
+    }
+
+    /// <summary>
+    /// Kütlesel çekme kovalarından biri dolduğunda ayrı ve isimli bir iz
+    /// düşer — "bir kullanıcı normalin çok üstünde veri çekmeye çalıştı"
+    /// bilgisi, sıradan bir 429'dan farklı bir güvenlik sinyali (bkz. G-07).
+    /// </summary>
+    private static async Task WriteMassExportAuditAsync(
+        HttpContext context, int retryAfterSeconds, CancellationToken ct)
+    {
+        var isMassExportSurface =
+            context.Request.Path.StartsWithSegments("/api/reports/export")
+            || context.Request.Path.StartsWithSegments("/api/documents")
+            || context.Request.Path.StartsWithSegments("/mcp");
+
+        if (!isMassExportSurface)
+            return;
+
+        var audit = context.RequestServices.GetService<IAuditWriter>();
+        if (audit is null)
+            return;
+
+        var userId = Guid.TryParse(context.User.FindFirst(AppClaims.UserId)?.Value, out var id)
+            ? id : (Guid?)null;
+        var role = Enum.TryParse<UserRole>(
+            context.User.FindFirst(AppClaims.Role)?.Value, out var parsedRole)
+            ? parsedRole : (UserRole?)null;
+
+        try
+        {
+            await audit.WriteForActorAsync(
+                userId, role,
+                "Security.MassExport", "Security", null,
+                after: new
+                {
+                    Path = context.Request.Path.Value,
+                    RetryAfterSeconds = retryAfterSeconds
+                },
+                ct: ct);
+        }
+        catch (Exception)
+        {
+            // bkz. WriteRateLimitAuditAsync: iz ikincil, 429 yanıtı birincil.
+        }
     }
 
     /// <summary>

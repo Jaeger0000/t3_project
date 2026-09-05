@@ -21,7 +21,7 @@ export default function DashboardPage() {
   useDocumentTitle('Ekosistem panosu')
   const { session } = useAuth()
   const [filters, setFilters] = useState<DashboardFilters>(defaultDashboardFilters)
-  const [exportError, setExportError] = useState<string | null>(null)
+  const [exportError, setExportError] = useState<unknown>(null)
   const [isExporting, setIsExporting] = useState(false)
 
   const stats = useEcosystemStats(filters)
@@ -36,7 +36,7 @@ export default function DashboardPage() {
     try {
       await exportStartupsCsv(filters)
     } catch (error) {
-      setExportError(error instanceof Error ? error.message : 'Dosya indirilemedi.')
+      setExportError(error)
     } finally {
       setIsExporting(false)
     }
@@ -63,7 +63,12 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {exportError ? <ErrorState message={exportError} /> : null}
+      {exportError ? (
+        <ErrorState
+          message={exportError instanceof Error ? exportError.message : 'Dosya indirilemedi.'}
+          error={exportError}
+        />
+      ) : null}
 
       <Card className="p-4">
         <div className="grid gap-3 sm:grid-cols-3">
@@ -103,7 +108,7 @@ export default function DashboardPage() {
       </Card>
 
       {stats.isPending ? <Spinner label="Karne hesaplanıyor…" /> : null}
-      {stats.error ? <ErrorState message={stats.error.message} /> : null}
+      {stats.error ? <ErrorState message={stats.error.message} error={stats.error} /> : null}
 
       {stats.data ? <StatsBody stats={stats.data} /> : null}
 

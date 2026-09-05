@@ -22,6 +22,8 @@ public sealed class ValidationFilter<TRequest>(IValidator<TRequest> validator) :
             return await next(context);
 
         return Results.Json(
+            // Referans yok: doğrulama hatası kullanıcının düzeltebileceği bir
+            // şey, referans numarası burada gürültü olur (bkz. ApiErrorBody).
             new ApiErrorBody(
                 StatusCodes.Status400BadRequest,
                 "Gönderilen veri geçersiz.",

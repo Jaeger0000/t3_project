@@ -106,7 +106,7 @@ export default function AssistantPanel() {
       </div>
 
       {ask.isPending ? <div className="mt-4"><Spinner label="Kayıtlar taranıyor…" /></div> : null}
-      {ask.error ? <div className="mt-4"><ErrorState message={ask.error.message} /></div> : null}
+      {ask.error ? <div className="mt-4"><ErrorState message={ask.error.message} error={ask.error} /></div> : null}
 
       {ask.data ? (
         <div className="mt-5 flex flex-col gap-4">

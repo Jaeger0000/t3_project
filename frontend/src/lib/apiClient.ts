@@ -12,12 +12,15 @@
 export class ApiError extends Error {
   readonly status: number
   readonly details?: string[]
+  /** Yalnızca 500'lerde dolar — bkz. backend ApiErrorBody.Referans. */
+  readonly referans?: string
 
-  constructor(status: number, message: string, details?: string[]) {
+  constructor(status: number, message: string, details?: string[], referans?: string) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.details = details
+    this.referans = referans
   }
 }
 
@@ -84,6 +87,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       response.status,
       body?.title ?? 'İstek başarısız oldu.',
       body?.errors ?? undefined,
+      body?.referans ?? undefined,
     )
   }
 

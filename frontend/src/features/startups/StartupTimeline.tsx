@@ -12,7 +12,7 @@ export default function StartupTimeline({ startupId }: { startupId: string }) {
   const timeline = useStartupTimeline(startupId)
 
   if (timeline.isPending) return <Spinner label="Yolculuk yükleniyor…" />
-  if (timeline.error) return <ErrorState message={timeline.error.message} />
+  if (timeline.error) return <ErrorState message={timeline.error.message} error={timeline.error} />
   if (!timeline.data) return null
 
   if (timeline.data.entries.length === 0) {

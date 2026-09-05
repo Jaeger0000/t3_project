@@ -92,7 +92,7 @@ export default function ChangePasswordPage() {
             />
 
             {mismatch ? <ErrorState message="İki şifre birbiriyle aynı değil." /> : null}
-            {change.error ? <ErrorState message={change.error.message} /> : null}
+            {change.error ? <ErrorState message={change.error.message} error={change.error} /> : null}
 
             <Button
               type="submit"

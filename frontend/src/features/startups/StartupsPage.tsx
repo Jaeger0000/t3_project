@@ -217,7 +217,7 @@ export default function StartupsPage() {
       </Card>
 
       {startups.isPending ? <Spinner label="Girişimler yükleniyor…" /> : null}
-      {startups.error ? <ErrorState message={startups.error.message} /> : null}
+      {startups.error ? <ErrorState message={startups.error.message} error={startups.error} /> : null}
 
       {startups.data && startups.data.items.length === 0 ? (
         <EmptyState
