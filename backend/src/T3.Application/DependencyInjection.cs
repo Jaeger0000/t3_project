@@ -44,6 +44,12 @@ public static class DependencyInjection
         services.AddScoped<AssistantToolbox>();
         services.AddScoped<OfflineAssistant>();
 
+        // Ajan döngüsü: tek soru ucu ile kalıcı sohbet dilimi aynı bileşeni
+        // çağırır. "*Handler" değil çünkü use-case değil — döngüyü kopyalamak,
+        // araç sonuçlarının modele giderken süzülmesi gibi adımların yalnızca
+        // bir dilimde güncellenmesi riskini doğururdu.
+        services.AddScoped<AssistantConversationRunner>();
+
         // Dikey dilim handler'ları: Features altındaki *Handler sınıflarını
         // isimlendirme kuralına göre otomatik kaydeder, böylece her yeni
         // özellik için DI'a elle satır eklemek gerekmez.

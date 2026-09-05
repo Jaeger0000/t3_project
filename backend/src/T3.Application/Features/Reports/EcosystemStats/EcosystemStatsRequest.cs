@@ -9,4 +9,5 @@ namespace T3.Application.Features.Reports.EcosystemStats;
 public sealed record EcosystemStatsRequest(
     Guid? ProgramId = null,
     Sector? Sector = null,
-    string? City = null);
+    string? City = null,
+    int? Year = null);

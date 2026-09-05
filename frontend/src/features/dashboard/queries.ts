@@ -6,12 +6,14 @@ export type DashboardFilters = {
   sector: Sector | ''
   programId: string
   city: string
+  year: string
 }
 
 export const defaultDashboardFilters: DashboardFilters = {
   sector: '',
   programId: '',
   city: '',
+  year: '',
 }
 
 function toQueryString(filters: DashboardFilters): string {
@@ -19,6 +21,7 @@ function toQueryString(filters: DashboardFilters): string {
   if (filters.sector) params.set('sector', filters.sector)
   if (filters.programId) params.set('programId', filters.programId)
   if (filters.city.trim()) params.set('city', filters.city.trim())
+  if (filters.year) params.set('year', filters.year)
   return params.toString()
 }
 

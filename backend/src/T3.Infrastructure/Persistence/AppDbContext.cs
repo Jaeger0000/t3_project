@@ -2,12 +2,14 @@ using Microsoft.EntityFrameworkCore;
 using T3.Application.Common.Interfaces;
 using T3.Domain.Achievements;
 using T3.Domain.Approvals;
+using T3.Domain.Assistant;
 using T3.Domain.Audit;
 using T3.Domain.Common;
 using T3.Domain.Documents;
 using T3.Domain.Identity;
 using T3.Domain.Milestones;
 using T3.Domain.Programs;
+using T3.Domain.Registrations;
 using T3.Domain.Startups;
 
 namespace T3.Infrastructure.Persistence;
@@ -31,6 +33,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Milestone> Milestones => Set<Milestone>();
     public DbSet<ChangeRequest> ChangeRequests => Set<ChangeRequest>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<StartupRegistrationRequest> StartupRegistrationRequests => Set<StartupRegistrationRequest>();
+
+    public DbSet<AiConversation> AiConversations => Set<AiConversation>();
+    public DbSet<AiConversationMessage> AiConversationMessages => Set<AiConversationMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

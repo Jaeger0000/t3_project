@@ -9,9 +9,11 @@ import {
 } from '@/components/RouteGuards'
 import LandingPage from '@/features/landing/LandingPage'
 import LoginPage from '@/features/auth/LoginPage'
+import RegisterStartupPage from '@/features/auth/RegisterStartupPage'
 import {
   ApprovalDetailPage,
   ApprovalsPage,
+  AssistantChatPage,
   AuditPage,
   ChangePasswordPage,
   DashboardPage,
@@ -19,6 +21,7 @@ import {
   PortalPage,
   PrivacyNoticePage,
   ProgramsPage,
+  RegistrationRequestsPage,
   ResetPasswordPage,
   StartupDetailPage,
   StartupsPage,
@@ -35,6 +38,7 @@ import {
 export const appRoutes = createRoutesFromElements(
   <Route element={<SuspenseLayout />}>
     <Route path="/giris" element={<LoginPage />} />
+    <Route path="/kayit-ol" element={<RegisterStartupPage />} />
     <Route path="/sifremi-unuttum" element={<ForgotPasswordPage />} />
     <Route path="/sifre-sifirla/:token" element={<ResetPasswordPage />} />
 
@@ -49,6 +53,9 @@ export const appRoutes = createRoutesFromElements(
         <Route path="/girisimler" element={<StartupsPage />} />
         <Route path="/girisimler/:id" element={<StartupDetailPage />} />
         <Route path="/programlar" element={<ProgramsPage />} />
+        {/* Ayrı bir izin aranmıyor: herkes kendi yetkisi kadarını görüyor,
+            süzme sunucuda yapılıyor (girişim kullanıcısı kendi kaydını sorar). */}
+        <Route path="/asistan" element={<AssistantChatPage />} />
         <Route path="/sifre-degistir" element={<ChangePasswordPage />} />
 
         {/* Onay ekranı iki yetkiden birini gerektiriyor: karar veren ya da
@@ -68,6 +75,7 @@ export const appRoutes = createRoutesFromElements(
         <Route element={<RequirePermission anyOf={['canManageUsers']} />}>
           <Route path="/kullanicilar" element={<UsersPage />} />
           <Route path="/denetim" element={<AuditPage />} />
+          <Route path="/kayit-basvurulari" element={<RegistrationRequestsPage />} />
         </Route>
       </Route>
     </Route>

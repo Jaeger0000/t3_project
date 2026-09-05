@@ -1,11 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using T3.Domain.Achievements;
 using T3.Domain.Approvals;
+using T3.Domain.Assistant;
 using T3.Domain.Audit;
 using T3.Domain.Documents;
 using T3.Domain.Identity;
 using T3.Domain.Milestones;
 using T3.Domain.Programs;
+using T3.Domain.Registrations;
 using T3.Domain.Startups;
 
 namespace T3.Application.Common.Interfaces;
@@ -32,6 +34,13 @@ public interface IAppDbContext
     DbSet<Milestone> Milestones { get; }
     DbSet<ChangeRequest> ChangeRequests { get; }
     DbSet<AuditLog> AuditLogs { get; }
+
+    /// <summary>Kayıt Ol ekranından gelen, onay bekleyen girişim başvuruları.</summary>
+    DbSet<StartupRegistrationRequest> StartupRegistrationRequests { get; }
+
+    /// <summary>Sunucuda saklanan AI sohbetleri ve turları (bkz. Features/Assistant/Chat).</summary>
+    DbSet<AiConversation> AiConversations { get; }
+    DbSet<AiConversationMessage> AiConversationMessages { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

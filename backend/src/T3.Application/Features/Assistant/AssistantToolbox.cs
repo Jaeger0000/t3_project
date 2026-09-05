@@ -5,6 +5,7 @@ using T3.Application.Common.Results;
 using T3.Application.Features.Achievements;
 using T3.Application.Features.Achievements.ListAchievements;
 using T3.Application.Features.Approvals.ListChangeRequests;
+using T3.Application.Features.Programs.ListPrograms;
 using T3.Application.Features.Reports.EcosystemStats;
 using T3.Application.Features.Startups;
 using T3.Application.Features.Startups.GetStartupCard;
@@ -15,8 +16,19 @@ using T3.Domain.Startups;
 
 namespace T3.Application.Features.Assistant;
 
-/// <summary>Araç çağrısının sonucu: modele giden JSON ve insana giden özet.</summary>
-public sealed record AssistantToolResult(string ToolName, string Json, string Summary);
+/// <summary>
+/// Araç çağrısının sonucu: modele giden JSON, insana giden özet ve sonucun
+/// dokunduğu girişim kimlikleri.
+///
+/// <see cref="StartupIds"/> varsayılan olarak boş: ekosistem geneli çalışan
+/// araçlar (karne, onay kuyruğu) tek bir girişime bağlanamaz; boş liste
+/// "girişim yok" demek, "bilinmiyor" değil.
+/// </summary>
+public sealed record AssistantToolResult(
+    string ToolName,
+    string Json,
+    string Summary,
+    IReadOnlyList<Guid> StartupIds);
 
 /// <summary>
 /// AI ve MCP'nin ortak araç kutusu.
@@ -32,6 +44,7 @@ public sealed class AssistantToolbox(
     GetStartupTimelineHandler timeline,
     ListAchievementsHandler achievements,
     EcosystemStatsHandler stats,
+    ListProgramsHandler programs,
     ListChangeRequestsHandler approvals)
 {
     private static readonly CultureInfo Turkish = CultureInfo.GetCultureInfo("tr-TR");
@@ -50,7 +63,13 @@ public sealed class AssistantToolbox(
     [
         new("search_startups",
             "Girişimleri arar ve süzer. Sektör, durum, şehir, program ve serbest metin "
-            + "ile filtrelenebilir. Yatırım sıralaması için sort=MostInvestment kullan.",
+            + "ile filtrelenebilir. Yatırım sıralaması için sort=MostInvestment kullan. "
+            // Model boş tutarı "maskeli" diye yorumluyordu: Süper Yönetici'ye
+            // yatırım kaydı olmayan bir girişim için "bu alan sizden gizli"
+            // demek, ürünün KVKK anlatısını doğrudan yanlış gösteriyor.
+            + "totalInvestment alanı null ise bunun iki sebebi olabilir: girişimin "
+            + "yatırım kaydı yoktur ya da tutar bu rol için maskelidir. Hangisi "
+            + "olduğunu bu araçtan bilemezsin — 'maskeli' deme, 'kayıt görünmüyor' de.",
             Schema(new
             {
                 q = Text("Ad, ürün açıklaması veya şehirde geçen serbest metin."),
@@ -82,13 +101,27 @@ public sealed class AssistantToolbox(
 
         new("ecosystem_stats",
             "Ekosistem karnesi: girişim sayıları, sektör/şehir/program dağılımı, "
-            + "yatırım ve hibe toplamları, yıllara göre eğilim.",
+            + "yatırım ve hibe toplamları, yıllara göre eğilim. "
+            // "En çok ciro yapan girişimler" sorusu bu alan olmadan
+            // yanıtlanamıyordu: model 30+ girişimi tek tek gezmeye çalışıp
+            // araç turlarını tüketiyordu.
+            + "**Sıralama soruları bu araçla yanıtlanır:** topByInvestment en "
+            + "çok yatırım alan, topByRevenue ise revenueRankingYear yılında en "
+            + "çok ciro yapan ilk 5 girişimi verir. Girişimleri tek tek gezme.",
             Schema(new
             {
                 programId = Text("Program kimliği (GUID) ile daralt."),
                 sector = EnumOf<Sector>("Sektör ile daralt."),
-                city = Text("Şehir ile daralt.")
+                city = Text("Şehir ile daralt."),
+                year = Number("Yıl ile daralt; ciro sıralaması da bu yıla göre kurulur.")
             })),
+
+        new("list_programs",
+            "Programları listeler: ad, tür, koordinatörlük, girişim sayısı ve "
+            + "dönemler. Kullanıcı bir programdan **adıyla** söz ettiğinde önce "
+            + "bunu çağır — program kimliğini (GUID) kullanıcıdan isteme, "
+            + "buradan çöz. Listede eşleşen ad yoksa öyle bir program yoktur.",
+            Schema(new object())),
 
         new("list_pending_approvals",
             "Bekleyen değişiklik onaylarını listeler. Yalnızca onay yetkisi olan "
@@ -104,6 +137,7 @@ public sealed class AssistantToolbox(
         "get_program_history" => await TimelineAsync(args, ct),
         "list_achievements" => await AchievementsAsync(args, ct),
         "ecosystem_stats" => await StatsAsync(args, ct),
+        "list_programs" => await ProgramsAsync(ct),
         "list_pending_approvals" => await ApprovalsAsync(args, ct),
         _ => Error.NotFound($"Bilinmeyen araç: {name}")
     };
@@ -131,7 +165,10 @@ public sealed class AssistantToolbox(
         return Wrap("search_startups", page, page.TotalCount == 0
             ? "Süzgece uyan girişim yok."
             : $"{page.TotalCount} girişim bulundu: {string.Join(", ", names)}"
-              + (page.TotalCount > 5 ? " …" : "."));
+              + (page.TotalCount > 5 ? " …" : "."),
+            // Toplam değil, sayfadaki kimlikler: arayüz yalnızca modele
+            // gerçekten gösterilen kayıtlara bağlantı verebilmeli.
+            StartupIdsOf(page.Items));
     }
 
     private async Task<Result<AssistantToolResult>> CardAsync(JsonElement args, CancellationToken ct)
@@ -146,7 +183,8 @@ public sealed class AssistantToolbox(
         return Wrap("get_startup_card", value,
             $"{value.Name} — {StartupLabels.Sector(value.Sector)}, {value.City ?? "şehir bilgisi yok"}, "
             + $"{StartupLabels.Status(value.Status)}; {value.Programs.Count} program kaydı, "
-            + $"{value.Achievements.TotalCount} başarı kaydı.");
+            + $"{value.Achievements.TotalCount} başarı kaydı.",
+            [value.Id]);
     }
 
     private async Task<Result<AssistantToolResult>> TimelineAsync(JsonElement args, CancellationToken ct)
@@ -162,7 +200,8 @@ public sealed class AssistantToolbox(
 
         return Wrap("get_program_history", value,
             $"{value.StartupName}: {value.Entries.Count} zaman çizelgesi girdisi"
-            + (first is { } start ? $", en eskisi {start.ToString("d MMMM yyyy", Turkish)}." : "."));
+            + (first is { } start ? $", en eskisi {start.ToString("d MMMM yyyy", Turkish)}." : "."),
+            [id]);
     }
 
     private async Task<Result<AssistantToolResult>> AchievementsAsync(JsonElement args, CancellationToken ct)
@@ -176,13 +215,15 @@ public sealed class AssistantToolbox(
         var value = result.Value!;
         return Wrap("list_achievements", value,
             $"{value.Items.Count} başarı kaydı"
-            + (value.ExactAmountsVisible ? "." : " (tutarlar bu rol için maskeli)."));
+            + (value.ExactAmountsVisible ? "." : " (tutarlar bu rol için maskeli)."),
+            [id]);
     }
 
     private async Task<Result<AssistantToolResult>> StatsAsync(JsonElement args, CancellationToken ct)
     {
         var result = await stats.Handle(new EcosystemStatsRequest(
-            Id(args, "programId"), En<Sector>(args, "sector"), Str(args, "city")), ct);
+            Id(args, "programId"), En<Sector>(args, "sector"), Str(args, "city"),
+            Int(args, "year")), ct);
 
         if (!result.IsSuccess) return result.Error!;
 
@@ -195,6 +236,25 @@ public sealed class AssistantToolbox(
         return Wrap("ecosystem_stats", value,
             $"{totals.Startups} girişim ({totals.ActiveStartups} faal), "
             + $"{totals.Participations} program katılımı, {investment}.");
+    }
+
+    /// <summary>
+    /// Program adı → kimlik köprüsü. Bu araç yokken model, adıyla sorulan bir
+    /// programın kimliğini kullanıcıdan istiyordu; kullanıcı da bilmiyordu.
+    /// Boş liste "böyle bir program yok" demek, "bilinmiyor" değil.
+    /// </summary>
+    private async Task<Result<AssistantToolResult>> ProgramsAsync(CancellationToken ct)
+    {
+        var result = await programs.Handle(ct);
+        if (!result.IsSuccess) return result.Error!;
+
+        var value = result.Value!;
+        var names = value.Take(5).Select(p => p.Name);
+
+        return Wrap("list_programs", value, value.Count == 0
+            ? "Görebildiğiniz kapsamda program yok."
+            : $"{value.Count} program: {string.Join(", ", names)}"
+              + (value.Count > 5 ? " …" : "."));
     }
 
     private async Task<Result<AssistantToolResult>> ApprovalsAsync(JsonElement args, CancellationToken ct)
@@ -213,8 +273,21 @@ public sealed class AssistantToolbox(
             $"{value.PendingCount} bekleyen onay isteği.");
     }
 
-    private static Result<AssistantToolResult> Wrap(string tool, object payload, string summary) =>
-        new AssistantToolResult(tool, JsonSerializer.Serialize(payload, Json), summary);
+    /// <summary>
+    /// Arama sonucundaki kimlikler, sonuçtaki sırayı koruyarak. Ayrı ve saf bir
+    /// metot olarak duruyor ki veritabanı olmadan doğrulanabilsin.
+    /// </summary>
+    public static IReadOnlyList<Guid> StartupIdsOf(IEnumerable<StartupListItemResponse> items) =>
+        [.. items.Select(i => i.Id).Distinct()];
+
+    /// <param name="startupIds">
+    /// Sonucun dokunduğu girişimler. Verilmezse boş kalır — ekosistem geneli
+    /// araçlarda doğru olan bu.
+    /// </param>
+    private static Result<AssistantToolResult> Wrap(
+        string tool, object payload, string summary, IReadOnlyList<Guid>? startupIds = null) =>
+        new AssistantToolResult(
+            tool, JsonSerializer.Serialize(payload, Json), summary, startupIds ?? []);
 
     // --- Argüman okuma ----------------------------------------------------
     // Model bazen alanı hiç göndermez, bazen null, bazen boş string gönderir;

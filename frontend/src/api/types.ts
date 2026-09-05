@@ -439,6 +439,40 @@ export type ForgotPasswordBody = { email: string }
 export type ResetPasswordBody = { token: string; newPassword: string }
 export type ChangePasswordBody = { currentPassword: string; newPassword: string }
 
+// --- Girişimin kendi kendine kaydı -----------------------------------------
+
+/**
+ * Ana sayfadaki "Kayıt Ol" formunun gövdesi. Şehir/telefon bilinçli olarak
+ * forma konmadı, bu yüzden burada hep `null` gönderilir — SuperAdmin onay
+ * sırasında girişim kartını tamamlar.
+ */
+export type RegisterStartupBody = {
+  email: string
+  password: string
+  fullName: string
+  startupName: string
+  sector: Sector
+  city?: string | null
+  contactPhone?: string | null
+  kvkkConsentVersion?: string
+}
+
+export type RegistrationRequestStatus = 'Pending' | 'Approved' | 'Rejected'
+
+export type RegistrationRequestRow = {
+  id: string
+  email: string
+  fullName: string
+  startupName: string
+  sector: Sector
+  city: string | null
+  contactPhone: string | null
+  status: RegistrationRequestStatus
+  createdAt: string
+  reviewedAt: string | null
+  rejectionReason: string | null
+}
+
 // --- Girişim silme --------------------------------------------------------
 
 /** Soft delete zincirinin raporu: hangi bağlı kayıt kaç adet pasife alındı. */
@@ -598,9 +632,20 @@ export type EcosystemStats = {
   investmentByYear: MoneySlice[]
   revenueByYear: MoneySlice[]
   topByInvestment: TopStartupSlice[]
+  /**
+   * `revenueRankingYear` yılında en çok ciro yapan ilk 5 girişim. Sıralama tek
+   * bir yıl üzerinden kurulur: yılları toplamak "bu yıl en çok ciro yapan"
+   * sorusunu yanıtlamaz. Maskeleme `topByInvestment` ile aynı kuralda.
+   */
+  topByRevenue: TopRevenueSlice[]
+  /** Ciro sıralamasının ait olduğu yıl; hiç ciro kaydı yoksa null. */
+  revenueRankingYear: number | null
   amountsVisible: boolean
   currency: string
   generatedAt: string
+  /** Kapsamdaki finansal kayıtların bulunduğu yıllar, yeniden eskiye — yıl
+   * süzgecinin seçenekleri buradan gelir, seçili yıldan bağımsız değişmez. */
+  availableYears: number[]
 }
 
 export type EcosystemTotals = {
@@ -629,12 +674,30 @@ export type TopStartupSlice = {
   investment: number | null
 }
 
+/**
+ * Ciro sıralaması satırı. Ayrı bir tip: sunucudaki alan adı `revenue` ve
+ * `TopStartupSlice`'ı ortak bir ada çevirmek panoyu ve doğrulama betiklerini
+ * kırardı.
+ */
+export type TopRevenueSlice = {
+  startupId: string
+  name: string
+  sectorLabel: string
+  revenue: number | null
+}
+
 // --- AI karar destek (Faz 5) ----------------------------------------------
 
 /** `Local`: anahtar tanımlı değil, yanıt yerel anahtar sözcük planlayıcısından. */
 export type AssistantMode = 'Model' | 'Local'
 
-export type AssistantSource = { tool: string; summary: string }
+/**
+ * `startupIds` yalnızca kimlik taşır, girişim nesnesi değil: cevap metnindeki
+ * addan kimlik çıkarmak hem kırılgan (aynı adlı iki kayıt) hem de modelin
+ * uydurduğu bir adı gerçek kayda bağlama riski. Kartı çizmek isteyen ekran
+ * kimlikleri girişim listesiyle eşleştirir — maskeleme orada zaten doğru.
+ */
+export type AssistantSource = { tool: string; summary: string; startupIds: string[] }
 
 export type AssistantAnswer = {
   question: string
@@ -654,4 +717,47 @@ export type StartupSummary = {
   modelName: string
   exactAmountsVisible: boolean
   generatedAt: string
+}
+
+// --- Kalıcı çok turlu sohbet ----------------------------------------------
+// Geçmiş sunucuda duruyor; istemcide ikinci bir kopya tutulmuyor. Sebep tek
+// cümlede: bağlamı istemci gönderebilseydi, hiç sorulmamış bir turu
+// "sorulmuş" gibi sunabilirdi.
+
+export type AiConversationSummary = {
+  id: string
+  title: string
+  lastMessageAt: string
+  messageCount: number
+}
+
+/** `mode`/`modelName` yalnızca asistan satırlarında dolu; kullanıcı satırında null. */
+export type AiChatMessageRow = {
+  id: string
+  role: 'User' | 'Assistant'
+  text: string
+  startupIds: string[]
+  tools: string[]
+  mode: AssistantMode | null
+  modelName: string | null
+  createdAt: string
+}
+
+export type AiConversationDetail = {
+  id: string
+  title: string
+  createdAt: string
+  lastMessageAt: string
+  messages: AiChatMessageRow[]
+}
+
+/** `conversationId` her turda dönüyor: yeni sohbeti sürdürmenin tek yolu bu. */
+export type AiChatReply = {
+  conversationId: string
+  answer: string
+  sources: AssistantSource[]
+  startupIds: string[]
+  mode: AssistantMode
+  modelName: string
+  answeredAt: string
 }

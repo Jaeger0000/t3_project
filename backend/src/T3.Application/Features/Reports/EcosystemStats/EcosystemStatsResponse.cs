@@ -17,9 +17,12 @@ public sealed record EcosystemStatsResponse(
     IReadOnlyList<MoneySlice> InvestmentByYear,
     IReadOnlyList<MoneySlice> RevenueByYear,
     IReadOnlyList<TopStartupSlice> TopByInvestment,
+    IReadOnlyList<TopRevenueSlice> TopByRevenue,
+    int? RevenueRankingYear,
     bool AmountsVisible,
     string Currency,
-    DateTimeOffset GeneratedAt);
+    DateTimeOffset GeneratedAt,
+    IReadOnlyList<int> AvailableYears);
 
 public sealed record EcosystemTotals(
     int Startups,
@@ -50,3 +53,14 @@ public sealed record MoneySlice(string Key, string Label, int Count, decimal? To
 /// </summary>
 public sealed record TopStartupSlice(
     Guid StartupId, string Name, string SectorLabel, decimal? Investment);
+
+/// <summary>
+/// Ciro sıralaması. Yatırım sıralamasıyla aynı maskeleme kuralına tabi:
+/// sıralamanın kendisi ekosistem karnesi, tekil tutar satır düzeyi hassas veri.
+///
+/// Ayrı bir kayıt olmasının sebebi <see cref="TopStartupSlice"/>'ın alan adının
+/// <c>Investment</c> olması; ortak bir ada çevirmek arayüzü ve doğrulama
+/// betiklerini kırardı, oysa kazanç yalnızca birkaç satır tasarruftu.
+/// </summary>
+public sealed record TopRevenueSlice(
+    Guid StartupId, string Name, string SectorLabel, decimal? Revenue);

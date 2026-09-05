@@ -54,22 +54,33 @@ public static class SessionCookie
     }
 
     /// <summary>
-    /// Oturum çerezi varken CSRF çerezi yoksa yenisini yazar. Tek amaç
+    /// Oturum çerezi varken CSRF çerezini doğru değere getirir. Tek amaç
     /// istemciyi kilitli durumda bırakmamak: çerezlerden yalnızca biri
     /// silinirse (tarayıcı temizliği, farklı ömür) her yazma isteği 403 alırdı.
+    ///
+    /// Eksik çerez kadar <b>eskimiş</b> çerez de onarılıyor: değer oturum
+    /// jetonundan türetildiği için önceki oturumdan kalan bir CSRF çerezi
+    /// artık eşleşmiyor ve kullanıcı çıkışsız bir 403 duvarına toslar —
+    /// tek kurtuluşu tarayıcı çerezlerini elle silmek olurdu. Sunucu doğru
+    /// değeri her zaman yeniden üretebildiği için burada sessizce düzeltiliyor.
+    /// Güvenlik gevşemiyor: yazılan değer yine yalnızca <c>Jwt:Secret</c>
+    /// sırrını bilenin üretebileceği HMAC ve yalnızca geçerli bir oturum
+    /// çerezi taşıyan isteğe yazılıyor.
     /// </summary>
     public static void EnsureCsrf(HttpContext context)
     {
         if (ReadToken(context) is not { } sessionToken)
             return;
 
-        if (!string.IsNullOrEmpty(context.Request.Cookies[CsrfCookieName]))
-            return;
-
         // Rastgele değil, oturuma bağlı türetilmiş değer: aynı jetonla her
         // çağrıldığında aynı sonucu üretir, ayrıca bir yerde saklanmaz
         // (bkz. G-11, Guvenlik_Denetimi_ve_Iyilestirme_Plani.md).
-        AppendCsrf(context, DeriveCsrfToken(context, sessionToken), expiresAt: null);
+        var expected = DeriveCsrfToken(context, sessionToken);
+
+        if (string.Equals(context.Request.Cookies[CsrfCookieName], expected, StringComparison.Ordinal))
+            return;
+
+        AppendCsrf(context, expected, expiresAt: null);
     }
 
     public static void Clear(HttpContext context)

@@ -40,6 +40,16 @@ public interface IChatModel
     /// <summary>Arayüzde "hangi model yanıtladı" bilgisini göstermek için.</summary>
     string Name { get; }
 
+    /// <summary>
+    /// Model araç çağırabiliyor mu? Ücretsiz/küçük modellerin bir kısmı
+    /// function calling'i hiç desteklemiyor ve araç gönderilen isteği tümden
+    /// reddediyor. Adaptör bunu ilk redde öğrenip <c>false</c>'a çeviriyor;
+    /// çağıran taraf da araçları kendisi çalıştırıp sonucu modele metin olarak
+    /// veren melez yola geçiyor. Varsayılan <c>true</c> — mevcut sağlayıcıların
+    /// davranışı değişmiyor.
+    /// </summary>
+    bool SupportsTools => true;
+
     Task<ChatTurn> CompleteAsync(
         string systemPrompt,
         IReadOnlyList<ChatMessage> messages,

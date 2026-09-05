@@ -1,5 +1,7 @@
 using System.Text.Json;
 using T3.Application.Features.Assistant;
+using T3.Application.Features.Startups.SearchStartups;
+using T3.Domain.Startups;
 
 namespace T3.Application.Tests;
 
@@ -45,6 +47,29 @@ public class AssistantToolboxTests
             Assert.Equal(JsonValueKind.Object, schema.GetProperty("properties").ValueKind);
         }
     }
+
+    [Fact]
+    public void Arama_sonucu_girisim_kimliklerini_tasir()
+    {
+        // Kimlikler modelin cevabından değil aracın döndürdüğü kayıttan gelir;
+        // arayüz cevaptaki girişime ancak bu listeyle bağlantı verebilir.
+        var first = Item("Alfa");
+        var second = Item("Beta");
+
+        var ids = AssistantToolbox.StartupIdsOf([first, second, first]);
+
+        Assert.Equal([first.Id, second.Id], ids);
+    }
+
+    [Fact]
+    public void Bos_arama_sonucunda_kimlik_listesi_bos()
+    {
+        Assert.Empty(AssistantToolbox.StartupIdsOf([]));
+    }
+
+    private static StartupListItemResponse Item(string name) =>
+        new(Guid.NewGuid(), name, Sector.Software, "İstanbul", StartupStatus.Active,
+            null, null, [], null, 0, 0, null, false, "TRY");
 
     [Fact]
     public void Zorunlu_alanlar_semada_tanimli()

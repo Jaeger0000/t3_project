@@ -27,13 +27,7 @@ public sealed record AssistantAnswerResponse(
     string ModelName,
     DateTimeOffset AnsweredAt);
 
-public sealed record AssistantSourceResponse(string Tool, string Summary);
-
-public enum AssistantMode
-{
-    /// <summary>Dil modeli yanıtladı.</summary>
-    Model = 1,
-
-    /// <summary>Anahtar tanımlı değil; yerel anahtar sözcük planlayıcısı yanıtladı.</summary>
-    Local = 2
-}
+// AssistantSourceResponse ve AssistantMode alanın ortak dosyasına taşındı
+// (Features/Assistant/AssistantResponse.cs): tek soru ucu, kalıcı sohbet ve
+// girişim özeti dilimlerinin üçü de aynı tipi döndürüyor; birinin klasöründe
+// tutmak diğer ikisini o dilime bağımlı kılardı.

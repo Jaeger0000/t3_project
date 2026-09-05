@@ -6,6 +6,7 @@ using T3.Application.Common.Interfaces;
 using T3.Application.Features.Auth.ChangePassword;
 using T3.Application.Features.Auth.GetSession;
 using T3.Application.Features.Auth.Login;
+using T3.Application.Features.Auth.Register;
 using T3.Application.Features.Auth.RequestPasswordReset;
 using T3.Application.Features.Auth.ResetPassword;
 
@@ -72,6 +73,22 @@ public static class AuthEndpoints
             })
             .AllowAnonymous()
             .WithSummary("Oturum çerezlerini siler ve kullanıcının tüm jetonlarını geçersiz kılar.");
+
+        // Kayıt Ol ekranının tek uğrağı: girişim kullanıcısı hiçbir tabloya
+        // doğrudan yazamadığı için burası da bir istisna değil, yalnızca onay
+        // bekleyen bir başvuru üretir. Herkese açık — ana sayfadan, oturum
+        // olmadan çağrılır; kaba kuvvet/numaralandırma riski login ile aynı
+        // kovada sınırlanıyor.
+        auth.MapPost("/register", async (
+                RegisterStartupRequest request,
+                RegisterStartupHandler handler,
+                CancellationToken ct) =>
+            (await handler.Handle(request, ct))
+                .ToCreated(created => $"/api/registration-requests/{created.Id}"))
+            .AllowAnonymous()
+            .RequireRateLimiting(AuthRateLimit.AuthPolicy)
+            .WithValidation<RegisterStartupRequest>()
+            .WithSummary("Girişim kullanıcısının kendi kendine kayıt başvurusunu oluşturur; SuperAdmin onayı bekler.");
 
         // Kurtarma uçları da giriş kovasında: ikisi de kimlik doğrulamadan önce
         // e-posta alan, kaba kuvvete ve numaralandırmaya açık yüzeyler.

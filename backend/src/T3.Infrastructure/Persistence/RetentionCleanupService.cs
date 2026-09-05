@@ -2,17 +2,20 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using T3.Domain.Assistant;
 using T3.Domain.Audit;
 using T3.Domain.Identity;
 
 namespace T3.Infrastructure.Persistence;
 
 /// <summary>
-/// Süresiz büyüyen iki kişisel veri deposunu günlük olarak temizler:
-/// <see cref="PasswordResetToken"/> (süresi dolanlar silinir) ve
+/// Süresiz büyüyen kişisel veri depolarını günlük olarak temizler:
+/// <see cref="PasswordResetToken"/> (süresi dolanlar silinir),
 /// <see cref="AuditLog"/> (10 yıldan eskiler kişisel veriden arındırılır,
-/// olayın kendisi kalır). Aydınlatma metninde (PrivacyNoticePage) yazılan
-/// saklama sürelerinin kod karşılığı burası — metin ile kod ayrışmasın diye
+/// olayın kendisi kalır) ve <see cref="AiConversation"/> (1 yıldan eskiler
+/// mesajlarıyla birlikte gerçekten silinir). Aydınlatma metninde
+/// (PrivacyNoticePage) yazılan saklama sürelerinin kod karşılığı burası —
+/// metin ile kod ayrışmasın diye
 /// (bkz. G-09, Guvenlik_Denetimi_ve_Iyilestirme_Plani.md).
 /// </summary>
 public sealed class RetentionCleanupService(
@@ -21,6 +24,14 @@ public sealed class RetentionCleanupService(
 {
     /// <summary>Denetim izi saklama süresi — aydınlatma metnindeki değerle aynı.</summary>
     public static readonly TimeSpan AuditLogRetention = TimeSpan.FromDays(365 * 10);
+
+    /// <summary>
+    /// AI sohbet geçmişi saklama süresi. Denetim izinden çok daha kısa, çünkü
+    /// sohbet serbest metin: kullanıcı oraya hiçbir formun sormadığı kişisel
+    /// veriyi yazabilir. Anonimleştirme de yeterli değil — anonimleştirilecek
+    /// alan metnin kendisi.
+    /// </summary>
+    public static readonly TimeSpan ConversationRetention = TimeSpan.FromDays(365);
 
     private static readonly TimeSpan Interval = TimeSpan.FromHours(24);
 
@@ -85,14 +96,27 @@ public sealed class RetentionCleanupService(
             log.AfterJson = null;
         }
 
-        if (expiredTokens.Count == 0 && oldLogs.Count == 0)
+        // 1 yıldan beri konuşulmamış AI sohbetleri gerçekten silinir; mesajlar
+        // ilişkinin cascade kuralıyla birlikte gider. Sohbette soft delete yok:
+        // pasife almak metni veritabanında bırakmak olurdu.
+        var conversationCutoff = now - ConversationRetention;
+
+        var oldConversations = await db.AiConversations
+            .Where(c => c.LastMessageAt < conversationCutoff)
+            .ToListAsync(ct);
+
+        if (oldConversations.Count > 0)
+            db.AiConversations.RemoveRange(oldConversations);
+
+        if (expiredTokens.Count == 0 && oldLogs.Count == 0 && oldConversations.Count == 0)
             return;
 
         await db.SaveChangesAsync(ct);
 
         logger.LogInformation(
             "Saklama süresi temizliği: {ExpiredTokens} şifre sıfırlama jetonu silindi, "
-            + "{AnonymizedLogs} denetim izi satırı anonimleştirildi.",
-            expiredTokens.Count, oldLogs.Count);
+            + "{AnonymizedLogs} denetim izi satırı anonimleştirildi, "
+            + "{DeletedConversations} AI sohbeti silindi.",
+            expiredTokens.Count, oldLogs.Count, oldConversations.Count);
     }
 }

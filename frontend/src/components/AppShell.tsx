@@ -5,6 +5,7 @@ import { roleLabels } from '@/lib/labels'
 import { usePendingCount } from '@/features/approvals/queries'
 import { Badge, Button } from '@/components/ui'
 import { LogoLockup } from '@/components/Logo'
+import AssistantWidget from '@/features/assistant/AssistantWidget'
 
 /**
  * Menü rol bazlı kurulur. Bu bir güvenlik önlemi değil — yetki sunucuda
@@ -22,6 +23,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     { to: '/pano', label: 'Pano', show: true },
     { to: '/girisimler', label: 'Girişimler', show: true },
     { to: '/programlar', label: 'Programlar', show: true },
+    // Girişim kullanıcısına da açık: kendi kaydını sorabiliyor, kapsamı
+    // sunucu daraltıyor.
+    { to: '/asistan', label: 'AI asistan', show: true },
     {
       to: '/portal',
       label: 'Girişim portalı',
@@ -34,6 +38,11 @@ export default function AppShell({ children }: { children?: ReactNode }) {
       badge: pendingCount,
     },
     { to: '/kullanicilar', label: 'Kullanıcılar', show: permissions?.canManageUsers ?? false },
+    {
+      to: '/kayit-basvurulari',
+      label: 'Kayıt başvuruları',
+      show: permissions?.canManageUsers ?? false,
+    },
     { to: '/denetim', label: 'Denetim izi', show: permissions?.canManageUsers ?? false },
   ]
 
@@ -141,6 +150,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           </a>
         </div>
       </footer>
+
+      {/* Sağ altta yüzen sohbet: soru, kullanıcının aklına geldiği ekranda
+          sorulabilmeli. Kendi içinde oturum/rota kontrolü yapıyor. */}
+      <AssistantWidget />
     </div>
   )
 }

@@ -142,6 +142,7 @@ demoda gerçek veriyle görünsün diye.
 | `POST /api/auth/forgot-password` | herkese açık — yanıt adresin kayıtlı olup olmadığını **söylemez** |
 | `POST /api/auth/reset-password` | herkese açık — jeton tek kullanımlık ve 2 saat geçerli |
 | `POST /api/auth/change-password` | kimlik doğrulanmış — mevcut şifre yeniden doğrulanır |
+| `POST /api/auth/register` | herkese açık — girişim kullanıcısının kendi kendine kayıt başvurusu; **hiçbir tabloya yazmaz**, yalnızca onay bekleyen `StartupRegistrationRequest` üretir |
 | `GET /api/me` | kimlik doğrulanmış — `mustChangePassword` bayrağını da taşır |
 | `GET /api/startups` | kimlik doğrulanmış — satırlar role göre daraltılır |
 | `GET /api/startups/{id}` | kimlik doğrulanmış — hassas alanlar role göre maskelenir |
@@ -168,20 +169,28 @@ demoda gerçek veriyle görünsün diye.
 | `GET /api/reports/export` | kimlik doğrulanmış — CSV; maskeli hücre "yetkiniz yok" yazar, her aktarma denetim izine düşer |
 | `POST /api/ai/ask` | kimlik doğrulanmış, kullanıcı başına dakikada 20 istek — yanıt yalnızca kullanıcının görebildiği kayıtlardan üretilir |
 | `GET /api/ai/startups/{id}/summary` | kimlik doğrulanmış — kart ve kronolojiden üretilen yönetici özeti |
+| `POST /api/ai/chat` | kimlik doğrulanmış — çok turlu sohbet; bağlam sunucuda saklanır, `conversationId` boşsa yeni sohbet açılır |
+| `GET /api/ai/chat/conversations` | kimlik doğrulanmış — **yalnızca kendi** sohbetleri, son konuşulan önce |
+| `GET /api/ai/chat/conversations/{id}` | kimlik doğrulanmış — sohbetin turları; başkasının sohbeti 404 |
 | `POST /mcp` | kimlik doğrulanmış — JSON-RPC 2.0; araçlar aynı Application handler'larını sarar |
 | `GET /api/audit-logs` | Süper Yönetici |
 | `GET/POST /api/users` · `PUT /api/users/{id}[/password]` · `DELETE /api/users/{id}` | Süper Yönetici |
+| `GET /api/registration-requests` · `POST /api/registration-requests/{id}/approve` · `POST /api/registration-requests/{id}/reject` | Süper Yönetici — onay, başvuru sahibinin seçtiği e-posta/şifreyle gerçek Startup + Girişim Kullanıcısı hesabını **anında** açar (`mustChangePassword=false`, kullanıcı zaten kendi şifresini belirledi) |
 
 Yetkilendirme varsayılan olarak kapalıdır (`FallbackPolicy`): üst veri
 taşımayan her uç kimlik ister, herkese açık uçlar bunu açıkça belirtir.
 
 ## AI katmanı
 
-Üç uç aynı Application handler'larını kullanır; AI için **paralel bir veri yolu
-yoktur**, dolayısıyla kapsam ve maskeleme kuralları tek yerde kalır.
+Uçların tamamı aynı Application handler'larını kullanır; AI için **paralel bir
+veri yolu yoktur**, dolayısıyla kapsam ve maskeleme kuralları tek yerde kalır.
 
 - `POST /api/ai/ask` — doğal dil soru. Yanıtın altında **hangi araç çağrıldı**
   listesi durur; AI burada karar verici değil karar *destek* katmanı.
+- `POST /api/ai/chat` — çok turlu sohbet. Geçmiş sunucuda saklanır (istemci
+  geçmişi göndermez), araç sonuçlarındaki girişim kimlikleri yanıtta
+  yapılandırılmış olarak döner. Sohbetler yalnızca sahibine görünür ve son
+  mesajdan 1 yıl sonra gerçekten silinir (`RetentionCleanupService`).
 - `GET /api/ai/startups/{id}/summary` — girişim kartındaki yönetici özeti.
   Tutarları göremeyen role tutarsız özet üretilir ve bunu ekranda söyler.
 - `POST /mcp` — JSON-RPC 2.0 MCP sunucusu (`initialize`, `ping`, `tools/list`,

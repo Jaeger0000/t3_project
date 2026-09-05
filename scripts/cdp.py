@@ -121,14 +121,19 @@ class Browser:
         script erişemiyor — güvenlik kazancının kendisi bu. CDP tarayıcının
         kendi çerez deposuna yazdığı için kurulum yine tek satır.
 
-        CSRF çerezi de yazılıyor: yazma istekleri çift-gönderim jetonu istiyor
-        ve değer bir sır değil, yalnızca çerez ile başlığın eşleşmesi aranıyor.
+        CSRF çerezi burada YAZILMIYOR ve bu bilinçli: G-11'den sonra değer
+        rastgele değil, `HMAC(Jwt:Secret, oturum jetonu)` ile türetiliyor —
+        yani onu yalnızca sunucu üretebilir. Betiğin uydurduğu bir değer (eskiden
+        "render-kontrolu" yazıyordu) her yazma isteğinde 403 aldırıyordu.
+
+        Onarımı sunucu kendisi yapıyor: uygulama açılışta `GET /api/me`
+        çağırıyor, `SessionCookie.EnsureCsrf` oturum çerezi varken eksik CSRF
+        çerezini doğru değerle tamamlıyor. Bu yüzden yalnızca oturum çerezini
+        yazmak yeterli — sayfa yüklendikten sonra yazma istekleri çalışır.
         """
         self.call("Network.enable")
         self.call("Network.setCookie", name="t3.session", value=token,
                   url=origin, path="/", httpOnly=True, sameSite="Strict")
-        self.call("Network.setCookie", name="t3.csrf", value="render-kontrolu",
-                  url=origin, path="/", httpOnly=False, sameSite="Strict")
         # Arayüz "daha önce oturum açıldı mı" bilgisini bu işaretten okuyor;
         # yokken 401 alan ziyaretçiye "süre doldu" demiyor (bkz. AuthProvider).
         self.evaluate("localStorage.setItem('t3.session.active', '1')")

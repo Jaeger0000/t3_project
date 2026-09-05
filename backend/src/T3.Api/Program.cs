@@ -351,6 +351,7 @@ app.MapProgramEndpoints();
 app.MapApprovalEndpoints();
 app.MapAuditEndpoints();
 app.MapUserEndpoints();
+app.MapRegistrationEndpoints();
 app.MapReportEndpoints();
 app.MapAssistantEndpoints();
 app.MapMcpEndpoints();

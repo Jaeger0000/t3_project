@@ -3,6 +3,12 @@ services:
     image: postgres:16-alpine
     container_name: t3-postgres
     restart: unless-stopped
+    # Doğrudan postgres kullanıcısıyla başlıyor: resmi imajın entrypoint'i
+    # root iken veri dizinini chown/chmod edip gosu ile bu kullanıcıya geçiyor
+    # (CAP_CHOWN/FOWNER/SETUID/SETGID ister) — root'a hiç çıkmayınca bu adım
+    # atlanıyor, cap_drop: [ALL] ile çakışmıyor. Bkz. G-17: 5 Eylül'de eklenen
+    # cap_drop tek başına postgres'i sonsuz restart döngüsüne sokuyordu.
+    user: postgres
     cap_drop: [ALL]
     mem_limit: 1g
     environment:

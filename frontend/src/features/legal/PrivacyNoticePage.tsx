@@ -93,7 +93,11 @@ export default function PrivacyNoticePage() {
           (kim, ne zaman, neyi değiştirdi) oluşturulmalarından itibaren 10 yıl
           saklanır — Türk Ticaret Kanunu'nun defter/belge saklama süresine
           kıyasen belirlenmiş bir üst sınırdır — ve bu sürenin sonunda
-          anonimleştirilir. Şifre sıfırlama bağlantıları en fazla 2 saat
+          anonimleştirilir. Yapay zekâ sohbet geçmişi (sorduğunuz sorular ve
+          aldığınız yanıtlar) son mesajdan itibaren 1 yıl saklanır ve bu sürenin
+          sonunda pasife alınmaz, <strong>tümüyle silinir</strong> — serbest
+          metin olduğu için anonimleştirilecek bir alan yoktur. Sohbetlerinizi
+          yalnızca siz görürsünüz. Şifre sıfırlama bağlantıları en fazla 2 saat
           geçerlidir ve kullanımdan veya süre dolumundan sonra silinir.
         </p>
       </LegalSection>

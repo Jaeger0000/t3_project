@@ -48,12 +48,18 @@ function toQueryString(filters: StartupFilters): string {
   return params.toString()
 }
 
-export function useStartups(filters: StartupFilters) {
+/**
+ * `enabled`: AI paneli girişim kartlarını ancak bir cevap geldiğinde çiziyor,
+ * o yüzden listeyi de o ana kadar istemiyor — panoyu her açan kullanıcı için
+ * boşuna bir istek atmasın.
+ */
+export function useStartups(filters: StartupFilters, enabled = true) {
   return useQuery({
     queryKey: ['startups', filters],
     queryFn: () => api.get<PagedResult<StartupListItem>>(`/api/startups?${toQueryString(filters)}`),
     // Sayfa/filtre değişirken listenin boşalmaması için önceki veri korunur.
     placeholderData: (previous) => previous,
+    enabled,
   })
 }
 

@@ -63,9 +63,35 @@ public sealed class EcosystemStatsHandler(
         var grants = await MoneyRowsAsync<GrantRecord>(
             scopedIds, _ => null, _ => null, MoneyKind.Grant, ct);
 
-        var achievementCount = await db.Achievements.AsNoTracking()
+        // Yıl seçilmeden önceki dağılımı taşıyor: açılır liste her zaman
+        // kapsamdaki TÜM yılları göstermeli, yoksa bir yıl seçilince diğer
+        // yıllar listeden sessizce kaybolurdu.
+        var availableYears = investments.Concat(revenues).Concat(exports).Concat(grants)
+            .Select(EffectiveYear)
+            .Distinct()
+            .OrderByDescending(y => y)
+            .ToList();
+
+        if (request.Year is { } year)
+        {
+            investments = investments.Where(r => EffectiveYear(r) == year).ToList();
+            revenues = revenues.Where(r => EffectiveYear(r) == year).ToList();
+            exports = exports.Where(r => EffectiveYear(r) == year).ToList();
+            grants = grants.Where(r => EffectiveYear(r) == year).ToList();
+        }
+
+        // `.Year` veritabanı sorgusunda değil bellekte hesaplanıyor: proje
+        // Application katmanında sağlayıcıya özel tarih çevirisine güvenmiyor
+        // (bkz. CLAUDE.md), diğer yıl kırılımları da (ByYear) aynı sebeple
+        // materialize edildikten sonra gruplanıyor.
+        var achievementDates = await db.Achievements.AsNoTracking()
             .Where(a => scopedIds.Contains(a.StartupId))
-            .CountAsync(ct);
+            .Select(a => a.OccurredOn)
+            .ToListAsync(ct);
+
+        var achievementCount = request.Year is { } y
+            ? achievementDates.Count(d => d.Year == y)
+            : achievementDates.Count;
 
         var visibility = StartupVisibility.Aggregate(currentUser);
 
@@ -75,8 +101,10 @@ public sealed class EcosystemStatsHandler(
                 .Select(p => new ParticipationRow(p.StartupId, p.ProgramId, p.ProgramName))
                 .ToList(),
             investments, revenues, exports, grants,
-            achievementCount, visibility, currentUser);
+            achievementCount, visibility, currentUser, availableYears);
     }
+
+    private static int EffectiveYear(MoneyRow row) => row.FiscalYear ?? row.OccurredOn.Year;
 
     /// <summary>
     /// Tek bir başarı alt tipini düzleştirilmiş tutar satırına indirger. Yalnızca
@@ -144,7 +172,8 @@ public sealed class EcosystemStatsHandler(
         List<MoneyRow> grants,
         int achievementCount,
         StartupVisibility visibility,
-        ICurrentUser currentUser)
+        ICurrentUser currentUser,
+        IReadOnlyList<int> availableYears)
     {
         var latestRevenueYear = revenues.Count == 0 ? (int?)null : revenues.Max(r => r.FiscalYear!.Value);
 
@@ -219,9 +248,36 @@ public sealed class EcosystemStatsHandler(
                     // düzeyi hassas veridir ve aynı role kapalıdır.
                     StartupVisibility.For(currentUser, s.Id).ShowExactAmounts ? x.Total : null))
                 .ToList(),
+            /*
+             * Ciro sıralaması **tek bir yıl** üzerinden kurulur: yılları
+             * toplamak "2025'te en çok ciro yapan" sorusunu yanıtlamaz, eski
+             * bir girişimi öne çıkarırdı. Yıl süzgeci verilmişse o yıl, yoksa
+             * kayıtlardaki en son yıl esas alınır — hangisi olduğunu istemci
+             * `RevenueRankingYear` alanından okur.
+             *
+             * Bu liste olmadan soru araçlarla yanıtlanamıyordu: ciro yalnızca
+             * girişim başına `list_achievements` ile geliyordu ve model 30+
+             * girişimi tek tek gezmeye çalışıp araç turlarını tüketiyordu.
+             */
+            TopByRevenue: latestRevenueYear is { } rankingYear
+                ? revenues
+                    .Where(r => r.FiscalYear == rankingYear)
+                    .GroupBy(r => r.StartupId)
+                    .Select(g => new { StartupId = g.Key, Total = g.Sum(r => r.Amount) })
+                    .OrderByDescending(x => x.Total)
+                    .Take(5)
+                    .Join(startups, x => x.StartupId, s => s.Id, (x, s) => new TopRevenueSlice(
+                        s.Id,
+                        s.Name,
+                        StartupLabels.Sector(s.Sector),
+                        StartupVisibility.For(currentUser, s.Id).ShowExactAmounts ? x.Total : null))
+                    .ToList()
+                : [],
+            RevenueRankingYear: latestRevenueYear,
             AmountsVisible: visibility.ShowExactAmounts,
             Currency: StartupMoney.ReportingCurrency,
-            GeneratedAt: DateTimeOffset.UtcNow);
+            GeneratedAt: DateTimeOffset.UtcNow,
+            AvailableYears: availableYears);
     }
 
     private static IReadOnlyList<MoneySlice> ByYear(

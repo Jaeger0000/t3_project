@@ -71,7 +71,7 @@ export default function DashboardPage() {
       ) : null}
 
       <Card className="p-4">
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-4">
           <Select
             label="Sektör"
             value={filters.sector}
@@ -104,6 +104,24 @@ export default function DashboardPage() {
             value={filters.city}
             onChange={(event) => update('city', event.target.value)}
           />
+
+          {/* Seçenekler sunucudan geliyor: kapsamdaki finansal kayıtların
+              gerçekten bulunduğu yıllar, uydurma bir aralık değil. Yıl
+              seçilince yalnızca finansal dağılımlar (yatırım, hibe, ciro,
+              ihracat, başarı sayısı) daralır — girişim listesi ve sektör/şehir
+              dağılımı kapsamdaki TÜM girişimleri göstermeye devam eder. */}
+          <Select
+            label="Yıl"
+            value={filters.year}
+            onChange={(event) => update('year', event.target.value)}
+          >
+            <option value="">Tümü</option>
+            {(stats.data?.availableYears ?? []).map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </Select>
         </div>
       </Card>
 

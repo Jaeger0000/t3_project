@@ -1,6 +1,11 @@
 import { useMutation } from '@tanstack/react-query'
 import { api } from '@/lib/apiClient'
-import type { ChangePasswordBody, ForgotPasswordBody, ResetPasswordBody } from '@/api/types'
+import type {
+  ChangePasswordBody,
+  ForgotPasswordBody,
+  RegisterStartupBody,
+  ResetPasswordBody,
+} from '@/api/types'
 
 /**
  * Şifre kurtarma uçları. Üçü de Dalga 1'de eklendi: öncesinde tek yol
@@ -25,5 +30,15 @@ export function useChangePassword() {
   return useMutation({
     mutationFn: (body: ChangePasswordBody) =>
       api.post<{ changedAt: string }>('/api/auth/change-password', body),
+  })
+}
+
+/**
+ * Ana sayfadaki "Kayıt Ol" formu. Anonim uç: hesap burada doğmuyor, yalnızca
+ * SuperAdmin onayı bekleyen bir başvuru satırı oluşuyor.
+ */
+export function useRegisterStartup() {
+  return useMutation({
+    mutationFn: (body: RegisterStartupBody) => api.post<{ id: string }>('/api/auth/register', body),
   })
 }

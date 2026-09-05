@@ -67,9 +67,22 @@ browser = Browser()
 
 
 def as_user(role, path, wait_for=None):
+    """Rolü kurup sayfayı açar ve **veri yerleşene kadar** bekler.
+
+    Başlık ("Ekosistem panosu") istek uçarken de ekranda: yalnızca ona
+    bakmak, karne hâlâ "hesaplanıyor" durumundayken metni yakalıyordu ve
+    sayı/kilit aramaları rastgele başarısız oluyordu. Yükleniyor işareti
+    kaybolana kadar beklemek bu yanlış alarmı kapatıyor.
+    """
     browser.goto(f"{APP}/giris")
     browser.set_session(tokens[role])
-    return browser.goto(f"{APP}{path}", wait_for=wait_for)
+    text = browser.goto(f"{APP}{path}", wait_for=wait_for)
+
+    deadline = time.time() + 20
+    while time.time() < deadline and "hesaplanıyor" in text:
+        time.sleep(0.4)
+        text = browser.text()
+    return text
 
 
 def testid_text(testid, timeout=15):
@@ -225,8 +238,11 @@ try:
     check("yetki uyarısı panelde",
           "yalnızca sizin görme yetkiniz olan kayıtlardan" in text, text[:500])
 
+    # Hangi aracın seçileceği artık modelin kararı: "kaç girişim var" sorusuna
+    # ecosystem_stats seçmesi search_startups'tan daha doğru. Beklenen şey belli
+    # bir araç değil, kaynak bloğunun ekrana gelmesi.
     text = browser.click_text("Savunma sektöründe kaç girişim var?",
-                              wait_for="search_startups")
+                              wait_for="KAYNAKLAR")
     answer = testid_text("assistant-answer")
     check("yanıt bloğu render oluyor", bool(answer and answer.strip()), str(answer)[:200])
     check("yanıt savunma sektöründen bahsediyor", "Savunma" in (answer or ""),
@@ -236,8 +252,10 @@ try:
         ".map(n => n.innerText).join(',')")
     check("kaynaklar başlığı ekranda", "KAYNAKLAR" in (text or "").upper(),
           (text or "")[:400])
-    check("kaynak araç adları ekranda", bool(sources and "search_startups" in sources),
-          str(sources))
+    known_tools = {"search_startups", "get_startup_card", "get_program_history",
+                   "list_achievements", "ecosystem_stats", "list_pending_approvals"}
+    check("kaynak araç adları ekranda",
+          any(tool in (sources or "") for tool in known_tools), str(sources))
     check("hangi modun yanıtladığı rozetle söyleniyor",
           "Yerel plan (model yok)" in (text or "") or "Model:" in (text or ""),
           (text or "")[:400])

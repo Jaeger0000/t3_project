@@ -33,12 +33,20 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white dark:bg-stone-950">
       <header className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-5">
         <LogoLockup compact />
-        <Link
-          to="/giris"
-          className="inline-flex items-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
-        >
-          Giriş yap
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/kayit-ol"
+            className="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:border-brand-500 hover:bg-brand-500 hover:text-white dark:border-stone-700 dark:text-stone-200"
+          >
+            Girişim misiniz? Kayıt olun
+          </Link>
+          <Link
+            to="/giris"
+            className="inline-flex items-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+          >
+            Giriş yap
+          </Link>
+        </div>
       </header>
 
       <main className="mx-auto max-w-5xl px-6 pb-16">
@@ -63,9 +71,15 @@ export default function LandingPage() {
             >
               Sisteme giriş yap
             </Link>
+            <Link
+              to="/kayit-ol"
+              className="inline-flex items-center rounded-lg border border-stone-300 px-5 py-2.5 text-sm font-medium text-stone-700 transition-colors hover:border-brand-500 hover:bg-brand-500 hover:text-white dark:border-stone-700 dark:text-stone-200"
+            >
+              Girişim misiniz? Kayıt olun
+            </Link>
             <a
               href="#neler-var"
-              className="inline-flex items-center rounded-lg border border-stone-300 px-5 py-2.5 text-sm font-medium text-stone-700 transition-colors hover:border-brand-500 hover:bg-brand-500 hover:text-white dark:border-stone-700 dark:text-stone-200"
+              className="inline-flex items-center rounded-lg px-5 py-2.5 text-sm font-medium text-stone-500 transition-colors hover:text-brand-700 dark:text-stone-400 dark:hover:text-brand-300"
             >
               Neler yapıyor?
             </a>
@@ -151,7 +165,15 @@ export default function LandingPage() {
             />
             <Rol
               ad="Girişim Kullanıcısı"
-              metin="Yalnızca kendi girişiminin kartını görür ve güncelleme önerisi gönderir."
+              metin={
+                <>
+                  Yalnızca kendi girişiminin kartını görür ve güncelleme önerisi
+                  gönderir.{' '}
+                  <Link to="/kayit-ol" className="font-medium underline hover:text-brand-700 dark:hover:text-brand-300">
+                    Henüz hesabınız yoksa kayıt olun.
+                  </Link>
+                </>
+              }
             />
             <Rol
               ad="Karar Verici"

@@ -2,11 +2,13 @@ using Microsoft.EntityFrameworkCore;
 using T3.Application.Common.Interfaces;
 using T3.Domain.Achievements;
 using T3.Domain.Approvals;
+using T3.Domain.Assistant;
 using T3.Domain.Audit;
 using T3.Domain.Documents;
 using T3.Domain.Identity;
 using T3.Domain.Milestones;
 using T3.Domain.Programs;
+using T3.Domain.Registrations;
 using T3.Domain.Startups;
 
 namespace T3.Application.Tests;
@@ -37,6 +39,11 @@ internal sealed class UnreachableDbContext : IAppDbContext
     public DbSet<Milestone> Milestones => throw Unreachable(nameof(Milestones));
     public DbSet<ChangeRequest> ChangeRequests => throw Unreachable(nameof(ChangeRequests));
     public DbSet<AuditLog> AuditLogs => throw Unreachable(nameof(AuditLogs));
+    public DbSet<StartupRegistrationRequest> StartupRegistrationRequests =>
+        throw Unreachable(nameof(StartupRegistrationRequests));
+    public DbSet<AiConversation> AiConversations => throw Unreachable(nameof(AiConversations));
+    public DbSet<AiConversationMessage> AiConversationMessages =>
+        throw Unreachable(nameof(AiConversationMessages));
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         throw Unreachable(nameof(SaveChangesAsync));

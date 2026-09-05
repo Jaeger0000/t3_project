@@ -98,12 +98,35 @@ public static class DependencyInjection
             return;
         }
 
-        services.AddHttpClient<IChatModel, AnthropicChatModel>(client =>
+        // Araç desteği süreç ömrü boyunca hatırlanıyor; singleton olmak zorunda.
+        services.AddSingleton<AiCapabilityState>();
+
+        if (ai.ResolveProvider() == AiProvider.Anthropic)
         {
-            client.BaseAddress = new Uri("https://api.anthropic.com");
+            services.AddHttpClient<IChatModel, AnthropicChatModel>(client =>
+            {
+                client.BaseAddress = new Uri(ai.BaseUrl ?? "https://api.anthropic.com");
+                client.Timeout = TimeSpan.FromSeconds(ai.TimeoutSeconds);
+                client.DefaultRequestHeaders.Add("x-api-key", ai.ApiKey);
+                client.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+            });
+
+            return;
+        }
+
+        services.AddHttpClient<IChatModel, OpenRouterChatModel>(client =>
+        {
+            client.BaseAddress = new Uri(ai.BaseUrl ?? "https://openrouter.ai");
             client.Timeout = TimeSpan.FromSeconds(ai.TimeoutSeconds);
-            client.DefaultRequestHeaders.Add("x-api-key", ai.ApiKey);
-            client.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+            client.DefaultRequestHeaders.Add("Authorization", $"Bearer {ai.ApiKey}");
+
+            // OpenRouter'ın kullanım sayfasında isteğin hangi uygulamadan
+            // geldiğini göstermek için; zorunlu değil, tanımlıysa gönderiliyor.
+            if (!string.IsNullOrWhiteSpace(ai.SiteUrl))
+                client.DefaultRequestHeaders.Add("HTTP-Referer", ai.SiteUrl);
+
+            if (!string.IsNullOrWhiteSpace(ai.AppTitle))
+                client.DefaultRequestHeaders.Add("X-Title", ai.AppTitle);
         });
     }
 }

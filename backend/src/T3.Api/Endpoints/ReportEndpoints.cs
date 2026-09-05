@@ -22,9 +22,10 @@ public static class ReportEndpoints
                 Guid? programId,
                 Sector? sector,
                 string? city,
+                int? year,
                 EcosystemStatsHandler handler,
                 CancellationToken ct) =>
-            (await handler.Handle(new EcosystemStatsRequest(programId, sector, city), ct)).ToHttp())
+            (await handler.Handle(new EcosystemStatsRequest(programId, sector, city, year), ct)).ToHttp())
             .WithSummary("Ekosistem karnesi: sayımlar, dağılımlar ve finansal toplamlar.");
 
         group.MapGet("/export", async (

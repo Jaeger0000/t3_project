@@ -826,6 +826,95 @@ bazı sağlayıcılarda düz metne düşüp parolayı ağa açık yollayabiliyor
 Kurulum adımları, DNS kayıtları ve tuzaklar:
 [Mail_Servisi_Kurulumu.md](Mail_Servisi_Kurulumu.md).
 
+## 3n. Girişim kendi kendine kayıt (Kayıt Ol) kararları
+
+**Ayrı bir onay tablosu, `ChangeRequest` değil.** `ChangeRequest` bir girişim
+*kaydının* değişiklik önerisini taşır — satırın zaten var olduğunu, kim
+gönderdiğini (`SubmittedByUserId`, gerçek bir `User`) varsayar. Kayıt Ol
+formunu dolduran kişinin henüz ne `User` ne `Startup` satırı var; ödünç bir
+kimlikle sahte bir öneri üretmek yerine kendi başına duran
+`StartupRegistrationRequest` tablosu açıldı. Sonuç: girişim kullanıcısının
+"hiçbir tabloya doğrudan yazmaz" kuralı burada da bozulmuyor — kayıt olmak da
+bir onay isteğinden farksız, sadece hedefi henüz var olmayan bir hesap.
+
+**Şifre özeti başvuruda bekliyor, düz metin hiçbir yerde durmuyor.**
+`RegisterStartupHandler` şifreyi aynı `IPasswordHasher` ile hemen özetler ve
+`StartupRegistrationRequest.PasswordHash`'e yazar; onay anında bu hash aynen
+yeni `User` satırına taşınır. Alternatif — başvuruyu düz metin şifreyle
+bekletip onayda özetlemek — düz metnin veritabanında (başvuru bekleme süresi
+boyunca) durmasına yol açardı; reddedildi.
+
+**Onaylanan hesapta `MustChangePassword = false`, admin'in `CreateUser`
+akışındakinin (`true`) tam tersi.** Admin eliyle açılan hesapta ilk şifreyi
+*admin* biliyor — kullanıcı ilk girişte kendi şifresini koymaya zorlanıyor.
+Kayıt Ol akışında şifreyi zaten yalnızca başvuru sahibi biliyor (hash'e admin
+hiçbir zaman erişmiyor); aynı zorlamayı burada da uygulamak anlamsız bir ekstra
+adım olurdu.
+
+**Onay anında e-posta/girişim adı tekilliği ikinci kez kontrol ediliyor.**
+Başvurudan onaya kadar geçen sürede (başvuru kuyrukta beklerken) bir admin aynı
+e-posta ya da girişim adıyla elle kayıt açmış olabilir. `ApproveRegistrationRequestHandler`
+`UserAdminGuard.EnsureEmailAvailableAsync` ve girişim adı kontrolünü
+`CreateStartupHandler` ile birebir aynı sorguyla tekrarlıyor — başvuru anındaki
+kontrol tek başına yarış durumuna karşı yetmez.
+
+**Reddedilen/onaylanan başvuru silinmiyor.** `ChangeRequest` ile aynı
+gerekçe: iz "bu başvuru geldi, şu sonuçla kapandı" bilgisini kaybetmemeli.
+Liste yanıtında `PasswordHash` kesinlikle yok — SuperAdmin'in gözünden bile
+özet görünmüyor, onay akışı onu dışarı hiç çıkarmadan doğrudan kullanıcı
+satırına taşıyor.
+
+## 3o. Sunucuda saklanan AI sohbeti kararları
+
+**Bağlam sunucuda, istemcide değil.** İstemci yalnızca `conversationId` ve yeni
+soruyu gönderir; geçmiş `AiConversationMessages` tablosundan okunur. Geçmişi
+gövdede kabul etmek, kullanıcının hiç sorulmamış bir turu ("asistan: bu
+girişimin cirosu 40M") sorulmuş gibi sunmasına, yani modeli kendi kayıtlarıyla
+kandırmasına izin verirdi.
+
+**Geçmişe yalnızca metin turları giriyor, araç blokları değil.** OpenAI uyumlu
+protokolde bir `tool_calls` mesajının ardından her çağrı için eşleşen bir `tool`
+mesajı gelmek zorunda; eşleşmeyen çift sağlayıcıdan 400 döndürür ve sohbet
+tümden çalışmaz. Araç sonuçları o turda tüketiliyor, sonraki tur gerekirse aracı
+yeniden çağırıyor (`ChatHistory.Build`, son 10 tur).
+
+**Ajan döngüsü tek yerde: `AssistantConversationRunner`.** `AskAssistant` ve
+`Chat` dilimlerinin ikisi de bu bileşeni çağırır. Döngüyü kopyalamak, araç
+sonuçlarının modele giderken süzülmesi (`AiRedaction`) gibi güvenlik adımlarının
+yalnızca bir dilimde güncellenmesi riskini doğururdu. `*Handler` adı taşımadığı
+için `DependencyInjection`'a elle kaydedildi.
+
+**Sohbette soft delete yok, gerçek silme var (1 yıl).** Diğer varlıklarda pasife
+alma denetim izinin bütünlüğü için; sohbet ise serbest metin, yani hiçbir formun
+sormadığı kişisel veriyi içerebilir. `RetentionCleanupService.ConversationRetention`
+= 365 gün ve süre dolan sohbet mesajlarıyla birlikte (cascade) silinir.
+Aydınlatma metnindeki "1 yıl" satırının kod karşılığı budur.
+
+**Başkasının sohbeti 404, 403 değil.** Sahiplik süzgeci sorgunun `WHERE`'inde
+(`ConversationAccess.Owned`): "var ama senin değil" demek, elindeki sohbet
+kimliğinin gerçek olduğunu doğrulamak olurdu. Kural istisnasız — SuperAdmin
+dahil hiçbir rol başkasının sohbetini okumaz.
+
+**`Assistant.Chat` denetim izi soru metnini yazmıyor** (tek soru ucu
+`Assistant.Ask` yazıyor). Fark bilinçli: sohbette aynı metin zaten sohbet
+tablosunda duruyor ve 1 yıllık saklama süresine tabi; izin 10 yıl saklanan
+satırına kopyalamak, serbest metni sohbetin saklama süresinden bağımsız hâle
+getirirdi. İz "kim, hangi sohbette, hangi araçlarla hangi girişimlere dokundu"
+sorusunu yanıtlamaya yetiyor.
+
+**Girişim kimlikleri araçtan geliyor, modelin cümlesinden değil.**
+`AssistantToolResult.StartupIds` → `AssistantSourceResponse.StartupIds` →
+`ChatResponse.StartupIds`. Cevap metnindeki addan kimlik çıkarmak hem kırılgan
+(aynı adlı iki girişim) hem de modelin uydurduğu bir adı gerçek bir kayda
+bağlama riski taşırdı.
+
+**Modda tek tanım: `AssistantMode` Application'da kalıyor.** Domain'in
+Application'a bağımlı olması yasak, enum'u Domain'e kopyalamak da aynı bilgiyi
+iki yerde tutmak olurdu; `AiConversationMessage.Mode` bu yüzden enum adını metin
+olarak saklıyor (`"Model"`/`"Local"`) ve okuma dilimi `Enum.TryParse` ile geri
+çeviriyor — çözülemeyen eski bir değer alanı boş bırakıyor, sohbeti okunmaz
+yapmıyor.
+
 ## 4. Ortam tuzakları — tekrar çarpılacak olanlar
 
 ### Faz 0
