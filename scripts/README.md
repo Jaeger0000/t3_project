@@ -83,6 +83,18 @@ oluşturuyor ve sonlarında giriş kovasını bilinçli olarak dolduruyor (hız 
 kontrolleri). Aralarında bir dakika beklenmezse `render_faz7.py` giriş
 aşamasında 429 alır.
 
+**Bir dakikalık bekleme yeterli değil.** `render_faz6.py`'nin sonundaki
+başarısız giriş denemeleri yalnızca 60 saniyelik IP kovasını değil,
+**G-05'in hesap başına 15 dakikalık, veritabanında kalıcı kilidini** de
+tetikler (`LoginHandler.cs` — `MaxFailedAttempts=10`, `LockoutDuration=15dk`).
+Kilit süresince admin hesabıyla giriş `429` değil `400 "E-posta veya şifre
+hatalı"` döner — `render_faz7.py` bu yüzden bir dakika sonra da giriş
+aşamasında düşebilir. Gerçekten 15 dakika beklemek yerine, geliştirme
+veritabanında admin kullanıcısının `LockedUntil`/`FailedLoginCount` alanlarını
+sıfırlamak (`UPDATE "Users" SET "LockedUntil" = NULL, "FailedLoginCount" = 0
+WHERE "Email" = 'admin@t3ekosistem.test';`) betikler arasında beklemeden
+devam etmeyi sağlar.
+
 `render_faz7.py` kendi verisini temizler: açtığı program, dönem ve katılımı
 yaşam döngüsünün sonunda kapatır. Tohum hesaplarının şifresine dokunmaz —
 şifre akışlarını tek kullanımlık bir hesapla sınar, çünkü diğer bütün betikler

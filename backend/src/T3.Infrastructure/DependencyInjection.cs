@@ -10,6 +10,7 @@ using T3.Infrastructure.Identity;
 using T3.Infrastructure.Notifications;
 using T3.Infrastructure.Persistence;
 using T3.Infrastructure.Persistence.Seed;
+using T3.Infrastructure.RateLimiting;
 using T3.Infrastructure.Reports;
 using T3.Infrastructure.Storage;
 
@@ -61,6 +62,7 @@ public static class DependencyInjection
         // aktarma) sohbet protokolü ikili veri taşıyamadığı için burada
         // bekletiliyor — bkz. IAssistantExportStore.
         services.AddSingleton<IAssistantExportStore, InMemoryAssistantExportStore>();
+        services.AddSingleton<IOperationRateLimiter, InMemoryOperationRateLimiter>();
 
         return services;
     }

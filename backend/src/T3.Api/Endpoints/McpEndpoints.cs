@@ -57,7 +57,12 @@ public static class McpEndpoints
 
                     "tools/list" => Ok(id, new JsonObject
                     {
-                        ["tools"] = new JsonArray([.. AssistantToolbox.Catalog.Select(tool =>
+                        // Sohbete özel araçlar (bkz. AssistantToolbox.McpExcludedTools)
+                        // burada listelenmez: MCP istemcisi zaten çağıramayacağı
+                        // bir aracı görüp denemesin.
+                        ["tools"] = new JsonArray([.. AssistantToolbox.Catalog
+                            .Where(tool => !AssistantToolbox.McpExcludedTools.Contains(tool.Name))
+                            .Select(tool =>
                             (JsonNode)new JsonObject
                             {
                                 ["name"] = tool.Name,
@@ -87,6 +92,9 @@ public static class McpEndpoints
         var name = Text(parameters, "name");
         if (string.IsNullOrWhiteSpace(name))
             return Error(id, -32602, "Araç adı (params.name) eksik.");
+
+        if (AssistantToolbox.McpExcludedTools.Contains(name))
+            return Error(id, -32601, $"'{name}' aracı yalnızca sohbet arayüzünden kullanılabilir.");
 
         var arguments = parameters.TryGetProperty("arguments", out var args)
             ? args

@@ -18,6 +18,16 @@ namespace T3.Api.RateLimiting;
 /// </summary>
 public static class AuthRateLimit
 {
+    /// <summary>
+    /// GEÇİCİ TEST ÇARPANI. Aşağıdaki her kovanın <c>PermitLimit</c>'i bununla
+    /// çarpılıyor — kullanıcı yoğun test yaparken üretim için düşünülmüş dar
+    /// kotalara takılmasın diye. Demo/canlıya çıkmadan önce bu **1**'e
+    /// döndürülmeli; her kovanın kendi doc yorumundaki taban rakam (ör.
+    /// "dakikada 10") hâlâ o kovanın gerçek/düşünülmüş tasarım değeri, bu
+    /// çarpan yalnızca test kolaylığı için geçici bir çoğaltıcı.
+    /// </summary>
+    private const int TestMultiplier = 10;
+
     public const string AuthPolicy = "auth";
     public const string AiPolicy = "ai";
 
@@ -89,7 +99,7 @@ public static class AuthRateLimit
             _ => new FixedWindowRateLimiterOptions
             {
                 Window = TimeSpan.FromMinutes(1),
-                PermitLimit = 10,
+                PermitLimit = 10 * TestMultiplier,
                 QueueLimit = 0
             });
 
@@ -107,7 +117,7 @@ public static class AuthRateLimit
             _ => new FixedWindowRateLimiterOptions
             {
                 Window = TimeSpan.FromMinutes(1),
-                PermitLimit = 30,
+                PermitLimit = 30 * TestMultiplier,
                 QueueLimit = 0
             });
 
@@ -166,7 +176,7 @@ public static class AuthRateLimit
             _ => new FixedWindowRateLimiterOptions
             {
                 Window = TimeSpan.FromHours(1),
-                PermitLimit = 10,
+                PermitLimit = 10 * TestMultiplier,
                 QueueLimit = 0
             });
 
@@ -177,7 +187,7 @@ public static class AuthRateLimit
             _ => new FixedWindowRateLimiterOptions
             {
                 Window = TimeSpan.FromHours(1),
-                PermitLimit = 6,
+                PermitLimit = 6 * TestMultiplier,
                 QueueLimit = 0
             });
 
@@ -197,7 +207,7 @@ public static class AuthRateLimit
             _ => new FixedWindowRateLimiterOptions
             {
                 Window = TimeSpan.FromMinutes(1),
-                PermitLimit = 100,
+                PermitLimit = 100 * TestMultiplier,
                 QueueLimit = 0
             });
 
@@ -213,7 +223,7 @@ public static class AuthRateLimit
             _ => new FixedWindowRateLimiterOptions
             {
                 Window = TimeSpan.FromMinutes(1),
-                PermitLimit = 300,
+                PermitLimit = 300 * TestMultiplier,
                 QueueLimit = 0
             });
 
@@ -229,7 +239,7 @@ public static class AuthRateLimit
             _ => new FixedWindowRateLimiterOptions
             {
                 Window = TimeSpan.FromMinutes(1),
-                PermitLimit = 20,
+                PermitLimit = 20 * TestMultiplier,
                 QueueLimit = 0
             });
 

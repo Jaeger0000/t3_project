@@ -54,8 +54,23 @@ public sealed class AssistantToolbox(
     ListChangeRequestsHandler approvals,
     ExportStartupsHandler exportStartups,
     IAssistantExportStore exportStore,
+    IOperationRateLimiter rateLimiter,
     ICurrentUser currentUser)
 {
+    /// <summary>
+    /// Saatte 10 dışa aktarma, kullanıcı başına — REST'in CSV "İndir" ucundaki
+    /// <c>AuthRateLimit.MassExportPolicy</c> ile aynı kota. Bu araç aynı
+    /// kütlesel/hassas veri kümesini ürettiği için sohbet (dakikada 20) ya da
+    /// MCP (dakikada 100) kovasının gevşekliğini miras almamalı — HTTP hız
+    /// sınırlayıcı bu uç içindeki tek bir aracın maliyetini göremiyor, o
+    /// yüzden kontrol burada, işlem düzeyinde tekrarlanıyor.
+    /// </summary>
+    // GEÇİCİ TEST ÇARPANI (AuthRateLimit.cs'teki ile aynı gerekçe): taban
+    // değer 10/saat — CSV export'un MassExportPolicy'siyle aynı kota. Demo/
+    // canlıya çıkmadan önce ×1'e (yani 10'a) döndürülmeli.
+    private const int ExcelExportHourlyLimit = 10 * 10;
+
+    private const string ExcelExportRateKey = "export-startups-excel";
     private static readonly CultureInfo Turkish = CultureInfo.GetCultureInfo("tr-TR");
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
@@ -161,6 +176,17 @@ public sealed class AssistantToolbox(
                 foundedYear = Number("Kuruluş yılı (ör. 2023).")
             }))
     ];
+
+    /// <summary>
+    /// MCP <c>tools/list</c>/<c>tools/call</c> yüzeyinden hariç tutulan araçlar.
+    /// Dosya üreten araçlar (export_startups_excel) indirme jetonunu yalnızca
+    /// sohbetin güvenilir ilk taraf istemcisine taşır (bkz. AssistantSourceResponse);
+    /// MCP'nin metin-tabanlı JSON-RPC yanıtında ayrı bir yapılandırılmış kanal
+    /// yok, jetonu oraya gömmek güven sınırını bulanıklaştırırdı. Araç MCP'de
+    /// hiç görünmez, yarım/sessiz çalışmaz (bkz. McpEndpoints).
+    /// </summary>
+    public static IReadOnlySet<string> McpExcludedTools { get; } =
+        new HashSet<string> { "export_startups_excel" };
 
     public async Task<Result<AssistantToolResult>> InvokeAsync(
         string name, JsonElement args, CancellationToken ct) => name switch
@@ -301,6 +327,11 @@ public sealed class AssistantToolbox(
     {
         if (currentUser.UserId is not { } userId)
             return Error.Forbidden("Dışa aktarma için oturum açmalısınız.");
+
+        if (!rateLimiter.TryConsume(ExcelExportRateKey, userId, ExcelExportHourlyLimit, TimeSpan.FromHours(1)))
+            return Error.Forbidden(
+                $"Excel dışa aktarma için saatlik sınıra ulaştınız (saatte en çok {ExcelExportHourlyLimit}). "
+                + "Bir süre sonra tekrar deneyin.");
 
         var result = await exportStartups.HandleExcel(new ExportStartupsRequest(
             Q: Str(args, "q"),

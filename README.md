@@ -166,16 +166,23 @@ demoda gerçek veriyle görünsün diye.
 | `GET /api/change-requests/{id}` | kimlik doğrulanmış — before/after diff, alanlar role göre maskeli |
 | `POST /api/change-requests/{id}/approve` · `/reject` | Süper Yönetici, Program Yöneticisi (kendi kapsamı) |
 | `GET /api/reports/ecosystem` | kimlik doğrulanmış — sayılar kapsamla daralır, tutarlar role göre maskelenir |
-| `GET /api/reports/export` | kimlik doğrulanmış — CSV; maskeli hücre "yetkiniz yok" yazar, her aktarma denetim izine düşer |
+| `GET /api/reports/export` | kimlik doğrulanmış, saatte 10 istek (kullanıcı başına) — CSV; maskeli hücre "yetkiniz yok" yazar, her aktarma denetim izine düşer |
+| `GET /api/startups/{id}/ai-report` | Süper Yönetici, Program Yöneticisi — T3 şablonlu, bölüm bölüm üretilen PDF raporu |
 | `POST /api/ai/ask` | kimlik doğrulanmış, kullanıcı başına dakikada 20 istek — yanıt yalnızca kullanıcının görebildiği kayıtlardan üretilir |
 | `GET /api/ai/startups/{id}/summary` | kimlik doğrulanmış — kart ve kronolojiden üretilen yönetici özeti |
 | `POST /api/ai/chat` | kimlik doğrulanmış — çok turlu sohbet; bağlam sunucuda saklanır, `conversationId` boşsa yeni sohbet açılır |
 | `GET /api/ai/chat/conversations` | kimlik doğrulanmış — **yalnızca kendi** sohbetleri, son konuşulan önce |
 | `GET /api/ai/chat/conversations/{id}` | kimlik doğrulanmış — sohbetin turları; başkasının sohbeti 404 |
+| `GET /api/ai/exports/{token}` | kimlik doğrulanmış — asistanın ürettiği dosyayı (ör. Excel) indirir; jeton tek kullanımlık, 15 dakika geçerli, yalnızca üreten kullanıcıya açık |
 | `POST /mcp` | kimlik doğrulanmış — JSON-RPC 2.0; araçlar aynı Application handler'larını sarar |
 | `GET /api/audit-logs` | Süper Yönetici |
 | `GET/POST /api/users` · `PUT /api/users/{id}[/password]` · `DELETE /api/users/{id}` | Süper Yönetici |
 | `GET /api/registration-requests` · `POST /api/registration-requests/{id}/approve` · `POST /api/registration-requests/{id}/reject` | Süper Yönetici — onay, başvuru sahibinin seçtiği e-posta/şifreyle gerçek Startup + Girişim Kullanıcısı hesabını **anında** açar (`mustChangePassword=false`, kullanıcı zaten kendi şifresini belirledi) |
+| `POST /api/startups/{id}/notifications` | Süper Yönetici, Program Yöneticisi — girişime serbest metin bildirimi; hem e-posta hem uygulama içi bildirim üretir |
+| `GET /api/notifications` | kimlik doğrulanmış — kendi bildirimleri, okunmamış sayısı dahil |
+| `GET /api/notifications/sent` | Süper Yönetici — gözetim görünümü; doğrudan gönderdikleri ile Program Yöneticilerinin gönderdikleri ayrı döner |
+| `POST /api/notifications/read-all` · `POST /api/notifications/{id}/read` | kimlik doğrulanmış (Süper Yönetici gözetim görünümündeki bildirimleri de işaretleyebilir) |
+| `DELETE /api/notifications/{id}` · `POST /api/notifications/{id}/restore` | kimlik doğrulanmış — alıcı için yumuşak silme/geri alma, Süper Yönetici için kalıcı silme |
 
 Yetkilendirme varsayılan olarak kapalıdır (`FallbackPolicy`): üst veri
 taşımayan her uç kimlik ister, herkese açık uçlar bunu açıkça belirtir.
@@ -199,11 +206,19 @@ veri yolu yoktur**, dolayısıyla kapsam ve maskeleme kuralları tek yerde kalı
   bir çağrıda cevap verir; istekle yalnızca belirli bölümler ya da serbest
   metinle özel bir istek de seçilebilir. Arayüzde girişim kartının başlığındaki
   "AI Raporu" düğmesinden açılır.
+- `export_startups_excel` (sohbet aracı) — süzülmüş girişim listesini gerçek
+  bir `.xlsx` dosyasına dönüştürür; REST'in CSV "İndir" ucuyla aynı sorgu ve
+  maskeleme mantığını paylaşır. Dosya modele değil kısa ömürlü, tek kullanımlık
+  bir jetona (`GET /api/ai/exports/{token}`) bağlanır; kullanıcı başına saatte
+  10 çağrıyla sınırlıdır (CSV export'la aynı kota).
 - `POST /mcp` — JSON-RPC 2.0 MCP sunucusu (`initialize`, `ping`, `tools/list`,
-  `tools/call`). Altı araç: `search_startups`, `get_startup_card`,
+  `tools/call`). Yedi araç: `search_startups`, `get_startup_card`,
   `get_program_history`, `list_achievements`, `ecosystem_stats`,
-  `list_pending_approvals`. Uç kimlik ister: MCP istemcisi de Bearer jetonu
-  taşımak zorunda, araçlar jetonun rolüyle çalışır.
+  `list_programs`, `list_pending_approvals`. Uç kimlik ister: MCP istemcisi de
+  Bearer jetonu taşımak zorunda, araçlar jetonun rolüyle çalışır.
+  (`export_startups_excel` sekizinci bir araç olarak yalnızca sohbette durur —
+  indirme jetonu MCP'nin metin kanalına taşınmaz, bkz.
+  `AssistantToolbox.McpExcludedTools`.)
 
 ### Bu kurulumda model bağlantısı: yalnızca MCP
 

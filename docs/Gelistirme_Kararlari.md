@@ -1137,6 +1137,42 @@ SuperAdmin'in gözetim ekranındaki "Silinenler" görünümü bilinçli olarak s
 okunur, bir girişimin kendi kararını (bildirimi kapatmasını) SuperAdmin'in
 geri alması yetki sınırını bulanıklaştırırdı.
 
+## 3s. AI asistanı Excel dışa aktarma kararları
+
+**Dosya modele değil jetonla istemciye gider.** Sohbet protokolü (OpenAI
+uyumlu tool-calling) ikili veri taşıyamaz — araç modele yalnızca metin/JSON
+döndürebilir. Bu yüzden `export_startups_excel` gerçek `.xlsx` içeriğini
+`IAssistantExportStore`'a (bellek içi, `IMemoryCache`) yazar, modele/sohbet
+geçmişine yalnızca dosya adı + satır sayısı gider; ham jeton
+`AssistantToolResult.DownloadToken` alanında ayrı taşınır ve yalnızca
+`AssistantSourceResponse` üzerinden **sohbetin ilk taraf istemcisine**
+ulaşır — modelin kendisi jetonu hiç görmez. İstemci `GET
+/api/ai/exports/{token}` ile indirir; jeton tek kullanımlık, 15 dakika
+ömürlü, yalnızca üreten kullanıcıya açık (`ownerUserId` eşleşmesi).
+
+**CSV ve Excel aynı sorgu/maskeleme verisini paylaşır.** `ExportStartupsHandler
+.FetchAsync` ikisi için de tek kaynak; biri diğerinden ayrı güncellenirse
+ekranda görünen ile dışa aktarılan veri sapardı.
+
+**Saatlik kota CSV export'la birebir aynı (10/saat, kullanıcı başına).**
+`export_startups_excel` de tıpkı `/api/reports/export` gibi kütlesel/hassas
+veri üretiyor (vergi no, iletişim, yatırım tutarları — en çok 2000 satır),
+ama sohbet (`AiPolicy`, dakikada 20) ya da MCP (`McpPolicy`, dakikada 100)
+kovasından çağrılıyor — ikisi de bu aracın maliyetini görmüyor, ele
+geçirilmiş bir oturumun dakikalar içinde ekosistemin tamamını çekmesine izin
+verirdi (bkz. G-07). HTTP hız sınırlayıcı bir uç içindeki tek bir aracı ayrı
+kovaya koyamadığı için (`RequireRateLimiting` endpoint düzeyinde çalışır),
+kontrol işlem düzeyinde tekrarlandı: `IOperationRateLimiter` (bellek içi
+sabit pencere sayacı, `AuthRateLimit.PartitionMassExport` ile aynı mantık)
+`AssistantToolbox.ExportExcelAsync` içinde saatte 10'da kesiyor.
+
+**Araç MCP'de hiç görünmez (`AssistantToolbox.McpExcludedTools`).** MCP'nin
+JSON-RPC yanıtında sohbetteki gibi ayrı bir "kaynak metadata" kanalı yok —
+indirme jetonunu ham metne gömmek güven sınırını (model vs. birinci taraf
+istemci) bulanıklaştırırdı. Aracı MCP `tools/list`'ten çıkarıp `tools/call`'da
+da açıkça reddetmek, "yarım/sessiz çalışan" bir yüzey bırakmaktan (jeton
+üretilir ama hiçbir MCP istemcisi indiremez) daha dürüst bir sınır.
+
 ## 4. Ortam tuzakları — tekrar çarpılacak olanlar
 
 ### Faz 0
