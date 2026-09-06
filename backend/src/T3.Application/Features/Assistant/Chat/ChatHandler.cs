@@ -78,6 +78,10 @@ public sealed class ChatHandler(
             CreatedAt = askedAt
         });
 
+        // Bir turda en çok bir dosya üretimi bekleniyor; birden fazla araç
+        // dosya döndürürse ilki saklanır — nadir ve zararsız bir kısıtlama.
+        var download = run.Sources.FirstOrDefault(s => s.DownloadToken is not null);
+
         db.AiConversationMessages.Add(new AiConversationMessage
         {
             Conversation = conversation,
@@ -89,6 +93,8 @@ public sealed class ChatHandler(
                 run.StartupIds.Take(MaxStoredStartupIds).ToArray()),
             Mode = run.Mode.ToString(),
             ModelName = run.ModelName,
+            ExportDownloadToken = download?.DownloadToken,
+            ExportFileName = download?.DownloadFileName,
             CreatedAt = askedAt
         });
 

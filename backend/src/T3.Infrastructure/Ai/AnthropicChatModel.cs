@@ -30,12 +30,13 @@ public sealed class AnthropicChatModel(
         string systemPrompt,
         IReadOnlyList<ChatMessage> messages,
         IReadOnlyList<ChatTool> tools,
-        CancellationToken ct)
+        CancellationToken ct,
+        int? maxTokens = null)
     {
         var body = new JsonObject
         {
             ["model"] = _options.Model,
-            ["max_tokens"] = _options.MaxTokens,
+            ["max_tokens"] = maxTokens ?? _options.MaxTokens,
             ["system"] = systemPrompt,
             ["messages"] = new JsonArray([.. messages.Select(ToMessage)])
         };

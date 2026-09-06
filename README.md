@@ -193,6 +193,12 @@ veri yolu yoktur**, dolayısıyla kapsam ve maskeleme kuralları tek yerde kalı
   mesajdan 1 yıl sonra gerçekten silinir (`RetentionCleanupService`).
 - `GET /api/ai/startups/{id}/summary` — girişim kartındaki yönetici özeti.
   Tutarları göremeyen role tutarsız özet üretilir ve bunu ekranda söyler.
+- `GET /api/startups/{id}/ai-report` — SuperAdmin/ProgramManager için T3
+  şablonlu, ayrıntılı PDF raporu. Model her başlığa (özet, güçlü yönler,
+  öneriler, ekip, program geçmişi, başarı/yatırım) tüm veriyi kullanarak ayrı
+  bir çağrıda cevap verir; istekle yalnızca belirli bölümler ya da serbest
+  metinle özel bir istek de seçilebilir. Arayüzde girişim kartının başlığındaki
+  "AI Raporu" düğmesinden açılır.
 - `POST /mcp` — JSON-RPC 2.0 MCP sunucusu (`initialize`, `ping`, `tools/list`,
   `tools/call`). Altı araç: `search_startups`, `get_startup_card`,
   `get_program_history`, `list_achievements`, `ecosystem_stats`,

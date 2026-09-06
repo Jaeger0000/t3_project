@@ -4,6 +4,7 @@ using T3.Application.Features.Assistant.AskAssistant;
 using T3.Application.Features.Assistant.Chat;
 using T3.Application.Features.Assistant.Chat.GetConversation;
 using T3.Application.Features.Assistant.Chat.ListConversations;
+using T3.Application.Features.Assistant.DownloadExport;
 using T3.Application.Features.Assistant.SummarizeStartup;
 
 namespace T3.Api.Endpoints;
@@ -59,6 +60,23 @@ public static class AssistantEndpoints
                 CancellationToken ct) =>
             (await handler.Handle(id, ct)).ToHttp())
             .WithSummary("Tek sohbetin turları; başkasının sohbeti 404 döner.");
+
+        // Asistanın araç turunda ürettiği dosya (ör. Excel dışa aktarma).
+        // Jeton tek kullanımlık; ikinci istekte 404 döner.
+        group.MapGet("/exports/{token}", (
+                string token,
+                DownloadAssistantExportHandler handler,
+                HttpContext http) =>
+            {
+                var result = handler.Handle(token);
+                if (!result.IsSuccess)
+                    return ApiResults.Problem(result.Error!);
+
+                var file = result.Value!;
+                http.Response.Headers["X-Content-Type-Options"] = "nosniff";
+                return Results.File(file.Content, file.ContentType, file.FileName);
+            })
+            .WithSummary("Asistanın ürettiği dosyayı indirir (ör. Excel dışa aktarma).");
 
         group.MapGet("/startups/{id:guid}/summary", async (
                 Guid id,

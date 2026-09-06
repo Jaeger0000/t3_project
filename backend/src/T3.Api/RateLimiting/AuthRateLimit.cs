@@ -29,6 +29,16 @@ public static class AuthRateLimit
     /// </summary>
     public const string MassExportPolicy = "mass-export";
 
+    /// <summary>
+    /// AI raporu üretimi tek başına bir soru değil — her bölüm ayrı bir model
+    /// çağrısı tetikliyor (6 standart bölüm + varsa özel istek), yani tek bir
+    /// tıklama bile OpenRouter'a birden çok istek gönderiyor.
+    /// <see cref="AiPolicy"/>'nin dakikalık kotası bunu hesaba katmıyor,
+    /// <see cref="MassExportPolicy"/> ise farklı bir tehdit modeline (kütlesel
+    /// veri çekme) ait; bu yüzden ayrı ve daha sıkı bir kova.
+    /// </summary>
+    public const string AiReportPolicy = "ai-report";
+
     private const string EmailItemKey = "auth-email";
 
     /// <summary>
@@ -160,6 +170,17 @@ public static class AuthRateLimit
                 QueueLimit = 0
             });
 
+    /// <summary>Saatte 6 rapor, kullanıcı başına.</summary>
+    public static RateLimitPartition<string> PartitionAiReport(HttpContext context) =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.User.FindFirst(AppClaims.UserId)?.Value ?? Ip(context),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromHours(1),
+                PermitLimit = 6,
+                QueueLimit = 0
+            });
+
     /// <summary>
     /// MCP'ye özel kova: <c>/mcp</c> tek bir uçtan hem sıradan sorular hem
     /// <c>tools/call</c> döngüleri geçiyor. <see cref="MassExportPolicy"/>'nin
@@ -240,7 +261,8 @@ public static class AuthRateLimit
         var isMassExportSurface =
             context.Request.Path.StartsWithSegments("/api/reports/export")
             || context.Request.Path.StartsWithSegments("/api/documents")
-            || context.Request.Path.StartsWithSegments("/mcp");
+            || context.Request.Path.StartsWithSegments("/mcp")
+            || context.Request.Path.Value?.EndsWith("/ai-report", StringComparison.Ordinal) is true;
 
         if (!isMassExportSurface)
             return;

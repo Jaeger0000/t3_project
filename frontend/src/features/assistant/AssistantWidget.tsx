@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Badge, Spinner } from '@/components/ui'
+import { api, ApiError } from '@/lib/apiClient'
 import { useAuth } from '@/lib/auth'
 import { sectorLabels } from '@/lib/labels'
 import { defaultFilters, useStartups } from '@/features/startups/queries'
@@ -343,6 +344,50 @@ function WidgetBubble({
           </ul>
         </div>
       ) : null}
+
+      {message.downloadToken ? <WidgetExportButton message={message} /> : null}
+    </div>
+  )
+}
+
+/** Genişlikte tam düğme yerine, dar baloncuğa sığan küçük bağlantı-benzeri buton. */
+function WidgetExportButton({ message }: { message: AiChatMessageRow }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleDownload() {
+    if (!message.downloadToken) return
+    setBusy(true)
+    setError(null)
+    try {
+      await api.download(
+        `/api/ai/exports/${message.downloadToken}`,
+        message.downloadFileName ?? 'disa-aktarma.xlsx',
+      )
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.status === 404
+            ? 'Bağlantının süresi doldu.'
+            : err.message
+          : 'Dosya indirilemedi.',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <button
+        type="button"
+        onClick={handleDownload}
+        disabled={busy}
+        className="rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-1.5 text-xs font-medium text-brand-800 transition-colors hover:border-brand-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:opacity-60 dark:border-brand-800 dark:bg-brand-950 dark:text-brand-200"
+      >
+        {busy ? 'İndiriliyor…' : `⬇ ${message.downloadFileName ?? 'Dosyayı indir'}`}
+      </button>
+      {error ? <p className="text-xs text-red-600 dark:text-red-400">{error}</p> : null}
     </div>
   )
 }

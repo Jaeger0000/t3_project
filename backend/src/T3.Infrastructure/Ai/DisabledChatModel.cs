@@ -17,7 +17,8 @@ public sealed class DisabledChatModel : IChatModel
         string systemPrompt,
         IReadOnlyList<ChatMessage> messages,
         IReadOnlyList<ChatTool> tools,
-        CancellationToken ct) =>
+        CancellationToken ct,
+        int? maxTokens = null) =>
         throw new InvalidOperationException(
             "Dil modeli yapılandırılmadı. Çağırmadan önce IsAvailable kontrol edilmeli.");
 }

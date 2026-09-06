@@ -10,27 +10,77 @@ using T3.Domain.Startups;
 namespace T3.Application.Features.Reports.ExportStartups;
 
 /// <summary>
-/// Girişim listesini CSV olarak dışa aktarır. Üç kural:
+/// Girişim listesini dışa aktarır — CSV (<see cref="Handle"/>, REST'in "İndir"
+/// düğmesi) ya da Excel (<see cref="HandleExcel"/>, AI asistanının
+/// <c>export_startups_excel</c> aracı). Üç kural:
 ///
 /// 1. Sorgu <see cref="IStartupScope"/>'tan geçer — dışa aktarma, ekranda
 ///    görülemeyen satırı dosyaya yazmanın arka kapısı değildir.
 /// 2. Hassas sütunlar satır bazında <see cref="StartupVisibility"/> ile
 ///    maskelenir; maskeli hücre boş değil, "yetkiniz yok" yazar.
 /// 3. Her indirme denetim izine yazılır: kim, ne zaman, kaç satır aldı.
+///
+/// İki format aynı satır verisini paylaşır (<see cref="FetchAsync"/>) —
+/// sorgu ya da maskeleme iki yerde ayrı ayrı güncellenirse biri unutulup
+/// formatlar arasında veri sapması doğardı.
 /// </summary>
 public sealed class ExportStartupsHandler(
     IAppDbContext db,
     IStartupScope scope,
     ICurrentUser currentUser,
-    IAuditWriter audit)
+    IAuditWriter audit,
+    IExcelFileBuilder excelBuilder)
 {
-    /// <summary>
-    /// Üst sınır. Dışa aktarma tek istekte tüm veritabanını çekebilecek tek uç;
-    /// sınırsız bırakmak hem bellek hem sızıntı riski.
-    /// </summary>
     private const int MaxRows = 2000;
 
+    private static readonly string[] Headers =
+    [
+        "Girişim", "Ünvan", "Vergi No", "Sektör", "Durum", "Şehir", "Kuruluş",
+        "Web", "İletişim e-posta", "İletişim telefon", "Teknoloji alanları",
+        "Programlar", "Ekip sayısı", "Toplam yatırım", "Toplam hibe",
+        "Toplam ihracat", "Son ciro yılı", "Son ciro", "Para birimi"
+    ];
+
     public async Task<Result<CsvFile>> Handle(ExportStartupsRequest request, CancellationToken ct)
+    {
+        var data = await FetchAsync(request, ct);
+        if (!data.IsSuccess) return data.Error!;
+
+        var csv = new CsvBuilder(Headers);
+        foreach (var row in data.Value!.Rows)
+            csv.Row([.. row]);
+
+        await WriteAuditAsync(data.Value!, request, ct);
+
+        var fileName = $"t3-girisimler-{DateTimeOffset.UtcNow:yyyyMMdd-HHmm}.csv";
+        return new CsvFile(fileName, "text/csv; charset=utf-8", csv.ToBytes());
+    }
+
+    /// <summary>
+    /// AI asistanının <c>export_startups_excel</c> aracı bunu çağırır —
+    /// REST'in kullandığı aynı sorgu ve maskeleme, farklı olan yalnızca dosya
+    /// biçimi.
+    /// </summary>
+    public async Task<Result<StartupExcelExport>> HandleExcel(
+        ExportStartupsRequest request, CancellationToken ct)
+    {
+        var data = await FetchAsync(request, ct);
+        if (!data.IsSuccess) return data.Error!;
+
+        var content = excelBuilder.Build("Girişimler", Headers, data.Value!.Rows);
+
+        await WriteAuditAsync(data.Value!, request, ct);
+
+        var fileName = $"t3-girisimler-{DateTimeOffset.UtcNow:yyyyMMdd-HHmm}.xlsx";
+        var file = new ExcelFile(
+            fileName,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            content);
+
+        return new StartupExcelExport(file, data.Value!.StartupIds);
+    }
+
+    private async Task<Result<ExportData>> FetchAsync(ExportStartupsRequest request, CancellationToken ct)
     {
         if (!currentUser.IsAuthenticated)
             return Error.Forbidden("Dışa aktarma için oturum açmalısınız.");
@@ -76,18 +126,15 @@ public sealed class ExportStartupsHandler(
                     return (Year: year, Total: g.Where(r => r.FiscalYear == year).Sum(r => r.Amount));
                 });
 
-        var csv = new CsvBuilder(
-            "Girişim", "Ünvan", "Vergi No", "Sektör", "Durum", "Şehir", "Kuruluş",
-            "Web", "İletişim e-posta", "İletişim telefon", "Teknoloji alanları",
-            "Programlar", "Ekip sayısı", "Toplam yatırım", "Toplam hibe",
-            "Toplam ihracat", "Son ciro yılı", "Son ciro", "Para birimi");
+        var rows = new List<IReadOnlyList<string?>>(startups.Count);
 
         foreach (var row in startups)
         {
             var visibility = StartupVisibility.For(currentUser, row.Id);
             var revenue = latestRevenue.TryGetValue(row.Id, out var found) ? found : default;
 
-            csv.Row(
+            rows.Add(
+            [
                 row.Name,
                 row.LegalName,
                 CsvBuilder.Text(row.TaxNumber, visibility.ShowTaxNumber),
@@ -106,21 +153,22 @@ public sealed class ExportStartupsHandler(
                 CsvBuilder.Money(Lookup(exports, row.Id), visibility.ShowExactAmounts),
                 revenue.Year == 0 ? null : CsvBuilder.Number(revenue.Year),
                 CsvBuilder.Money(revenue.Year == 0 ? null : revenue.Total, visibility.ShowExactAmounts),
-                StartupMoney.ReportingCurrency);
+                StartupMoney.ReportingCurrency
+            ]);
         }
 
-        // Satır kimlikleri iz'e yazılıyor: bir sızıntı sonrası "hangi girişimler
-        // gitti" sorusu yalnızca satır SAYISIYLA cevaplanamıyordu (bkz. G-07,
-        // Guvenlik_Denetimi_ve_Iyilestirme_Plani.md).
+        return new ExportData(rows, ids);
+    }
+
+    // Satır kimlikleri iz'e yazılıyor: bir sızıntı sonrası "hangi girişimler
+    // gitti" sorusu yalnızca satır SAYISIYLA cevaplanamıyordu (bkz. G-07,
+    // Guvenlik_Denetimi_ve_Iyilestirme_Plani.md).
+    private async Task WriteAuditAsync(
+        ExportData data, ExportStartupsRequest request, CancellationToken ct) =>
         await audit.WriteAsync(
             "Report.Export", "Startup", null,
-            after: new { Rows = startups.Count, Filter = request, StartupIds = ids },
+            after: new { Rows = data.Rows.Count, Filter = request, StartupIds = data.StartupIds },
             ct: ct);
-
-        // Dosya adı tarihli: aynı klasöre indirilen iki rapor birbirini ezmesin.
-        var fileName = $"t3-girisimler-{DateTimeOffset.UtcNow:yyyyMMdd-HHmm}.csv";
-        return new CsvFile(fileName, "text/csv; charset=utf-8", csv.ToBytes());
-    }
 
     private static decimal? Lookup(Dictionary<Guid, decimal> totals, Guid id) =>
         totals.TryGetValue(id, out var value) ? value : null;
@@ -157,6 +205,15 @@ public sealed class ExportStartupsHandler(
         if (!string.IsNullOrWhiteSpace(request.City))
             query = query.Where(StartupSearch.InCity(request.City));
 
+        // Yıl aralığı bellekte hesaplanıyor (iki DateOnly sınırı), EF'e
+        // sağlayıcıya özgü bir ".Year" çevirisi gitmiyor — bkz. CLAUDE.md.
+        if (request.FoundedYear is { } foundedYear)
+        {
+            var yearStart = new DateOnly(foundedYear, 1, 1);
+            var yearEnd = new DateOnly(foundedYear, 12, 31);
+            query = query.Where(s => s.FoundedOn >= yearStart && s.FoundedOn <= yearEnd);
+        }
+
         return query;
     }
 
@@ -175,4 +232,10 @@ public sealed class ExportStartupsHandler(
         List<string> TechnologyAreas,
         List<string> Programs,
         int TeamCount);
+
+    private sealed record ExportData(IReadOnlyList<IReadOnlyList<string?>> Rows, Guid[] StartupIds);
 }
+
+/// <summary>Excel dışa aktarmanın sonucu: dosyanın kendisi ve dokunduğu
+/// girişim kimlikleri (asistan yanıtındaki kaynak listesi için).</summary>
+public sealed record StartupExcelExport(ExcelFile File, Guid[] StartupIds);

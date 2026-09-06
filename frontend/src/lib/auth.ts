@@ -26,7 +26,15 @@ export type AuthState = {
    * Sunucu bunu denetim izine yazıyor; istemcideki kayıt yalnızca kolaylık.
    */
   login: (email: string, password: string, kvkkOnaySurumu?: string) => Promise<void>
-  logout: () => void
+  /**
+   * `redirectTo` verilirse `RequireAuth` oturumun düştüğünü görünce oraya
+   * yönlendirir (varsayılan `/giris`). Çıkış düğmesi tanıtım sayfasına
+   * dönmek istediğinde kullanılır — bunu burada tek bir durumdan
+   * yönetmemizin nedeni, çıkışla eşzamanlı ayrı bir `navigate()` çağrısının
+   * `RequireAuth`'un kendi yönlendirmesiyle yarışıp bazen kaybetmesiydi.
+   */
+  logout: (redirectTo?: string) => void
+  logoutRedirect: string | null
   loginError: string | null
   isLoggingIn: boolean
 }

@@ -169,6 +169,15 @@ builder.Services.AddAuthorization(options =>
     // gevşetirken diğerini sessizce gevşetmek olurdu.
     options.AddPolicy(Policies.ViewAuditLogs, policy => policy.RequireRole(
         nameof(UserRole.SuperAdmin)));
+
+    options.AddPolicy(Policies.GenerateAiReports, policy => policy.RequireRole(
+        nameof(UserRole.SuperAdmin), nameof(UserRole.ProgramManager)));
+
+    options.AddPolicy(Policies.SendNotifications, policy => policy.RequireRole(
+        nameof(UserRole.SuperAdmin), nameof(UserRole.ProgramManager)));
+
+    options.AddPolicy(Policies.ViewAllNotifications, policy => policy.RequireRole(
+        nameof(UserRole.SuperAdmin)));
 });
 
 // Enum'lar sayı değil ad olarak taşınır: arayüz tipleri okunabilir kalır ve
@@ -194,6 +203,7 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy(AuthRateLimit.AiPolicy, AuthRateLimit.PartitionAi);
     options.AddPolicy(AuthRateLimit.MassExportPolicy, AuthRateLimit.PartitionMassExport);
     options.AddPolicy(AuthRateLimit.McpPolicy, AuthRateLimit.PartitionMcp);
+    options.AddPolicy(AuthRateLimit.AiReportPolicy, AuthRateLimit.PartitionAiReport);
 
     // Adı konmamış her uca da bir üst sınır: kullanıcı/IP başına dakikada 300
     // istek (bkz. G-07). İsim verilmiş politikalarla birlikte çalışır —
@@ -354,6 +364,7 @@ app.MapUserEndpoints();
 app.MapRegistrationEndpoints();
 app.MapReportEndpoints();
 app.MapAssistantEndpoints();
+app.MapNotificationEndpoints();
 app.MapMcpEndpoints();
 
 // İstemci rotaları (/girisimler/…) index.html'e düşer; API önekleri düşmez.

@@ -28,6 +28,8 @@ import TeamSection from './TeamSection'
 import ParticipationForm from './ParticipationForm'
 import ParticipationEditor from './ParticipationEditor'
 import StartupSummaryCard from '@/features/assistant/StartupSummaryCard'
+import AiReportPanel from './AiReportPanel'
+import SendNotificationPanel from './SendNotificationPanel'
 import { useStartupCard, useDeleteStartup } from './queries'
 import type { CardParticipation, StartupCard } from '@/api/types'
 import { useDocumentTitle } from '@/lib/useDocumentTitle'
@@ -49,6 +51,8 @@ export default function StartupDetailPage() {
   const card = useStartupCard(id)
   const [tab, setTab] = useState<Tab>('genel')
   const [editingProfile, setEditingProfile] = useState(false)
+  const [showReportPanel, setShowReportPanel] = useState(false)
+  const [showNotifyPanel, setShowNotifyPanel] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
 
   // Kanca koşulsuz çağrılıyor: kart yüklenene kadar başlık genel kalır.
@@ -95,6 +99,10 @@ export default function StartupDetailPage() {
           setEditingProfile(true)
           setNotice(null)
         }}
+        onOpenReport={() => setShowReportPanel(true)}
+        showReportButton={!showReportPanel}
+        onOpenNotify={() => setShowNotifyPanel(true)}
+        showNotifyButton={!showNotifyPanel}
       />
 
       {notice ? (
@@ -113,6 +121,14 @@ export default function StartupDetailPage() {
           }}
           onCancel={() => setEditingProfile(false)}
         />
+      ) : null}
+
+      {showReportPanel ? (
+        <AiReportPanel startup={startup} onClose={() => setShowReportPanel(false)} />
+      ) : null}
+
+      {showNotifyPanel ? (
+        <SendNotificationPanel startupId={id} onClose={() => setShowNotifyPanel(false)} />
       ) : null}
 
       <FinancialSummary startup={startup} />
@@ -158,12 +174,20 @@ function CardHeader({
   canDelete,
   editing,
   onEdit,
+  onOpenReport,
+  showReportButton,
+  onOpenNotify,
+  showNotifyButton,
 }: {
   startup: StartupCard
   canEdit: boolean
   canDelete: boolean
   editing: boolean
   onEdit: () => void
+  onOpenReport: () => void
+  showReportButton: boolean
+  onOpenNotify: () => void
+  showNotifyButton: boolean
 }) {
   const initials = startup.name
     .split(' ')
@@ -210,6 +234,19 @@ function CardHeader({
           sunucu aynı kontrolü Policies.ManageStartups ile tekrar yapıyor. */}
       {canEdit && !editing ? (
         <div className="flex flex-wrap items-center gap-2">
+          {/* AI raporu da ManageStartups kapsamında: SuperAdmin/ProgramManager
+              erişimi tam olarak canEdit ile örtüşüyor, ayrı bir izin bayrağı
+              eklemek gerekmedi. */}
+          {showReportButton ? (
+            <Button variant="outline" onClick={onOpenReport}>
+              AI Raporu
+            </Button>
+          ) : null}
+          {showNotifyButton ? (
+            <Button variant="outline" onClick={onOpenNotify}>
+              Bildirim Gönder
+            </Button>
+          ) : null}
           <Button variant="outline" onClick={onEdit}>
             Düzenle
           </Button>

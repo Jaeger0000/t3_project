@@ -14,6 +14,11 @@ public sealed record ConversationResponse(
 /// taşır: geçmişi açan kullanıcı da o günün cevabının kaynağını görebilmeli —
 /// kaynağı görünmeyen cümle karar desteği değil, iddiadır.
 /// </summary>
+/// <param name="DownloadToken">
+/// Bu turda bir dosya (ör. Excel dışa aktarma) üretildiyse indirme jetonu.
+/// Jeton kısa ömürlü (bkz. IAssistantExportStore) — eski bir sohbette süresi
+/// dolmuş olabilir, istemci bunu 404 ile fark eder.
+/// </param>
 public sealed record ConversationMessageResponse(
     Guid Id,
     AiMessageRole Role,
@@ -22,4 +27,6 @@ public sealed record ConversationMessageResponse(
     IReadOnlyList<string> Tools,
     AssistantMode? Mode,
     string? ModelName,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? DownloadToken = null,
+    string? DownloadFileName = null);

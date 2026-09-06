@@ -4,11 +4,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using T3.Application.Common.Interfaces;
 using T3.Infrastructure.Ai;
+using T3.Infrastructure.Assistant;
 using T3.Infrastructure.Audit;
 using T3.Infrastructure.Identity;
 using T3.Infrastructure.Notifications;
 using T3.Infrastructure.Persistence;
 using T3.Infrastructure.Persistence.Seed;
+using T3.Infrastructure.Reports;
 using T3.Infrastructure.Storage;
 
 namespace T3.Infrastructure;
@@ -49,8 +51,16 @@ public static class DependencyInjection
 
         AddEmailSender(services, configuration, environment);
         services.AddSingleton<IResetLinkBuilder, ResetLinkBuilder>();
+        services.AddSingleton<IAppLinkBuilder, AppLinkBuilder>();
 
         AddChatModel(services, configuration);
+        services.AddSingleton<IReportPdfRenderer, QuestPdfReportRenderer>();
+        services.AddSingleton<IExcelFileBuilder, ClosedXmlExcelFileBuilder>();
+
+        // AI asistanının ürettiği indirilebilir dosyalar (ör. Excel dışa
+        // aktarma) sohbet protokolü ikili veri taşıyamadığı için burada
+        // bekletiliyor — bkz. IAssistantExportStore.
+        services.AddSingleton<IAssistantExportStore, InMemoryAssistantExportStore>();
 
         return services;
     }

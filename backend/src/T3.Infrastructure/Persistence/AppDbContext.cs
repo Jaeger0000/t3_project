@@ -8,6 +8,7 @@ using T3.Domain.Common;
 using T3.Domain.Documents;
 using T3.Domain.Identity;
 using T3.Domain.Milestones;
+using T3.Domain.Notifications;
 using T3.Domain.Programs;
 using T3.Domain.Registrations;
 using T3.Domain.Startups;
@@ -37,6 +38,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<AiConversation> AiConversations => Set<AiConversation>();
     public DbSet<AiConversationMessage> AiConversationMessages => Set<AiConversationMessage>();
+
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

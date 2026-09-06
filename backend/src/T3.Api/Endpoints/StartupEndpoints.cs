@@ -1,6 +1,8 @@
 using T3.Api.Authorization;
 using T3.Api.Filters;
 using T3.Api.Http;
+using T3.Application.Features.Notifications.SendNotification;
+using T3.Application.Features.Reports.GenerateStartupReport;
 using T3.Application.Features.Startups;
 using T3.Application.Features.Startups.CreateStartup;
 using T3.Application.Features.Startups.DeleteStartup;
@@ -31,6 +33,7 @@ public static class StartupEndpoints
                 StartupStatus? status,
                 Guid? programId,
                 string? city,
+                int? foundedYear,
                 StartupSort? sort,
                 int? page,
                 int? pageSize,
@@ -47,6 +50,7 @@ public static class StartupEndpoints
                     Status = status,
                     ProgramId = programId,
                     City = city,
+                    FoundedYear = foundedYear,
                     Sort = sort ?? StartupSort.Name,
                     Page = page ?? 1,
                     PageSize = pageSize ?? 20
@@ -69,6 +73,48 @@ public static class StartupEndpoints
                 CancellationToken ct) =>
             (await handler.Handle(id, ct)).ToHttp())
             .WithSummary("Girişimin gelişim yolculuğunu kronolojik olarak döner.");
+
+        // --- AI raporu -------------------------------------------------------
+        // GET: veri değiştirmiyor, CSV aktarımıyla (bkz. ReportEndpoints) aynı
+        // desen.
+        //
+        // Hız sınırı (AuthRateLimit.AiReportPolicy) ŞİMDİLİK KALDIRILDI —
+        // geliştirme/deneme sırasında saatte 6 kovası engelliyordu. Demo/canlı
+        // öncesi geri eklenmeli: `.RequireRateLimiting(AuthRateLimit.AiReportPolicy)`
+        // satırını aşağıya geri koy (politika hâlâ AuthRateLimit.cs'te tanımlı).
+        group.MapGet("/{id:guid}/ai-report", async (
+                Guid id,
+                string[]? sections,
+                string? customFocus,
+                GenerateStartupReportHandler handler,
+                HttpContext http,
+                CancellationToken ct) =>
+            {
+                var request = new GenerateStartupReportRequest(sections, customFocus);
+                var result = await handler.Handle(id, request, ct);
+
+                if (!result.IsSuccess)
+                    return ApiResults.Problem(result.Error!);
+
+                var file = result.Value!;
+
+                http.Response.Headers["X-Content-Type-Options"] = "nosniff";
+
+                return Results.File(file.Content, file.ContentType, file.FileName);
+            })
+            .RequireAuthorization(Policies.GenerateAiReports)
+            .WithSummary("Girişim için AI destekli, T3 şablonlu PDF raporu üretir.");
+
+        // --- Bildirim --------------------------------------------------------
+        group.MapPost("/{id:guid}/notifications", async (
+                Guid id,
+                SendNotificationRequest model,
+                SendNotificationHandler handler,
+                CancellationToken ct) =>
+            (await handler.Handle(id, model, ct)).ToHttp())
+            .RequireAuthorization(Policies.SendNotifications)
+            .WithValidation<SendNotificationRequest>()
+            .WithSummary("Girişime serbest metinli bir bildirim gönderir (uygulama içi + e-posta).");
 
         // --- Yazma ---------------------------------------------------------
         group.MapPost("/", async (

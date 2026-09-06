@@ -915,6 +915,228 @@ olarak saklıyor (`"Model"`/`"Local"`) ve okuma dilimi `Enum.TryParse` ile geri
 çeviriyor — çözülemeyen eski bir değer alanı boş bırakıyor, sohbeti okunmaz
 yapmıyor.
 
+## 3p. Girişim profili otomatik onay kararı
+
+**Onay kuyruğu artık hedef türüne göre ikiye ayrılıyor.** Doküman (PDF ekleme/
+kaldırma), başarı/yatırım kaydı (yarışma ödülü, seed/yatırım turu — ikisi de
+`Achievement`) ve ekip üyesi önerileri **değişmedi**: hâlâ `Pending` açılır,
+SuperAdmin/ProgramManager onaylamadan hedef tabloya işlenmez. Yalnızca girişim
+**profili** (`ChangeTargetType.Startup` — ad, sektör, açıklama, website,
+şehir, iletişim e-postası/telefonu, durum) artık onay beklemiyor: gönderimle
+aynı anda uygulanıp kayıt doğrudan `Approved` açılıyor
+(`SubmitChangeRequestHandler`, `ChangeTargetType.Startup` dalı).
+
+**Neden bu ayrım:** kullanıcı isteği — PDF/yarışma/seed gibi *doğrulama*
+gerektiren kayıtlar (kanıt, gerçeklik payı olan bir iddia) yetkili gözünden
+geçmeli; telefon numarası gibi profil alanları doğrulama gerektirmiyor, her
+öneriyi kuyruğa sokmak yöneticiye anlamsız bir onay yükü bindiriyordu.
+
+**Nasıl uygulandı, neden ChangeRequest satırı hâlâ var:** `SubmitChangeRequestHandler`
+draft'ı kurduktan sonra, hedef `Startup` ise `ChangeRequestApplier.ApplyAsync`'i
+**aynı handler içinde, aynı `SaveChanges`'ta** çağırıyor — `ApproveChangeRequestHandler`'ın
+kullandığı uygulayıcının birebir aynısı, mantık iki yerde ayrışmasın diye.
+Başarılıysa `Status=Approved`, `ReviewedByUserId=null` (kimse incelemedi),
+`ReviewNote` sabit bir açıklama cümlesiyle dolduruluyor. Satır **silinmiyor**:
+"girişim kullanıcısı hiçbir tabloya doğrudan yazmaz" kuralı bu şekilde harfiyen
+korunuyor — yazan hep `ChangeRequestApplier`, değişen yalnızca "kim ne zaman
+tetikliyor" (yetkili tıklaması yerine gönderimin kendisi). Denetim izi de aynı
+iki satırı yazıyor (`ChangeRequest.Submit` + `Startup.Update`), onay yolundakiyle
+birebir aynı biçimde sorgulanabiliyor.
+
+**Uygulama başarısız olursa (ör. isim çakışması) hiç `ChangeRequest` satırı
+yazılmıyor** — sistem tarafından "reddedilmiş" sahte bir kayıt bırakmak yerine
+istek doğrudan hatayla döner, sanki hiç gönderilmemiş gibi.
+
+**Frontend:** `useSubmitChangeRequest` artık yanıttaki `status`'a bakıp
+`Approved` ise `['startups']` sorgusunu da geçersizleştiriyor (onay yolundaki
+`useReviewChangeRequest` ile aynı davranış) — aksi hâlde kart, profil hemen
+uygulanmış olsa bile önbellekte eski hâliyle kalırdı. `StartupForm.tsx`'in
+"öneri kuyrukta" metni kaldırıldı (`mode==='proposal'` bu bileşende yalnızca
+`Startup` hedefini gönderiyor, dolayısıyla başarı her zaman anında uygulama
+demek); `TeamSection`/`AchievementSection`/`DocumentSection` metinleri
+dokunulmadı, onlar hâlâ kuyruğa giriyor.
+
+## 3q. Girişim AI raporu (PDF) kararları
+
+**Tek promptla değil, bölüm başına ayrı model çağrısı.** Kullanıcı isteği
+buydu: model her başlığa (yönetici özeti, güçlü yönler, öneriler, ekip,
+program geçmişi, başarı/yatırım) TÜM veriyi görerek ayrı ayrı cevap versin.
+`GenerateStartupReportHandler` tek bir "kanıt paketi" (`GetStartupCardHandler`
++ `GetStartupTimelineHandler` + `ListAchievementsHandler` çıktısı, JSON'a
+serileştirilip `AiRedaction.Redact` ile temizlenmiş) kurup bunu her bölüm için
+`Task.WhenAll` ile **paralel** 6 ayrı `IChatModel.CompleteAsync` çağrısına
+veriyor. Sıralı olsaydı (6 × birkaç saniye) tek tıklama kullanıcıyı yarım
+dakikadan fazla bekletirdi.
+
+**Bölüm hatası tüm raporu batırmıyor.** İlk denemede altı çağrıdan biri
+ücretsiz modelde (`minimax-m3:free`) 45 saniyelik `HttpClient.Timeout`'a takıldı
+ve `Task.WhenAll` tüm isteği 500'e düşürdü — beş başarılı bölüm de kayboldu.
+`AskSectionAsync` artık kendi hatasını yutup o bölüm için bilgilendirici bir
+metin döndürüyor; diğer bölümler etkilenmiyor.
+
+**Kısmi/özel rapor: sabit bölüm listesi + serbest metin, NLU yok.** İstek
+gövdesinde `sections` (seçili anahtarlar) ve `customFocus` (serbest istek) var.
+İkisi de boşsa tam rapor (6 bölüm) üretilir; yalnızca `customFocus` verilmişse
+SADECE o tek özel bölüm üretilir (ör. "büyüme önerisi hazırla" gibi doğrudan
+istekler bu yolu kullanır) — modelin niyeti tahmin etmesi gerekmiyor, kullanıcı
+zaten checkbox/metin ile açıkça seçiyor.
+
+**Uç GET, POST değil.** Veri değiştirmediği için (tamamen hesaplanan, kalıcı
+olmayan bir dosya) CSV aktarımıyla aynı desen seçildi — bu sayede frontend'in
+CSRF başlığı gerektiren POST-blob indirme yolunu yeniden yazmasına gerek
+kalmadı, mevcut `api.download()` (GET) olduğu gibi kullanılabildi.
+
+**Ayrı hız sınırı politikası (`AiReportPolicy`, saatte 6, kullanıcı başına).**
+Ne `AiPolicy` (dakikada 20 — tek bir rapor isteği bile 6 paralel model çağrısı
+ürettiği için çok gevşek kalırdı) ne `MassExportPolicy` (farklı tehdit modeli:
+kütlesel veri çekme) uygun; ayrı, daha sıkı bir kova açıldı.
+
+**Erişim `Policies.GenerateAiReports` = SuperAdmin + ProgramManager**, aynı
+"karar destek" katmanı (ekosistem karnesi, onay kuyruğu). Frontend'de ayrı bir
+izin bayrağı eklemedi: `canManageStartups` zaten birebir aynı rol kümesi,
+`StartupDetailPage`'deki "AI Raporu" butonu `canEdit` ile aynı koşulu kullanıyor.
+
+**PDF şablonu sabit kodlu (QuestPDF, Community lisansı), model yalnızca
+içerik dolduruyor.** Marka (T3/TGM işareti — gerçek PNG, `Reports/Assets/`
+altında gömülü kaynak olarak; handoff kuralı "yeniden çizilmez" dediği için
+SVG'ye çevrilmedi), renk paleti (`#E73A13`/`#B52205`, frontend'deki
+`--color-brand-*` ile birebir) ve sayfa düzeni `QuestPdfReportRenderer`'da.
+Modelin biçim özgürlüğü bilinçli olarak dar tutuldu (`ReportSections
+.FormatInstruction`): yalnızca düz paragraf, "- " madde imi, `**kalın**` —
+tablo/başlık işareti istemiyor, çünkü PDF tarafındaki basit ayrıştırıcı
+(`ComposeBody`) yalnızca bu alt kümeyi biliyor.
+
+**Font açıkça `Liberation Sans` — sistem varsayılanı metin katmanını
+bozuyordu.** İlk sürümde `page.DefaultTextStyle` bir font ailesi belirtmiyordu;
+sayfa GÖRSEL olarak kusursuz basılıyordu ama PDF'in metin katmanı (kopyala/
+yapıştır, `pdftotext`, ekran okuyucu) belirli harf çiftlerini ("ti", "tt")
+sessizce düşürüyordu — "üretim" → "ürem", "kritik" → "krik". Kök neden,
+sistemin bağlam duyarlı biçimlendirme uygulayan değişken genişlikli varsayılan
+fontunun oluşturduğu bitişik harf glifinin PDF'in ToUnicode eşlemesinde doğru
+karşılığının olmaması. `Liberation Sans` böyle bir bitişik harf kullanmıyor;
+görsel çıktı aynı kalırken metin katmanı da artık doğru.
+
+**`IChatModel.CompleteAsync`'e opsiyonel `maxTokens` parametresi eklendi**
+(global `AiOptions.MaxTokens` = 1024 sohbet/özet için yeterliyken çok
+paragraflı rapor bölümünü ortasından kesiyordu). Var olan çağrı yerleri
+(`AssistantConversationRunner`, `SummarizeStartupHandler`) hiç değişmedi —
+parametre isteğe bağlı ve sondan eklendi, yalnızca rapor bölümü çağrısı kendi
+üst sınırını (2000) veriyor. Global sınırı yükseltmek yerine bu yol seçildi:
+sohbet/özet için gereksiz maliyet/gecikme artışı istenmedi.
+
+## 3r. Bildirim sistemi kararları
+
+**İki kanal, tek kayıt.** `Notification` (yeni entity, `AuditLog` gibi
+"yalnızca ekleme") hem uygulama içi gelen kutusunu hem e-posta gönderimini
+tek yerden besliyor — e-posta başarısız olursa (SMTP kapalı, alıcı `.test`
+alan adı) uygulama içi kayıt yine de kalıcı olur (`SendNotificationHandler
+.TrySendAsync` hatayı yutar). Demo ortamında SMTP her zaman ayakta
+olmayabilir; bu MVP maddesini bloklamamalı.
+
+**Alıcı, girişimin `StartupId`'sine bağlı TÜM aktif `StartupUser` hesapları.**
+Şema birden fazla `StartupUser` hesabına izin veriyor (`User.StartupId` üzerinde
+unique index yok, yalnızca `Email` tekil) — `SendNotificationHandler` bu
+yüzden `db.Users.Where(u => u.StartupId == id && u.Role == StartupUser &&
+u.IsActive)` ile TÜM eşleşen hesaplara ayrı ayrı bildirim satırı ve e-posta
+üretiyor, "ilk bulduğun hesaba gönder" varsayımı yapmıyor.
+
+**Program Yöneticisi gönderirse SuperAdmin'e e-posta kopyası gider, ayrı bir
+bildirim SATIRI değil.** Kullanıcı isteği netti: SuperAdmin hiçbir Program
+Yöneticisi bildirimini gözden kaçırmamalı ama iki türü ekranda karıştırmamalı.
+Çözüm: `Notification.SentByRole` her satırda gönderenin gönderim anındaki
+rolünü taşıyor; SuperAdmin'in gözetim ekranı (`ListSentNotificationsHandler`)
+TEK bir sorguyu bu alana göre ikiye ayırıyor (`DirectFromSuperAdmin` /
+`FromProgramManagers`). SuperAdmin'e giden e-posta kopyası ayrıca, konu
+başlığına `[Program Yöneticisi bildirimi]` öneki eklenerek gönderiliyor —
+ama uygulama içi tarafta ikinci bir `Notification` satırı AÇILMIYOR (SuperAdmin
+zaten aynı satırı gözetim ekranında `FromProgramManagers` altında görüyor).
+
+**`IEmailSender` HTML gönderime `SendHtmlAsync` ile genişletildi, `SendAsync`
+(düz metin) hiç değişmedi.** Şifre sıfırlama bilinçli olarak düz metin kalıyor
+(bkz. `SmtpEmailSender`'ın kendi yorumu: "HTML gövde bağlantıyı gizleyebilir").
+Yeni metot arayüzde varsayılan gövdeli (`=> SendAsync(...)`) tanımlandığı için
+`ThrowingEmailSender` hiç dokunulmadı; yalnızca `SmtpEmailSender` (MimeKit
+`BodyBuilder` ile gerçek `multipart/alternative`) ve `FileOutboxEmailSender`
+(hem `.txt` hem `.html` dosyası — geliştirici tarayıcıda önizleyebilsin) kendi
+uygulamalarını yazdı. E-posta şablonu (`NotificationEmailTemplate`) Infrastructure'da
+değil Application'da: marka nasıl göründüğü sağlayıcıya (SMTP/dosya) bağlı
+olmamalı. Kullanıcının serbest metnini HTML'e gömerken `WebUtility.HtmlEncode`
+zorunlu — bu bir web sayfası değil ama HTML e-posta istemcisi HTML render
+ediyor, kaçırılmamış metin e-postaya rastgele bağlantı/biçim enjekte etmenin
+yolu olurdu.
+
+**SuperAdmin'in gözetim ekranında sayfalama yok, tüm bildirimler tek seferde
+geliyor.** Bilinçli kapsam daraltması: bu bir denetim/gözetim ekranı, hacim
+düşük (bir hackathon demosunda onlarca değil birkaç bildirim olur); pagination
+gerçek bir üretim ihtiyacı hâline gelirse sonra eklenir.
+
+**Menüde "Bildirimler" yalnızca StartupUser (rozetli, kendi gelen kutusu) ve
+SuperAdmin'e (rozetsiz, gözetim ekranı) görünüyor.** Program Yöneticisi'nin
+ne kendi kutusu ne gözetim ekranına ihtiyacı var — gönderme zaten girişim
+kartındaki "Bildirim Gönder" düğmesinden yapılıyor, ayrı bir liste ucu
+gerektirmiyor. Rozet `usePendingCount`'takinden farklı bir anahtar
+kullanmıyor (`useMyNotifications`/`useUnreadNotificationCount` aynı sorgu
+anahtarını paylaşıyor) — bildirim listesinin filtre durumu olmadığı için
+`pendingCount`'ta olduğu gibi ayrı bir anahtara gerek kalmadı, TanStack
+Query rozet ile sayfanın kendisini tek istekten besliyor.
+
+**"Gördükten sonra rozet gitsin" ilk sürümde otomatikti — sonradan manuele
+çevrildi.** İlk sürüm ekranı açar açmaz `POST /api/notifications/read-all`i
+tetikliyordu; kullanıcı isteği bunu bilinçli kontrole çevirdi: her bildirimin
+kendi "Okundu işaretle" düğmesi var (`POST /api/notifications/{id}/read`),
+"tümünü okundu işaretle" hâlâ duruyor ama artık bir düğme, otomatik değil.
+Ekran da tek listeden **iki sekmeye** ayrıldı — "Bekleyenler" (varsayılan) ve
+"Okunmuşlar" — ikisi de aynı `/api/notifications` yanıtından `readAt` alanına
+göre istemci tarafında filtreleniyor, ayrı bir uç gerekmedi.
+
+**Bildirim silme alıcıya özel, kayıt gerçekten silinmiyor.** `Notification`
+`RecipientDeletedAt` alanı taşıyor; `DELETE /api/notifications/{id}` bunu
+dolduruyor ve satır yalnızca **alıcının kendi** listesinden (`ListMyNotifications
+Handler`) çıkıyor. SuperAdmin'in gözetim ekranı bu alana hiç bakmıyor — bir
+girişimin kendi kutusunu temizlemesi, Program Yöneticisi'nin ne gönderdiğine
+dair denetim izini silmemeli; oversight her zaman tam kalmalı.
+
+**SuperAdmin'in gözetim ekranından okundu işaretleme/silme de eklendi —
+ama silme orada FARKLI davranıyor.** Kullanıcı isteği: SuperAdmin, kendi
+"Bildirimler" sekmesinde gördüğü (kendisininki ya da Program Yöneticilerinin
+gönderdiği) her bildirimi okundu işaretleyebilmeli ve silebilmeli.
+`MarkNotificationReadHandler`/`DeleteNotificationHandler`'daki sahiplik
+kontrolü artık `RecipientUserId == currentUser.UserId || isSuperAdmin`.
+Okundu işaretleme her iki yolda da AYNI `ReadAt` alanını dolduruyor (ayrı bir
+"admin inceledi" bayrağı açılmadı — kapsamı gereksiz büyütürdü). Silme ise
+KASITLI olarak asimetrik: alıcı silince (kendi kutusundan) kayıt yine
+`RecipientDeletedAt` ile yalnızca gizleniyor; SuperAdmin gözetim ekranından
+silince kayıt `db.Notifications.Remove(...)` ile GERÇEKTEN kalkıyor — hem
+oversight'tan hem alıcının kendi kutusundan. Sebep: SuperAdmin'in "sil"
+demesi ile alıcının "benim kutumdan kaldır" demesi farklı yetki seviyeleri;
+ikisine aynı yumuşak-silmeyi uygulasaydık SuperAdmin ekranından sildiği bir
+kayıt kendi listesinde görünmeye devam ederdi (oversight bu alana bakmadığı
+için), kafa karıştırırdı.
+
+**Gmail tarzı filtre düğmeleri: "Silinenler" görünür olmak zorunda kaldığı
+için `ListMyNotificationsHandler` artık silinen satırları da döndürüyor.**
+Önceki sürüm `RecipientDeletedAt` dolu satırları sorgudan tamamen çıkarıyordu
+— ama bir "Silinenler" sekmesi göstermek için veri hâlâ gerekiyor. Süzme artık
+istemci tarafında (`NotificationsPage.tsx`): tek `/api/notifications`
+yanıtından `readAt`/`deletedByRecipientAt` alanlarına bakarak Okunmamışlar /
+Okunmuşlar / Silinenler ayrılıyor, ayrı uç açılmadı. `unreadCount` (rozet)
+silinmiş bir bildirimi hâlâ saymıyor (`ReadAt is null && DeletedByRecipientAt
+is null`) — kullanıcı zaten kapattığı bir şeyin rozeti şişirmesini istemez.
+
+SuperAdmin'in ekranı da aynı desenle TEK bir listeye indirgendi: eski iki
+sabit bölüm (Doğrudan/Program Yöneticileri) yerine beş düğme (Gelenler /
+Gönderilenler / Okunmamışlar / Okunmuşlar / Silinenler) aynı `/api/notifications
+/sent` yanıtını farklı şekilde süzüyor. "Silinenler" burada **alıcının kendi
+kutusundan sildiği** bildirimleri gösteriyor (SuperAdmin'in kendi "sil"i zaten
+kalıcı olduğu için orada gösterilecek bir şey kalmıyor) — oversight açısından
+gerçek bir sinyal: "bu girişim şu bildirimi kendi tarafında kapattı".
+
+**"Geri yükle" yalnızca gerçek alıcıya açık, SuperAdmin'e değil.**
+`RestoreNotificationHandler` sahiplik kontrolünde SuperAdmin bypass'ı yok —
+SuperAdmin'in gözetim ekranındaki "Silinenler" görünümü bilinçli olarak salt
+okunur, bir girişimin kendi kararını (bildirimi kapatmasını) SuperAdmin'in
+geri alması yetki sınırını bulanıklaştırırdı.
+
 ## 4. Ortam tuzakları — tekrar çarpılacak olanlar
 
 ### Faz 0

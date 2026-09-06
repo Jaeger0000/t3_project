@@ -39,8 +39,9 @@ export default function PortalPage() {
             {card.name}
           </h1>
           <p className="mt-1 text-sm text-stone-500">
-            Girişim portalı — buradan gönderdiğiniz her değişiklik program
-            yöneticisinin onayından sonra yayına girer.
+            Girişim portalı — profil bilgileriniz kaydettiğiniz anda yayına
+            girer; ekip, başarı/yatırım ve doküman değişiklikleri ise program
+            yöneticisinin onayını bekler.
           </p>
         </div>
         <Link

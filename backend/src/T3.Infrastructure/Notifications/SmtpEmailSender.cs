@@ -26,11 +26,23 @@ public sealed class SmtpEmailSender(
 {
     private readonly EmailOptions _options = options.Value;
 
-    public async Task SendAsync(
-        string to, string subject, string body, CancellationToken ct = default)
+    public Task SendAsync(
+        string to, string subject, string body, CancellationToken ct = default) =>
+        SendMessageAsync(to, subject, BuildMessage(_options, to, subject, body), ct);
+
+    public Task SendHtmlAsync(
+        string to, string subject, string textBody, string htmlBody, CancellationToken ct = default) =>
+        SendMessageAsync(to, subject, BuildHtmlMessage(_options, to, subject, textBody, htmlBody), ct);
+
+    /// <summary>
+    /// Bağlan/gönder/kapat döngüsü düz metin ve HTML gönderiminde birebir
+    /// aynı — tek fark mesaj gövdesinin nasıl kurulduğu (bkz. BuildMessage /
+    /// BuildHtmlMessage), o yüzden burada bir kez yazılıyor.
+    /// </summary>
+    private async Task SendMessageAsync(
+        string to, string subject, MimeMessage message, CancellationToken ct)
     {
         var smtp = _options.Smtp;
-        var message = BuildMessage(_options, to, subject, body);
 
         using var client = new SmtpClient
         {
@@ -82,6 +94,31 @@ public sealed class SmtpEmailSender(
     public static MimeMessage BuildMessage(
         EmailOptions options, string to, string subject, string body)
     {
+        var message = NewMessage(options, to, subject);
+
+        // Düz metin: sıfırlama e-postası tek bağlantıdan ibaret, HTML gövde
+        // hem spam puanını yükseltir hem de bağlantıyı gizleyebileceği için
+        // kullanıcıya adresi olduğu gibi göstermenin önüne geçerdi.
+        message.Body = new TextPart("plain") { Text = body };
+
+        return message;
+    }
+
+    /// <summary>
+    /// HTML + düz metin ikilisi (multipart/alternative): HTML render etmeyen
+    /// istemci (ya da ekran okuyucu) düz metne düşer, bu yüzden ikisi de
+    /// birlikte gidiyor — yalnızca HTML yollamak erişilebilirliği kırardı.
+    /// </summary>
+    public static MimeMessage BuildHtmlMessage(
+        EmailOptions options, string to, string subject, string textBody, string htmlBody)
+    {
+        var message = NewMessage(options, to, subject);
+        message.Body = new BodyBuilder { TextBody = textBody, HtmlBody = htmlBody }.ToMessageBody();
+        return message;
+    }
+
+    private static MimeMessage NewMessage(EmailOptions options, string to, string subject)
+    {
         var message = new MimeMessage();
 
         message.From.Add(new MailboxAddress(options.FromName, options.From));
@@ -91,12 +128,6 @@ public sealed class SmtpEmailSender(
             message.ReplyTo.Add(MailboxAddress.Parse(options.ReplyTo));
 
         message.Subject = subject;
-
-        // Düz metin: sıfırlama e-postası tek bağlantıdan ibaret, HTML gövde
-        // hem spam puanını yükseltir hem de bağlantıyı gizleyebileceği için
-        // kullanıcıya adresi olduğu gibi göstermenin önüne geçerdi.
-        message.Body = new TextPart("plain") { Text = body };
-
         return message;
     }
 }

@@ -43,6 +43,15 @@ public sealed class SearchStartupsHandler(
             query = query.Where(s => s.Participations
                 .Any(p => p.ProgramTerm.ProgramId == programId));
 
+        // Yıl aralığı bellekte hesaplanıyor (iki DateOnly sınırı), EF'e
+        // sağlayıcıya özgü bir ".Year" çevirisi gitmiyor — bkz. CLAUDE.md.
+        if (request.FoundedYear is { } foundedYear)
+        {
+            var yearStart = new DateOnly(foundedYear, 1, 1);
+            var yearEnd = new DateOnly(foundedYear, 12, 31);
+            query = query.Where(s => s.FoundedOn >= yearStart && s.FoundedOn <= yearEnd);
+        }
+
         var totalCount = await query.CountAsync(ct);
 
         query = request.Sort switch

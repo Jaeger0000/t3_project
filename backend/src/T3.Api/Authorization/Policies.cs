@@ -25,4 +25,21 @@ public static class Policies
     public const string ReviewApprovals = "approvals:review";
     public const string ManageUsers = "users:manage";
     public const string ViewAuditLogs = "audit:view";
+
+    /// <summary>
+    /// Girişim için AI raporu üretme — aynı "karar destek" katmanı (ekosistem
+    /// karnesi, onay kuyruğu incelemesi) bu iki role açık; girişim kullanıcısı
+    /// kendi verisi için bir AI raporu isteyemez.
+    /// </summary>
+    public const string GenerateAiReports = "reports:ai-generate";
+
+    /// <summary>Girişime bildirim gönderme — AI raporuyla aynı rol kümesi.</summary>
+    public const string SendNotifications = "notifications:send";
+
+    /// <summary>
+    /// Tüm bildirimleri (gönderen role göre ayrılmış) gözetim ekranından
+    /// görme — yalnızca SuperAdmin. Program Yöneticisi kendi gönderdiklerini
+    /// zaten gönderim anında ekranda görüyor, ayrı bir liste ucuna ihtiyacı yok.
+    /// </summary>
+    public const string ViewAllNotifications = "notifications:view-all";
 }

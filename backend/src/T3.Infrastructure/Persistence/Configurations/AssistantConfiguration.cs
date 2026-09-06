@@ -38,6 +38,8 @@ public class AiConversationMessageConfiguration : IEntityTypeConfiguration<AiCon
         builder.Property(m => m.StartupIdsJson).HasMaxLength(2000);
         builder.Property(m => m.Mode).HasMaxLength(32);
         builder.Property(m => m.ModelName).HasMaxLength(120);
+        builder.Property(m => m.ExportDownloadToken).HasMaxLength(64);
+        builder.Property(m => m.ExportFileName).HasMaxLength(260);
 
         // Sohbet silindiğinde mesajlar da silinir: saklama süresi temizliği
         // yalnızca başlığı silip metni bırakırsa iş görmez.

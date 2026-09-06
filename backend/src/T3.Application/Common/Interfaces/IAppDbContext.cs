@@ -6,6 +6,7 @@ using T3.Domain.Audit;
 using T3.Domain.Documents;
 using T3.Domain.Identity;
 using T3.Domain.Milestones;
+using T3.Domain.Notifications;
 using T3.Domain.Programs;
 using T3.Domain.Registrations;
 using T3.Domain.Startups;
@@ -41,6 +42,9 @@ public interface IAppDbContext
     /// <summary>Sunucuda saklanan AI sohbetleri ve turları (bkz. Features/Assistant/Chat).</summary>
     DbSet<AiConversation> AiConversations { get; }
     DbSet<AiConversationMessage> AiConversationMessages { get; }
+
+    /// <summary>Yöneticiden girişime giden bildirimler (bkz. Features/Notifications).</summary>
+    DbSet<Notification> Notifications { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

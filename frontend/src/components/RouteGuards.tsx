@@ -53,7 +53,7 @@ export function NotFoundRoute() {
  * olduğu için "elimde jeton var mı" diye bakamıyoruz, cevabı /api/me veriyor.
  */
 export function RequireAuth() {
-  const { session, isResolving, connectionError, retrySession } = useAuth()
+  const { session, isResolving, connectionError, retrySession, logoutRedirect } = useAuth()
   const location = useLocation()
 
   if (isResolving) {
@@ -76,8 +76,14 @@ export function RequireAuth() {
   }
 
   if (!session) {
-    // Kullanıcı gitmek istediği adrese giriş sonrası dönsün.
-    return <Navigate to="/giris" replace state={{ from: location.pathname + location.search }} />
+    // Bilinçli çıkış (logoutRedirect verilmiş) tanıtım sayfasına döner;
+    // aksi hâlde (oturum süresi doldu, sekmeler arası senkron) giriş
+    // ekranına — kullanıcı gitmek istediği adrese giriş sonrası dönsün.
+    return logoutRedirect ? (
+      <Navigate to={logoutRedirect} replace />
+    ) : (
+      <Navigate to="/giris" replace state={{ from: location.pathname + location.search }} />
+    )
   }
 
   // Yönetici şifre attı: kullanıcı kendi şifresini belirlemeden başka ekrana

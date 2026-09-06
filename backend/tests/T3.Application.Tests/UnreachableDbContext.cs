@@ -7,6 +7,7 @@ using T3.Domain.Audit;
 using T3.Domain.Documents;
 using T3.Domain.Identity;
 using T3.Domain.Milestones;
+using T3.Domain.Notifications;
 using T3.Domain.Programs;
 using T3.Domain.Registrations;
 using T3.Domain.Startups;
@@ -44,6 +45,7 @@ internal sealed class UnreachableDbContext : IAppDbContext
     public DbSet<AiConversation> AiConversations => throw Unreachable(nameof(AiConversations));
     public DbSet<AiConversationMessage> AiConversationMessages =>
         throw Unreachable(nameof(AiConversationMessages));
+    public DbSet<Notification> Notifications => throw Unreachable(nameof(Notifications));
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         throw Unreachable(nameof(SaveChangesAsync));

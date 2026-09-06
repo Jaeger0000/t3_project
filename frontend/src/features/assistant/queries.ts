@@ -4,17 +4,9 @@ import type {
   AiChatReply,
   AiConversationDetail,
   AiConversationSummary,
-  AssistantAnswer,
   PagedResult,
   StartupSummary,
 } from '@/api/types'
-
-export function useAskAssistant() {
-  return useMutation({
-    mutationFn: (question: string) =>
-      api.post<AssistantAnswer>('/api/ai/ask', { question }),
-  })
-}
 
 /**
  * Girişim kartındaki özet. Kullanıcı isteyene kadar çağrılmıyor (`enabled`):

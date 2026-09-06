@@ -5,7 +5,6 @@ import { formatCompactMoney, formatMoney } from '@/lib/format'
 import { sectorLabels } from '@/lib/labels'
 import { Button, Card, ErrorState, Input, Select, Spinner } from '@/components/ui'
 import { usePrograms } from '@/features/startups/queries'
-import AssistantPanel from '@/features/assistant/AssistantPanel'
 import { BarChart, ChartCard, DonutChart } from './charts'
 import { defaultDashboardFilters, exportStartupsCsv, useEcosystemStats } from './queries'
 import type { DashboardFilters } from './queries'
@@ -129,8 +128,6 @@ export default function DashboardPage() {
       {stats.error ? <ErrorState message={stats.error.message} error={stats.error} /> : null}
 
       {stats.data ? <StatsBody stats={stats.data} /> : null}
-
-      <AssistantPanel />
     </div>
   )
 }

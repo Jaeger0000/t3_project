@@ -21,6 +21,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const [signedOut, setSignedOut] = useState(false)
 
+  // Çıkışın nereye yönlendireceği: RequireAuth, oturum düşünce buraya bakar
+  // (yoksa /giris'e döner). Bkz. logout() içindeki not.
+  const [logoutRedirect, setLogoutRedirect] = useState<string | null>(null)
+
   // Oturumun kaynağı artık istemcideki bir jeton değil, sunucunun çerezi:
   // "elimde jeton var mı" diye bakamıyoruz, her açılışta /api/me soruyoruz.
   // Yanıt aynı zamanda rolü, hesabın aktifliğini ve "şifre değiştir" bayrağını
@@ -63,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       marker.set()
       setSignedOut(false)
       setSignedOutReason(null)
+      setLogoutRedirect(null)
       // Giriş yanıtı oturum bilgisini de taşıyor: fazladan /api/me turu yok.
       queryClient.setQueryData(['session'], data.user)
     },
@@ -77,11 +82,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [loginMutation],
   )
 
-  const logout = useCallback(() => {
+  const logout = useCallback((redirectTo?: string) => {
     marker.clear()
     // Ekran hemen tepki vermeli: sunucu turunu beklemek "düğme çalışmıyor"
     // izlenimi verirdi.
     setSignedOut(true)
+    setLogoutRedirect(redirectTo ?? null)
 
     void (async () => {
       // Çerezi yalnızca sunucu geçersiz kılabilir; istemcinin "unutması"
@@ -142,6 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signedOutReason,
         login,
         logout,
+        logoutRedirect,
         loginError: loginMutation.error?.message ?? null,
         isLoggingIn: loginMutation.isPending,
       }}

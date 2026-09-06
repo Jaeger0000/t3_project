@@ -19,8 +19,16 @@ public sealed class FileOutboxEmailSender(
 {
     private readonly EmailOptions _options = options.Value;
 
-    public async Task SendAsync(
-        string to, string subject, string body, CancellationToken ct = default)
+    public Task SendAsync(
+        string to, string subject, string body, CancellationToken ct = default) =>
+        WriteAsync(to, subject, body, htmlBody: null, ct);
+
+    public Task SendHtmlAsync(
+        string to, string subject, string textBody, string htmlBody, CancellationToken ct = default) =>
+        WriteAsync(to, subject, textBody, htmlBody, ct);
+
+    private async Task WriteAsync(
+        string to, string subject, string textBody, string? htmlBody, CancellationToken ct)
     {
         Directory.CreateDirectory(_options.OutboxPath);
 
@@ -28,7 +36,7 @@ public sealed class FileOutboxEmailSender(
         // gönderilen" e-postayı okuyor.
         var stamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss-fff", CultureInfo.InvariantCulture);
         var safeRecipient = string.Concat(to.Select(c => char.IsLetterOrDigit(c) ? c : '_'));
-        var path = Path.Combine(_options.OutboxPath, $"{stamp}-{safeRecipient}.txt");
+        var basePath = Path.Combine(_options.OutboxPath, $"{stamp}-{safeRecipient}");
 
         var content = $"""
             Kime: {to}
@@ -36,13 +44,18 @@ public sealed class FileOutboxEmailSender(
             Konu: {subject}
             Tarih: {DateTimeOffset.UtcNow:O}
 
-            {body}
+            {textBody}
             """;
 
-        await File.WriteAllTextAsync(path, content, ct);
+        await File.WriteAllTextAsync($"{basePath}.txt", content, ct);
+
+        // HTML gövde ayrıca yazılıyor: geliştirici tarayıcıda açıp gerçek
+        // e-posta istemcisine yakın bir önizleme görebilsin.
+        if (htmlBody is not null)
+            await File.WriteAllTextAsync($"{basePath}.html", htmlBody, ct);
 
         logger.LogInformation(
             "E-posta gönderilmedi, geliştirme kutusuna yazıldı: {Path} (konu: {Subject})",
-            path, subject);
+            $"{basePath}.txt", subject);
     }
 }

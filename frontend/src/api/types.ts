@@ -329,6 +329,20 @@ export type SubmitChangeRequestBody = {
   achievement?: AchievementWriteModel | null
 }
 
+/**
+ * Girişim profili (Startup) önerisi onay beklemez: gönderimle birlikte
+ * otomatik uygulanır, bu yüzden `status` burada da `Approved` gelir — diğer
+ * hedef türleri (ekip/başarı/doküman) hâlâ `Pending` döner.
+ */
+export type SubmitChangeRequestResult = {
+  id: string
+  targetType: ChangeTargetType
+  operation: ChangeOperation
+  status: ChangeRequestStatus
+  submittedAt: string
+  changedFieldCount: number
+}
+
 export type ReviewChangeRequestResult = {
   id: string
   status: ChangeRequestStatus
@@ -697,7 +711,18 @@ export type AssistantMode = 'Model' | 'Local'
  * uydurduğu bir adı gerçek kayda bağlama riski. Kartı çizmek isteyen ekran
  * kimlikleri girişim listesiyle eşleştirir — maskeleme orada zaten doğru.
  */
-export type AssistantSource = { tool: string; summary: string; startupIds: string[] }
+/**
+ * `downloadToken` yalnızca dosya üreten araçlarda (ör. Excel dışa aktarma)
+ * dolu. Jeton tek kullanımlık ve kısa ömürlü — süresi dolmuşsa indirme ucu
+ * 404 döner.
+ */
+export type AssistantSource = {
+  tool: string
+  summary: string
+  startupIds: string[]
+  downloadToken?: string | null
+  downloadFileName?: string | null
+}
 
 export type AssistantAnswer = {
   question: string
@@ -741,6 +766,9 @@ export type AiChatMessageRow = {
   mode: AssistantMode | null
   modelName: string | null
   createdAt: string
+  /** Bu turda bir dosya üretildiyse (ör. Excel) indirme jetonu; jeton kısa ömürlü. */
+  downloadToken?: string | null
+  downloadFileName?: string | null
 }
 
 export type AiConversationDetail = {
@@ -760,4 +788,32 @@ export type AiChatReply = {
   mode: AssistantMode
   modelName: string
   answeredAt: string
+}
+
+// --- Bildirimler -----------------------------------------------------------
+
+export type NotificationRow = {
+  id: string
+  startupId: string
+  startupName: string
+  sentByName: string
+  sentByRole: UserRole
+  sentByRoleLabel: string
+  message: string
+  sentAt: string
+  readAt: string | null
+  emailSent: boolean
+  /** Alıcı bu bildirimi kendi kutusundan sildiğinde dolar — "Silinenler" filtresi bunu okur. */
+  deletedByRecipientAt: string | null
+}
+
+export type MyNotificationsResponse = {
+  items: NotificationRow[]
+  unreadCount: number
+}
+
+/** SuperAdmin gözetim ekranı: gönderen role göre ayrılmış iki liste. */
+export type SentNotificationsResponse = {
+  directFromSuperAdmin: NotificationRow[]
+  fromProgramManagers: NotificationRow[]
 }

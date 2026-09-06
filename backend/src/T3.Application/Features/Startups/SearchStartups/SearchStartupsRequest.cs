@@ -15,6 +15,10 @@ public sealed record SearchStartupsRequest : PagedRequest
     public Guid? ProgramId { get; init; }
 
     public string? City { get; init; }
+
+    /// <summary>Kuruluş yılı (ör. 2023). <c>FoundedOn</c> boş olan girişimler elenir.</summary>
+    public int? FoundedYear { get; init; }
+
     public StartupSort Sort { get; init; } = StartupSort.Name;
 }
 

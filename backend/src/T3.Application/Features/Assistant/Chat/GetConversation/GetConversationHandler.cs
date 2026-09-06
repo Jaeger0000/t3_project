@@ -51,7 +51,9 @@ public sealed class GetConversationHandler(IAppDbContext db, ICurrentUser curren
             Names(message.ToolNamesJson),
             Enum.TryParse<AssistantMode>(message.Mode, out var mode) ? mode : null,
             message.ModelName,
-            message.CreatedAt);
+            message.CreatedAt,
+            message.ExportDownloadToken,
+            message.ExportFileName);
 
     private static IReadOnlyList<Guid> Ids(string? json) =>
         Parse<Guid>(json);

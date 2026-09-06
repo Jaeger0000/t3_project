@@ -48,5 +48,15 @@ public class AiConversationMessage : Entity
 
     public string? ModelName { get; set; }
 
+    /// <summary>
+    /// Bu turda bir dosya üretildiyse (ör. Excel dışa aktarma) indirme jetonu.
+    /// Jeton bellek içi depoda kısa ömürlü (bkz. IAssistantExportStore) — sohbet
+    /// geçmişini sonradan açan kullanıcı için bağlantı süresi dolmuş olabilir,
+    /// bu normal: dosyayı istediğinde aracı yeniden çağırması yeterli.
+    /// </summary>
+    public string? ExportDownloadToken { get; set; }
+
+    public string? ExportFileName { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 }

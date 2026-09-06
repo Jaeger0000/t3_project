@@ -28,4 +28,6 @@ export const RegistrationRequestsPage = lazy(
 export const AuditPage = lazy(() => import('@/features/audit/AuditPage'))
 export const PrivacyNoticePage = lazy(() => import('@/features/legal/PrivacyNoticePage'))
 export const TermsPage = lazy(() => import('@/features/legal/TermsPage'))
+export const ProfilePage = lazy(() => import('@/features/profile/ProfilePage'))
+export const NotificationsPage = lazy(() => import('@/features/notifications/NotificationsPage'))
 

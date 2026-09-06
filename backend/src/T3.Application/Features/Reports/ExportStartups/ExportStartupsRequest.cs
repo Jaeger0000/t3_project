@@ -11,4 +11,5 @@ public sealed record ExportStartupsRequest(
     Sector? Sector = null,
     StartupStatus? Status = null,
     Guid? ProgramId = null,
-    string? City = null);
+    string? City = null,
+    int? FoundedYear = null);

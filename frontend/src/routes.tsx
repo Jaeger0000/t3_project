@@ -18,8 +18,10 @@ import {
   ChangePasswordPage,
   DashboardPage,
   ForgotPasswordPage,
+  NotificationsPage,
   PortalPage,
   PrivacyNoticePage,
+  ProfilePage,
   ProgramsPage,
   RegistrationRequestsPage,
   ResetPasswordPage,
@@ -56,6 +58,8 @@ export const appRoutes = createRoutesFromElements(
         {/* Ayrı bir izin aranmıyor: herkes kendi yetkisi kadarını görüyor,
             süzme sunucuda yapılıyor (girişim kullanıcısı kendi kaydını sorar). */}
         <Route path="/asistan" element={<AssistantChatPage />} />
+        <Route path="/bildirimler" element={<NotificationsPage />} />
+        <Route path="/profil" element={<ProfilePage />} />
         <Route path="/sifre-degistir" element={<ChangePasswordPage />} />
 
         {/* Onay ekranı iki yetkiden birini gerektiriyor: karar veren ya da

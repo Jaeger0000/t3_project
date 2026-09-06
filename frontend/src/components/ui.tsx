@@ -22,6 +22,24 @@ export function Card({ children, className = '', ...rest }: HTMLAttributes<HTMLD
   )
 }
 
+/**
+ * Varsayılan profil resmi. Gerçek bir fotoğraf yükleme özelliği yok — bu
+ * yüzden marka rengiyle sabit bir silüet ikonu gösteriyor, kullanıcıya göre
+ * değişen bir baş harf değil (baş harf ad-soyad her yerde göründüğü için ek
+ * bilgi taşımaz, salt görsel boşluğu dolduruyor).
+ */
+export function Avatar({ className = '' }: { className?: string }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-300 ${className}`}
+    >
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-[60%] w-[60%]" aria-hidden="true">
+        <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.24-8 5v1a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-1c0-2.76-3.58-5-8-5Z" />
+      </svg>
+    </span>
+  )
+}
+
 export function Badge({
   children,
   tone = 'bg-brand-50 text-brand-800 dark:bg-brand-950 dark:text-brand-200',

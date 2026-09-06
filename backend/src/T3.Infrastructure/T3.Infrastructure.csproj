@@ -5,6 +5,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- PDF raporunun başlığındaki gerçek T3/TGM işareti. Handoff kuralı
+         "harf kompozisyonu, renk sırası, blok oranları değiştirilmez" diyor;
+         PNG bu yüzden gömülü kaynak olarak olduğu gibi taşınıyor, yeniden
+         çizilmiyor. Kaynak dosya: frontend/public/marka/tgm-logo-isaret.png. -->
+    <EmbeddedResource Include="Reports\Assets\tgm-logo-isaret.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.104.2" />
     <PackageReference Include="MailKit" Version="4.8.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -15,6 +24,7 @@
     <PackageReference Include="Microsoft.Extensions.Identity.Core" Version="8.0.10" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.10" />
+    <PackageReference Include="QuestPDF" Version="2025.7.0" />
     <PackageReference Include="Serilog" Version="4.3.1" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
   </ItemGroup>

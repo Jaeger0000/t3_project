@@ -71,7 +71,11 @@ değerlendirme aşamasına geçemez — **önce MVP, sonra güzellik**.
   betikleri ve Swagger için durur. Çerezle kimliklenen yazma isteği
   `X-CSRF-Token` ister; Bearer isteği istemez (başka origin başlık koyamaz).
 - **MCP araçları REST ile aynı Application handler'larını sarar** — asla paralel veri yolu.
-- **Girişim kullanıcısı hiçbir tabloya doğrudan yazmaz** — yalnızca `ChangeRequest` üretir.
+- **Girişim kullanıcısı hiçbir tabloya doğrudan yazmaz** — yalnızca `ChangeRequest`
+  üretir. Tek istisna: profil alanları (`ChangeTargetType.Startup`) doğrulama
+  gerektirmediği için gönderimle birlikte otomatik `Approved` açılır; doküman,
+  ekip üyesi ve başarı/yatırım (yarışma, seed) hâlâ yetkili onayı bekler
+  (bkz. [Gelistirme_Kararlari.md §3p](docs/Gelistirme_Kararlari.md#3p-girişim-profili-otomatik-onay-kararı)).
 
 ## Sık çarpılan tuzaklar (ayrıntı: [Gelistirme_Kararlari.md](docs/Gelistirme_Kararlari.md))
 

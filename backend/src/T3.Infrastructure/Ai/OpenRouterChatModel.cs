@@ -51,13 +51,14 @@ public sealed class OpenRouterChatModel : IChatModel
         string systemPrompt,
         IReadOnlyList<ChatMessage> messages,
         IReadOnlyList<ChatTool> tools,
-        CancellationToken ct)
+        CancellationToken ct,
+        int? maxTokens = null)
     {
         var useTools = tools.Count > 0 && !_capabilities.ToolsDisabled;
 
         try
         {
-            return await SendAsync(systemPrompt, messages, useTools ? tools : [], ct);
+            return await SendAsync(systemPrompt, messages, useTools ? tools : [], ct, maxTokens);
         }
         catch (UnsupportedToolsException)
         {
@@ -70,7 +71,7 @@ public sealed class OpenRouterChatModel : IChatModel
                 "Model {Model} araç çağırmayı desteklemiyor; araçsız yola geçildi.",
                 _options.Model);
 
-            return await SendAsync(systemPrompt, messages, [], ct);
+            return await SendAsync(systemPrompt, messages, [], ct, maxTokens);
         }
     }
 
@@ -78,16 +79,18 @@ public sealed class OpenRouterChatModel : IChatModel
         string systemPrompt,
         IReadOnlyList<ChatMessage> messages,
         IReadOnlyList<ChatTool> tools,
-        CancellationToken ct)
+        CancellationToken ct,
+        int? maxTokens)
     {
-        var payload = await PostWithRetryAsync(BuildBody(systemPrompt, messages, tools), ct);
+        var payload = await PostWithRetryAsync(BuildBody(systemPrompt, messages, tools, maxTokens), ct);
         return Parse(payload);
     }
 
     internal JsonObject BuildBody(
         string systemPrompt,
         IReadOnlyList<ChatMessage> messages,
-        IReadOnlyList<ChatTool> tools)
+        IReadOnlyList<ChatTool> tools,
+        int? maxTokens = null)
     {
         // Sistem yönergesi ilk mesaj olarak giriyor: OpenAI şemasında ayrı bir
         // "system" alanı yok.
@@ -103,7 +106,7 @@ public sealed class OpenRouterChatModel : IChatModel
         var body = new JsonObject
         {
             ["model"] = _options.Model,
-            ["max_tokens"] = _options.MaxTokens,
+            ["max_tokens"] = maxTokens ?? _options.MaxTokens,
             ["messages"] = wire
         };
 

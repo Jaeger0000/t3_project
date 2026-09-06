@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Badge, Button, Card, EmptyState, ErrorState, Spinner } from '@/components/ui'
+import { api, ApiError } from '@/lib/apiClient'
 import { formatDate } from '@/lib/format'
 import { useDocumentTitle } from '@/lib/useDocumentTitle'
 import { defaultFilters, useStartups } from '@/features/startups/queries'
@@ -411,6 +412,48 @@ function ChatBubble({
         </div>
       ) : null}
 
+      {message.downloadToken ? <ExportDownloadButton message={message} /> : null}
+    </div>
+  )
+}
+
+/**
+ * Asistanın ürettiği dosyayı indirir. Jeton tek kullanımlık ve 15 dakika
+ * ömürlü — eski bir sohbette buton tıklanırsa 404 dönebilir, kullanıcıya
+ * "aracı yeniden çağırın" demek yeterli, sessizce yeniden denemek yerine.
+ */
+function ExportDownloadButton({ message }: { message: AiChatMessageRow }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleDownload() {
+    if (!message.downloadToken) return
+    setBusy(true)
+    setError(null)
+    try {
+      await api.download(
+        `/api/ai/exports/${message.downloadToken}`,
+        message.downloadFileName ?? 'disa-aktarma.xlsx',
+      )
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.status === 404
+            ? 'Bağlantının süresi dolmuş; asistana isteği yeniden sorun.'
+            : err.message
+          : 'Dosya indirilemedi.',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <Button variant="outline" onClick={handleDownload} disabled={busy}>
+        {busy ? 'İndiriliyor…' : `⬇ ${message.downloadFileName ?? 'Dosyayı indir'}`}
+      </Button>
+      {error ? <p className="text-xs text-red-600 dark:text-red-400">{error}</p> : null}
     </div>
   )
 }

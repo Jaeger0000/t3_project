@@ -7,6 +7,7 @@ using T3.Application.Features.Achievements.ListAchievements;
 using T3.Application.Features.Approvals.ListChangeRequests;
 using T3.Application.Features.Programs.ListPrograms;
 using T3.Application.Features.Reports.EcosystemStats;
+using T3.Application.Features.Reports.ExportStartups;
 using T3.Application.Features.Startups;
 using T3.Application.Features.Startups.GetStartupCard;
 using T3.Application.Features.Startups.GetStartupTimeline;
@@ -23,12 +24,17 @@ namespace T3.Application.Features.Assistant;
 /// <see cref="StartupIds"/> varsayılan olarak boş: ekosistem geneli çalışan
 /// araçlar (karne, onay kuyruğu) tek bir girişime bağlanamaz; boş liste
 /// "girişim yok" demek, "bilinmiyor" değil.
+///
+/// <see cref="DownloadToken"/>/<see cref="DownloadFileName"/> yalnızca dosya
+/// üreten araçlarda dolu; bkz. <see cref="AssistantSourceResponse"/>.
 /// </summary>
 public sealed record AssistantToolResult(
     string ToolName,
     string Json,
     string Summary,
-    IReadOnlyList<Guid> StartupIds);
+    IReadOnlyList<Guid> StartupIds,
+    string? DownloadToken = null,
+    string? DownloadFileName = null);
 
 /// <summary>
 /// AI ve MCP'nin ortak araç kutusu.
@@ -45,7 +51,10 @@ public sealed class AssistantToolbox(
     ListAchievementsHandler achievements,
     EcosystemStatsHandler stats,
     ListProgramsHandler programs,
-    ListChangeRequestsHandler approvals)
+    ListChangeRequestsHandler approvals,
+    ExportStartupsHandler exportStartups,
+    IAssistantExportStore exportStore,
+    ICurrentUser currentUser)
 {
     private static readonly CultureInfo Turkish = CultureInfo.GetCultureInfo("tr-TR");
 
@@ -62,8 +71,14 @@ public sealed class AssistantToolbox(
     public static IReadOnlyList<ChatTool> Catalog { get; } =
     [
         new("search_startups",
-            "Girişimleri arar ve süzer. Sektör, durum, şehir, program ve serbest metin "
-            + "ile filtrelenebilir. Yatırım sıralaması için sort=MostInvestment kullan. "
+            "Girişimleri arar ve süzer. Sektör, durum, şehir, program, kuruluş yılı ve "
+            + "serbest metin ile filtrelenebilir. Yatırım sıralaması için "
+            + "sort=MostInvestment kullan. "
+            // "2023 yılı kuruluşlu" gibi sorularda foundedYear'ı BURADA
+            // gönder — sonuçtaki foundedOn alanını kendin okuyup elemeye
+            // çalışma, küçük modelde tarih karşılaştırması hataya açık.
+            + "Kuruluş yılına göre süzmek için foundedYear kullan; sonuçları kendin "
+            + "tarihe göre eleme. "
             // Model boş tutarı "maskeli" diye yorumluyordu: Süper Yönetici'ye
             // yatırım kaydı olmayan bir girişim için "bu alan sizden gizli"
             // demek, ürünün KVKK anlatısını doğrudan yanlış gösteriyor.
@@ -77,6 +92,7 @@ public sealed class AssistantToolbox(
                 status = EnumOf<StartupStatus>("Girişimin durumu."),
                 city = Text("Şehir adı (tam eşleşme)."),
                 programId = Text("Program kimliği (GUID)."),
+                foundedYear = Number("Kuruluş yılı (ör. 2023)."),
                 sort = EnumOf<StartupSort>("Sıralama."),
                 pageSize = Number("Kaç kayıt dönsün (varsayılan 20, en çok 100).")
             })),
@@ -126,7 +142,24 @@ public sealed class AssistantToolbox(
         new("list_pending_approvals",
             "Bekleyen değişiklik onaylarını listeler. Yalnızca onay yetkisi olan "
             + "kullanıcılar için sonuç döner.",
-            Schema(new { startupId = Text("Tek bir girişimin isteklerine daralt.") }))
+            Schema(new { startupId = Text("Tek bir girişimin isteklerine daralt.") })),
+
+        new("export_startups_excel",
+            "Süzülmüş girişim listesini indirilebilir bir Excel (.xlsx) dosyasına "
+            + "dönüştürür. search_startups ile aynı süzgeçleri kabul eder. Kullanıcı "
+            + "'excel olarak ver', 'dosya indir', 'tabloya dök', 'liste hâlinde gönder' "
+            + "gibi bir istek yaptığında bu aracı çağır — sonuçları kendi metninde "
+            + "tablo gibi yazmaya çalışma, gerçek indirilebilir dosya üret. Yanıtın "
+            + "altında bir indirme bağlantısı gösterileceğini kullanıcıya söyle.",
+            Schema(new
+            {
+                q = Text("Ad, ürün açıklaması veya şehirde geçen serbest metin."),
+                sector = EnumOf<Sector>("Sektör."),
+                status = EnumOf<StartupStatus>("Girişimin durumu."),
+                city = Text("Şehir adı (tam eşleşme)."),
+                programId = Text("Program kimliği (GUID)."),
+                foundedYear = Number("Kuruluş yılı (ör. 2023).")
+            }))
     ];
 
     public async Task<Result<AssistantToolResult>> InvokeAsync(
@@ -139,6 +172,7 @@ public sealed class AssistantToolbox(
         "ecosystem_stats" => await StatsAsync(args, ct),
         "list_programs" => await ProgramsAsync(ct),
         "list_pending_approvals" => await ApprovalsAsync(args, ct),
+        "export_startups_excel" => await ExportExcelAsync(args, ct),
         _ => Error.NotFound($"Bilinmeyen araç: {name}")
     };
 
@@ -153,6 +187,7 @@ public sealed class AssistantToolbox(
             Status = En<StartupStatus>(args, "status"),
             City = Str(args, "city"),
             ProgramId = Id(args, "programId"),
+            FoundedYear = Int(args, "foundedYear"),
             Sort = En<StartupSort>(args, "sort") ?? StartupSort.Name,
             PageSize = Int(args, "pageSize") ?? 20
         }, ct);
@@ -257,6 +292,41 @@ public sealed class AssistantToolbox(
               + (value.Count > 5 ? " …" : "."));
     }
 
+    /// <summary>
+    /// Dosyanın kendisi modele gitmez, yalnızca bir jeton — asıl içerik
+    /// <see cref="exportStore"/>'da bekliyor ve istemci onu ayrı bir GET
+    /// ucundan indiriyor (bkz. AssistantEndpoints, IAssistantExportStore).
+    /// </summary>
+    private async Task<Result<AssistantToolResult>> ExportExcelAsync(JsonElement args, CancellationToken ct)
+    {
+        if (currentUser.UserId is not { } userId)
+            return Error.Forbidden("Dışa aktarma için oturum açmalısınız.");
+
+        var result = await exportStartups.HandleExcel(new ExportStartupsRequest(
+            Q: Str(args, "q"),
+            Sector: En<Sector>(args, "sector"),
+            Status: En<StartupStatus>(args, "status"),
+            ProgramId: Id(args, "programId"),
+            City: Str(args, "city"),
+            FoundedYear: Int(args, "foundedYear")), ct);
+
+        if (!result.IsSuccess) return result.Error!;
+
+        var export = result.Value!;
+        var token = exportStore.Save(userId, new AssistantExportFile(
+            export.File.FileName, export.File.ContentType, export.File.Content));
+
+        return Wrap("export_startups_excel",
+            new { fileName = export.File.FileName, rowCount = export.StartupIds.Length },
+            export.StartupIds.Length == 0
+                ? "Süzgece uyan girişim yok, boş bir Excel dosyası hazırlandı."
+                : $"'{export.File.FileName}' adında {export.StartupIds.Length} satırlık "
+                  + "Excel dosyası hazırlandı; indirme bağlantısı yanıtın altında görünecek.",
+            export.StartupIds,
+            downloadToken: token,
+            downloadFileName: export.File.FileName);
+    }
+
     private async Task<Result<AssistantToolResult>> ApprovalsAsync(JsonElement args, CancellationToken ct)
     {
         var result = await approvals.Handle(new ListChangeRequestsRequest
@@ -284,10 +354,17 @@ public sealed class AssistantToolbox(
     /// Sonucun dokunduğu girişimler. Verilmezse boş kalır — ekosistem geneli
     /// araçlarda doğru olan bu.
     /// </param>
+    /// <param name="downloadToken">
+    /// Dosya üreten araçlarda dolu; ham dosya modele değil yalnızca jeton
+    /// gider (bkz. IAssistantExportStore).
+    /// </param>
     private static Result<AssistantToolResult> Wrap(
-        string tool, object payload, string summary, IReadOnlyList<Guid>? startupIds = null) =>
+        string tool, object payload, string summary,
+        IReadOnlyList<Guid>? startupIds = null,
+        string? downloadToken = null, string? downloadFileName = null) =>
         new AssistantToolResult(
-            tool, JsonSerializer.Serialize(payload, Json), summary, startupIds ?? []);
+            tool, JsonSerializer.Serialize(payload, Json), summary, startupIds ?? [],
+            downloadToken, downloadFileName);
 
     // --- Argüman okuma ----------------------------------------------------
     // Model bazen alanı hiç göndermez, bazen null, bazen boş string gönderir;

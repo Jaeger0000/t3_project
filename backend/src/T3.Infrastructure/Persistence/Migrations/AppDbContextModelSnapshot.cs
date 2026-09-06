@@ -181,6 +181,14 @@ namespace T3.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("ExportDownloadToken")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ExportFileName")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)");
+
                     b.Property<string>("Mode")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
@@ -499,6 +507,54 @@ namespace T3.Infrastructure.Persistence.Migrations
                     b.HasIndex("StartupId", "OccurredOn");
 
                     b.ToTable("Milestones", (string)null);
+                });
+
+            modelBuilder.Entity("T3.Domain.Notifications.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("EmailSent")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("RecipientDeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RecipientUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("SentByRole")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("SentByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StartupId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SentByRole");
+
+                    b.HasIndex("SentByUserId");
+
+                    b.HasIndex("StartupId");
+
+                    b.HasIndex("RecipientUserId", "ReadAt");
+
+                    b.ToTable("Notifications", (string)null);
                 });
 
             modelBuilder.Entity("T3.Domain.Programs.EcosystemProgram", b =>
@@ -1050,6 +1106,33 @@ namespace T3.Infrastructure.Persistence.Migrations
                         .HasForeignKey("StartupId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Startup");
+                });
+
+            modelBuilder.Entity("T3.Domain.Notifications.Notification", b =>
+                {
+                    b.HasOne("T3.Domain.Identity.User", "Recipient")
+                        .WithMany()
+                        .HasForeignKey("RecipientUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("T3.Domain.Identity.User", "SentBy")
+                        .WithMany()
+                        .HasForeignKey("SentByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("T3.Domain.Startups.Startup", "Startup")
+                        .WithMany()
+                        .HasForeignKey("StartupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Recipient");
+
+                    b.Navigation("SentBy");
 
                     b.Navigation("Startup");
                 });

@@ -14,13 +14,23 @@ namespace T3.Application.Features.Approvals.SubmitChangeRequest;
 /// <summary>
 /// MVP #3'ün giriş kapısı. Girişim kullanıcısı hiçbir tabloya doğrudan yazmaz;
 /// önerdiği değişiklik burada "önce" ve "sonra" gövdesiyle birlikte kuyruğa
-/// girer ve ancak yetkili onayladıktan sonra hedef varlığa uygulanır.
+/// girer.
+///
+/// Tek istisna: girişim <b>profili</b> (ad, sektör, iletişim bilgisi vb. —
+/// <see cref="ChangeTargetType.Startup"/>). Doküman, ekip üyesi ve
+/// başarı/yatırım kayıtları hâlâ yetkili onayı bekliyor; ama profil alanları
+/// (telefon değişikliği gibi) yönetici kuyruğunu doldurmaya değecek kadar
+/// riskli değil — kanıt/doküman/yatırım gibi doğrulama gerektirmiyor. Bu
+/// yüzden burada, gönderimle aynı anda <see cref="ChangeRequestApplier"/> ile
+/// uygulanıp kayıt <c>Approved</c> olarak kapatılıyor (bkz.
+/// docs/Gelistirme_Kararlari.md, "Profil önerisi otomatik onay").
 /// </summary>
 public sealed class SubmitChangeRequestHandler(
     IAppDbContext db,
     ICurrentUser currentUser,
     IStartupScope startupScope,
     IChangeRequestScope approvals,
+    ChangeRequestApplier applier,
     IAuditWriter audit)
 {
     public async Task<Result<SubmitChangeRequestResponse>> Handle(
@@ -80,6 +90,24 @@ public sealed class SubmitChangeRequestHandler(
             Status = ChangeRequestStatus.Pending
         };
 
+        // Profil alanları için onay beklenmez: gönderimle aynı anda uygulanır.
+        // ApproveChangeRequestHandler'ın kullandığı aynı uygulayıcıdan geçiyor
+        // ki doğrulama ve alan yazma mantığı iki yolda ayrışmasın.
+        AppliedChange? autoApplied = null;
+        if (request.TargetType == ChangeTargetType.Startup)
+        {
+            var applied = await applier.ApplyAsync(changeRequest, ct);
+            if (!applied.IsSuccess)
+                return applied.Error!;
+
+            autoApplied = applied.Value!;
+            var appliedAt = DateTimeOffset.UtcNow;
+            changeRequest.Status = ChangeRequestStatus.Approved;
+            changeRequest.ReviewedAt = appliedAt;
+            changeRequest.ReviewNote =
+                "Girişim profili alanları yönetici onayı gerektirmez; gönderimle birlikte otomatik uygulandı.";
+        }
+
         db.ChangeRequests.Add(changeRequest);
         await db.SaveChangesAsync(ct);
 
@@ -91,9 +119,20 @@ public sealed class SubmitChangeRequestHandler(
                 changeRequest.TargetType,
                 changeRequest.Operation,
                 changeRequest.TargetId,
-                ChangedFieldCount = changedCount
+                ChangedFieldCount = changedCount,
+                changeRequest.Status
             },
             ct: ct);
+
+        // Otomatik uygulanan değişiklik de aynı adla denetim izine yazılır:
+        // "Startup.Update" izinin portaldan mı yoksa onaydan mı geldiğine
+        // bakmadan aynı biçimde sorgulanabilmesi gerekiyor (bkz.
+        // ApproveChangeRequestHandler).
+        if (autoApplied is { } change)
+            await audit.WriteAsync(
+                $"{change.EntityType}.{changeRequest.Operation}",
+                change.EntityType, change.EntityId,
+                before: change.Before, after: change.After, ct: ct);
 
         return new SubmitChangeRequestResponse(
             changeRequest.Id,

@@ -34,12 +34,13 @@ public static class ReportEndpoints
                 StartupStatus? status,
                 Guid? programId,
                 string? city,
+                int? foundedYear,
                 ExportStartupsHandler handler,
                 HttpContext http,
                 CancellationToken ct) =>
             {
                 var result = await handler.Handle(
-                    new ExportStartupsRequest(q, sector, status, programId, city), ct);
+                    new ExportStartupsRequest(q, sector, status, programId, city, foundedYear), ct);
 
                 if (!result.IsSuccess)
                     return ApiResults.Problem(result.Error!);

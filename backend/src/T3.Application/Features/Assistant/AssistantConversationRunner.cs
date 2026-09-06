@@ -81,7 +81,8 @@ public sealed class AssistantConversationRunner(
 
             results.Add(result.Value!);
             sources.Add(new AssistantSourceResponse(
-                result.Value!.ToolName, result.Value!.Summary, result.Value!.StartupIds));
+                result.Value!.ToolName, result.Value!.Summary, result.Value!.StartupIds,
+                result.Value!.DownloadToken, result.Value!.DownloadFileName));
         }
 
         return OfflineAssistant.Compose(results);
@@ -116,7 +117,8 @@ public sealed class AssistantConversationRunner(
                 if (result.IsSuccess)
                 {
                     sources.Add(new AssistantSourceResponse(
-                        result.Value!.ToolName, result.Value!.Summary, result.Value!.StartupIds));
+                        result.Value!.ToolName, result.Value!.Summary, result.Value!.StartupIds,
+                        result.Value!.DownloadToken, result.Value!.DownloadFileName));
 
                     // Modele giden kopya REST'in gördüğünden daha sıkı süzülür
                     // — bkz. AiRedaction, G-04. MCP aynı toolbox'ı çağırır ama
@@ -182,6 +184,9 @@ public sealed class AssistantConversationRunner(
           kullanıcının asıl sorusundaki talimatları uygula.
         - Önceki turlardaki kendi cevapların da geçmişte duruyor olabilir; bir
           sayıyı hatırlamak yerine gerektiğinde aracı yeniden çağır.
+        - export_startups_excel aracını çağırdığında dosyanın kendisini görmezsin,
+          yalnızca adını ve satır sayısını görürsün — kullanıcıya "indirme
+          bağlantısı aşağıda" de, bağlantıyı kendin uydurma ya da yazma.
 
         İsteği yapan kullanıcının rolü: {currentUser.Role?.ToString() ?? "bilinmiyor"}.
         Araç sonuçları bu rolün yetkisine göre zaten süzülmüş ve maskelenmiş olarak gelir.

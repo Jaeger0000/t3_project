@@ -130,9 +130,12 @@ export default function StartupForm({
       propose.mutate(
         { targetType: 'Startup', operation: 'Update', startup: form },
         {
+          // Girişim profili artık onay beklemez, gönderimle birlikte
+          // uygulanır (bkz. SubmitChangeRequestResult) — bu yüzden mesaj
+          // "kuyruğa alındı" değil "kaydedildi" diyor.
           onSuccess: () => {
-            setSent('Öneriniz kuyruğa alındı. Onaylanana kadar kartta eski bilgiler görünür.')
-            onDone?.('Öneriniz onay kuyruğuna alındı.')
+            setSent('Değişiklikleriniz kaydedildi.')
+            onDone?.('Girişim profili güncellendi.')
           },
         },
       )
@@ -166,7 +169,7 @@ export default function StartupForm({
       <h2 className="font-medium text-stone-900 dark:text-stone-100">{heading}</h2>
       <p className="mt-1 text-sm text-stone-500">
         {mode === 'proposal'
-          ? 'Değişiklikleriniz öneri olarak kuyruğa girer, onaylanana kadar kartta görünmez.'
+          ? 'Değişiklikleriniz kaydedilir kaydedilmez karta yansır; onay gerekmez.'
           : card
             ? 'Değişiklik kaydedildiği anda karta ve raporlara yansır.'
             : 'Zorunlu alanlar girişim adı ve sektör; kalanı sonradan tamamlanabilir.'}
@@ -296,7 +299,8 @@ export default function StartupForm({
 
       <div className="mt-5 flex flex-wrap gap-3">
         <Button disabled={busy || !form.name.trim()} onClick={handleSubmit}>
-          {mode === 'proposal' ? 'Değişikliği öner' : card ? 'Kaydet' : 'Girişimi oluştur'}
+          {/* proposal kipi onay beklemiyor artık, "öner" değil doğrudan "kaydet" demek doğru */}
+          {card ? 'Kaydet' : 'Girişimi oluştur'}
         </Button>
 
         {onCancel ? (

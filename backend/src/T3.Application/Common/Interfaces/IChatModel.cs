@@ -50,9 +50,17 @@ public interface IChatModel
     /// </summary>
     bool SupportsTools => true;
 
+    /// <param name="maxTokens">
+    /// Bu çağrıya özel üst sınır; verilmezse <c>AiOptions.MaxTokens</c>
+    /// kullanılır. Kısa sohbet/özet yanıtları için varsayılan yeterliyken,
+    /// çok paragraflı rapor bölümleri (bkz. GenerateStartupReportHandler)
+    /// varsayılanla ortasından kesiliyordu — global sınırı yükseltmek yerine
+    /// yalnızca bu tür çağrılar kendi üst sınırını istiyor.
+    /// </param>
     Task<ChatTurn> CompleteAsync(
         string systemPrompt,
         IReadOnlyList<ChatMessage> messages,
         IReadOnlyList<ChatTool> tools,
-        CancellationToken ct);
+        CancellationToken ct,
+        int? maxTokens = null);
 }

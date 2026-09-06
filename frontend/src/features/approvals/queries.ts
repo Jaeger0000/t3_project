@@ -6,6 +6,7 @@ import type {
   ChangeRequestStatus,
   ReviewChangeRequestResult,
   SubmitChangeRequestBody,
+  SubmitChangeRequestResult,
 } from '@/api/types'
 
 export type QueueFilters = {
@@ -90,9 +91,15 @@ export function useSubmitChangeRequest() {
 
   return useMutation({
     mutationFn: (body: SubmitChangeRequestBody) =>
-      api.post<{ id: string }>('/api/change-requests', body),
-    onSuccess: () => {
+      api.post<SubmitChangeRequestResult>('/api/change-requests', body),
+    onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ['change-requests'] })
+
+      // Girişim profili önerisi hemen uygulanıyor (bkz. SubmitChangeRequestResult);
+      // girişim kartı/listesi de bayat kalmasın diye onay akışıyla aynı
+      // geçersizleştirmeyi burada da yapıyoruz.
+      if (result.status === 'Approved')
+        void queryClient.invalidateQueries({ queryKey: ['startups'] })
     },
   })
 }
