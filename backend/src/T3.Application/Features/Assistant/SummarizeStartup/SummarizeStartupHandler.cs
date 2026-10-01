@@ -40,17 +40,45 @@ public sealed class SummarizeStartupHandler(
         var entries = timelineResult.Value!;
         var highlights = Highlights(value, entries);
 
-        var summary = model.IsAvailable
-            ? await AskModelAsync(value, entries, highlights, ct)
-            : Compose(value, highlights);
+        // Üç durum var ve ikisi aynı sonuca çıkıyor: anahtar yok (model hiç
+        // kurulmamış) ve sağlayıcı yanıt vermedi (kota/geçici hata). İkisinde de
+        // kart boş kalmasın diye sayılardan kurulan şablon özet gösteriliyor;
+        // fark yalnızca kullanıcıya hangi kaynağın yazdığını söyleyen etikette.
+        string summary;
+        AssistantMode mode;
+        string modelName;
+
+        if (!model.IsAvailable)
+        {
+            summary = Compose(value, highlights);
+            mode = AssistantMode.Local;
+            modelName = "Yerel özet";
+        }
+        else
+        {
+            try
+            {
+                // Rozet gerçekten yanıtlayan modeli gösterir; sağlayıcı yedek
+                // zinciri denemişse bu birincil modelden farklı olabilir.
+                (summary, var answeredBy) = await AskModelAsync(value, entries, highlights, ct);
+                mode = AssistantMode.Model;
+                modelName = answeredBy ?? model.Name;
+            }
+            catch (ChatModelUnavailableException)
+            {
+                summary = Compose(value, highlights);
+                mode = AssistantMode.Local;
+                modelName = "Yerel özet (model yanıt vermedi)";
+            }
+        }
 
         return new StartupSummaryResponse(
             value.Id,
             value.Name,
             summary,
             highlights,
-            model.IsAvailable ? AssistantMode.Model : AssistantMode.Local,
-            model.IsAvailable ? model.Name : "Yerel özet",
+            mode,
+            modelName,
             entries.ExactAmountsVisible,
             DateTimeOffset.UtcNow);
     }
@@ -121,7 +149,7 @@ public sealed class SummarizeStartupHandler(
             : opening + " " + string.Join(" ", highlights);
     }
 
-    private async Task<string> AskModelAsync(
+    private async Task<(string Summary, string? Model)> AskModelAsync(
         StartupCardResponse card,
         StartupTimelineResponse timeline,
         IReadOnlyList<string> highlights,
@@ -145,7 +173,8 @@ public sealed class SummarizeStartupHandler(
             ct);
 
         // Model boş dönerse kart yine de özet göstermeli.
-        return string.IsNullOrWhiteSpace(reply.Text) ? Compose(card, highlights) : reply.Text!;
+        return (string.IsNullOrWhiteSpace(reply.Text) ? Compose(card, highlights) : reply.Text!,
+            reply.Model);
     }
 
     private static string Money(decimal amount, string? currency) =>

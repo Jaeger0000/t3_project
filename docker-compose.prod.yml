@@ -73,6 +73,15 @@ services:
       T3_Cors__Origins__0: ${PUBLIC_BASE_URL}
 
       T3_Ai__ApiKey: ${T3_AI_API_KEY:-}
+
+      # Sağlayıcı, model ve düşünme eforu ortamdan geliyor, imaja gömülü
+      # değil: 1 Ekim 2026'da kullanılan ücretsiz model dilimi
+      # (minimax/minimax-m3:free) ücretli sürüme taşındı, asistan HTTP 404
+      # almaya başladı ve düzeltme imaj derleyip taşımayı gerektirdi. Artık
+      # sunucuda tek satır + `docker compose up -d` yetiyor.
+      T3_Ai__Provider: ${T3_AI_PROVIDER:-DeepSeek}
+      T3_Ai__Model: ${T3_AI_MODEL:-deepseek-flash}
+      T3_Ai__ReasoningEffort: ${T3_AI_REASONING_EFFORT:-none}
     ports:
       # Yalnızca loopback'e bağlanıyor: dışarıya açılan yüz TLS sonlandıran
       # vekil olmalı.

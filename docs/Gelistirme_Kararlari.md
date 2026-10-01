@@ -1173,6 +1173,201 @@ istemci) bulanıklaştırırdı. Aracı MCP `tools/list`'ten çıkarıp `tools/c
 da açıkça reddetmek, "yarım/sessiz çalışan" bir yüzey bırakmaktan (jeton
 üretilir ama hiçbir MCP istemcisi indiremez) daha dürüst bir sınır.
 
+## 3t. Sağlayıcı yanıt vermediğinde asistan kararları (1 Ekim 2026)
+
+**Olay.** Panel içi asistan canlıda ve yerelde çalışmayı bıraktı. Sebep kodda
+değildi: yapılandırılmış model (`minimax/minimax-m3:free`) OpenRouter'ın
+ücretsiz kataloğundan kalkmış ve sağlayıcı şunu döndürüyordu —
+*"This model is unavailable for free. The paid version is available now."*
+(HTTP 404). Model `qwen/qwen3.8-27b:free` olarak değiştirildi (262k bağlam,
+araç çağırma destekli — araç desteği zorunlu, onsuz araç kutusu boşa düşer).
+
+**Karar 1 — model kimliği ortamda, imajda değil.** Üretim compose'unda
+yalnızca `T3_Ai__ApiKey` vardı; model kimliği `AiOptions` içinde derleme
+zamanı varsayılanıydı. Yani slug kapandığında düzeltme "imajı yeniden derle,
+sunucuya taşı, konteyneri yenile" demekti. Artık
+`T3_Ai__Model: ${T3_AI_MODEL:-qwen/qwen3.8-27b:free}` olarak ortamdan geliyor:
+sunucuda bir satır + `docker compose up -d` yetiyor. **Ücretsiz dilimlerin
+kapanması olağan bir olay**, yapılandırma bunu varsaymalı.
+
+**Karar 2 — sağlayıcı hatası ayrı bir istisna tipi.** Adaptörler
+`HttpRequestException` fırlatıyordu; bu, `ExceptionHandlingMiddleware`'in genel
+dalına düşüp kullanıcıya **HTTP 500 + referans numarası** gösteriyordu. Oysa
+ücretsiz katmanda 429 bir arıza değil, olağan bir cevap. Artık
+`ChatModelUnavailableException` (Application katmanında — adaptör fırlatır,
+use-case yakalar) ve:
+
+| Yüzey | Yanıt vermediğinde |
+|---|---|
+| `POST /api/ai/chat`, `POST /api/ai/ask` | Yerel planlayıcıya düşer; cevabın başına "model yanıt vermiyor, bu cevap doğrudan kayıtlardan" notu, `mode=Local`, `modelName="Yerel plan (model yanıt vermedi)"` |
+| `GET /api/ai/startups/{id}/summary` | Şablon özet (`"Yerel özet (model yanıt vermedi)"`) — kart bölümü boş kalmaz |
+| `GET /api/startups/{id}/ai-report` | Bölüm bölüm geçilir (zaten vardı): bir bölümün hatası diğer beşi düşürmez |
+| Yedeği olmayan her çağrı yolu | **503** + "birkaç dakika sonra tekrar deneyin" (500 değil, referans numarası yok) |
+
+Gerekçe: yerel planlayıcı zaten anahtarsız kurulum için vardı ve **veriler
+elimizde** — eksik olan tek şey cümleyi kuran model. Demoda "asistan çöktü"
+görüntüsü, cümlesi kaba ama sayıları doğru bir cevaptan çok daha pahalı.
+Yedeğe düşüldüğü kullanıcıdan saklanmıyor: aynı soru biraz sonra daha iyi
+cevap verebilir, kullanıcı bunu ancak farkı bilirse tekrar dener.
+
+**Karar 3 — yeniden deneme 2'den 3'e.** Ücretsiz havuzda (sağlayıcı: ModelRun)
+ölçülen 429 oranı yaklaşık üçte bir; iki denemede her dokuz sorudan biri yedek
+yola düşüyordu. Bekleme `Retry-After` başlığından, yoksa üstel (1-2-4 sn).
+
+**Reddedilen alternatif:** hatayı olduğu gibi kullanıcıya göstermek ("model
+meşgul, tekrar deneyin" ekranı). Sohbet kutusu zaten araçları çağırabiliyorken
+kullanıcıyı eli boş göndermek, yalnızca cümle üretemediğimiz için veriyi de
+saklamak olurdu.
+
+**Doğrulama.** Model kasten geçersiz bir slug'a çevrilip gerçek API'ye vuruldu:
+üç uç da 200 ve `mode=Local` döndü (eski davranış 500'dü). Adaptör tarafı 4
+birim testiyle korunuyor (`ModelYanitVermediTests`): 429 tükenince doğru
+istisna, 429 sonrası başarı, gövde içi hata, boş gövde.
+
+## 3u. Sağlayıcı seçimi: ücretsiz katmandan DeepSeek'e (1 Ekim 2026)
+
+**Neden ücretsizden çıkıldı.** Ücretsiz dilimler iki sert sınır taşıyor ve
+ikisi de yazılımla aşılamıyor:
+
+| Sınır | Ölçülen etki |
+|---|---|
+| Hesap başına günde 50 istek | Bir AI raporu 6 model çağrısı → günde 8 rapor, sonra **sohbet de** susuyor |
+| Paylaşımlı yukarı akış havuzu (ModelRun) | Üç istekten birinde 429; rapor altı çağrıyı aynı anda yaptığı için bölümlerin çoğu düşüyordu |
+
+Aynı rapor, aynı girişim, aynı kod:
+
+| Sağlayıcı | Süre | Model tarafından yazılan bölüm |
+|---|---|---|
+| OpenRouter ücretsiz (`qwen/qwen3.8-27b:free`) | 52 sn | **2 / 6** |
+| DeepSeek (`deepseek-flash`) | 15,9 sn | **6 / 6** |
+
+**Model seçimi: `deepseek-flash`.** Katalogda iki model var
+(`deepseek-flash` = DeepSeek-V4.1-Flash, `deepseek-v4-pro`); ikisi de 1M
+bağlam ve araç çağırma destekli. Flash seçildi çünkü bu iş **akıl yürütme
+değil**: araç seç, aracın döndürdüğü sayıyı Türkçe cümleye çevir. Pro'nun
+jeton fiyatı yaklaşık dört katı ve ölçülebilir bir kazanç sağlamıyor.
+Maliyet kanıtı: bir tam rapor + ~25 sohbet/özet çağrısı **0,01 USD**.
+
+**`reasoning_effort = none`.** Sağlayıcı varsayılanı `high`. Aynı soruda
+ölçüm: 23 çıkış jetonu (none) karşı 41 (low; 17'si düşünme jetonu). Araç
+seçimi iki durumda da doğruydu — yani düşünme bu akışta gecikme ve fatura
+olarak ödeniyor, doğruluk olarak dönmüyor. Rapor bölümlerinde daha uzun akıl
+yürütme istenirse değer ortamdan yükseltilir (`T3_Ai__ReasoningEffort`).
+
+**Adaptör paylaşılıyor, sağlayıcı yapılandırmada.** DeepSeek'in API'si OpenAI
+uyumlu, dolayısıyla `OpenRouterChatModel` (tarihsel ad; aslında OpenAI uyumlu
+adaptör) ikisine de hizmet ediyor. Üç fark `AiOptions` üzerinden ayrılıyor:
+
+- **Uç yolu:** OpenRouter `/api/v1/chat/completions`, DeepSeek
+  `/chat/completions`. Yol sabit kodluydu; DeepSeek'e geçişte bu, teşhisi zor
+  bir 404 demekti (`EffectiveCompletionsPath`).
+- **Geçide özgü alanlar:** `models` yedek zinciri yalnızca OpenRouter'a
+  gönderiliyor (`SupportsModelChain`), `reasoning_effort` yalnızca DeepSeek'e.
+  Tanınmayan alan kimi uçta yok sayılıyor, kimi uçta 400 üretiyor.
+- **Sağlayıcı açık yazılmalı.** `Auto` anahtar önekine bakıyor ama DeepSeek
+  anahtarları da `sk-` ile başlıyor ve OpenRouter'ın `sk-or-` dışındaki
+  biçimlerinden ayırt edilemiyor → `T3_Ai__Provider="DeepSeek"` zorunlu.
+
+**AI raporu artık bölümleri ikişer soruyor** (önce altısı paralel gidiyordu) ve
+90 saniyelik toplam süre bütçesi var; bütçe dolarsa kalan bölüm olgusal
+paragrafa düşüyor. Ücretli sağlayıcıda da geçerli bir karar: altı eşzamanlı
+çağrı sağlayıcıyı gereksiz zorluyor ve önündeki nginx 120 sn'de okumayı
+bırakıyor. Düşen bölüm artık kuru özür değil **gerçek sayıları taşıyan**
+paragraf yazıyor — rapor her koşulda kullanılabilir bir belge kalıyor.
+
+**`AiReportPolicy` uca geri bağlandı** (saatte 60 rapor/kullanıcı). Politika
+tanımlıydı ama hiçbir uca bağlı değildi ("geliştirme sırasında engelliyordu"
+notuyla kaldırılmış). Sınırsız rapor ucu ücretsiz katmanda günlük kotayı, ücretli
+katmanda bakiyeyi tek oturumda tüketebiliyor — ve ikisinde de yan etki aynı:
+panel asistanı da susuyor.
+
+**Reddedilen alternatifler:**
+- *Ücretsizde kalıp yeniden denemeyi artırmak.* Günlük 50 istek sınırı
+  yeniden denemeyle aşılamıyor; üstelik her deneme kotadan düşüyor.
+- *Modeli istemciye bırakıp yalnızca MCP sunmak.* Jüri panelde asistanı
+  görmek isteyecek; MCP istemcisi kurmak demo akışının parçası değil.
+- *OpenRouter'ı ücretli anahtarla kullanmak.* Geçit katmanı bu projede ek
+  değer vermiyor; doğrudan sağlayıcı bir atlama daha az.
+
+## 3v. AI raporunun dili: kanıt paketi JSON'dan düzyazıya (1 Ekim 2026)
+
+**Belirti.** Canlıda üretilen bir raporun "Gelişim Önerileri" bölümü şöyle
+başlıyordu:
+
+> "Eksik ve tamamlanmamış veri alanları. En görünür boşluk, logoUrl alanının
+> `null` olması… İkinci olarak achievements.totalExport `null` geliyor…
+> Ayrıca visibility bloğunda `taxNumber`, `teamPersonalData`, `documents` ve
+> `contactDetails` 'true'…"
+
+Yöneticiye ve jüriye giden basılı bir belgede veritabanı alan adı bulunamaz.
+
+**Kök neden — ikisi birlikte.** Kanıt paketi
+`JsonSerializer.Serialize(new { card, timeline, achievements })` çıktısıydı:
+modelin "bu bilgi eksik" demek için elindeki tek kelime dağarcığı camelCase
+alan adları ve `null` sabitiydi. Üstüne biçim talimatı *"bir alan boş/maskeli
+geldiyse bunu açıkça söyle"* diyordu — yani modeli tam olarak buna davet
+ediyordu. Model ikisini birleştirince raporu şemayla anlattı.
+
+**Üç katman, sırayla:**
+
+1. **Kanıt paketi düzyazı** (`ReportEvidence`). Her değer Türkçe etiketle
+   yazılıyor, değeri yoksa satır **hiç** yazılmıyor ("Logo: —" bile modele
+   "burada boş bir alan var" bilgisini verir ve rapora sızar). `IsVerified`
+   yerine "yetkili tarafından doğrulandı / yetkili onayı bekliyor".
+2. **Talimat** (`ReportSections.FormatInstruction`). Teknik dil açıkça
+   yasak; eksik bilgiden söz edilecekse brifin sonundaki iş dilindeki
+   listenin ifadeleri kullanılıyor.
+3. **Denetim** (`ReportProse`). Metin basılmadan önce camelCase kalıbı ve
+   kısa bir yasaklı ifade listesiyle taranıyor; sızıntı varsa bölüm bir kez
+   daha isteniyor (modelin kendi metni konuşmada duruyor: "şunu yazdın, böyle
+   olmaz" demek talimatı tekrar etmekten iyi sonuç veriyor), ikinci deneme de
+   sızdırırsa yalnızca sızdıran **cümleler** atılıyor.
+
+**Neden eksikler yine modele veriliyor.** "Gelişim Önerileri" bölümünün somut
+boşluğa ihtiyacı var; boşluk verilmediğinde model genel geçer tavsiye
+uyduruyor. Çözüm eksikleri saklamak değil, **iş diliyle** vermek: "logoUrl
+null" değil "Logo görseli yüklenmemiş". Talimat da eksikleri sıralamayı değil,
+her eksikliği girişimin ne kazanacağına bağlayan bir tavsiyeye çevirmeyi
+istiyor.
+
+**Neden cümle atılıyor, kelime değiştirilmiyor.** "null" → "boş" değişimi
+Türkçe cümlenin gramerini bozuyordu; bölümü tümden atmak ise tek kelime
+yüzünden sağlam bir analizi çöpe atıyor. Süzme sonrası 200 karakterin altına
+düşen bölüm olgusal özetle geçiyor — ve bu durumda mesaj "model yanıt
+veremedi" **değil**: model yanıt verdi, metni kullanılabilir değildi.
+
+**Yanlış pozitif kapısı.** Denetim, kanıt paketinde geçen bir kelimeyi
+sızıntı saymıyor. Brifte alan adı olmadığı için orada da görünen kelime
+şemadan değil veriden geliyor (ürün açıklamasındaki "eTicaret", bir yatırımcı
+adı). Bu kapı olmasa denetim sağlam cümleleri atardı.
+
+**Yan kazanç: KVKK'da kara listeden beyaz listeye.** Eski yol
+`AiRedaction` ile **alan adı kara listesi** üzerinden siliyordu; yeni paket
+alanları tek tek yazdığı için ad, e-posta, telefon, LinkedIn ve vergi
+numarası **yapı gereği** dışarıda. DTO'ya eklenen yeni bir hassas alanın
+sessizce sızma yolu kalmıyor (bkz. G-04). `AiRedaction` sohbet/araç yolunda
+duruyor, orada girdi hâlâ JSON.
+
+**Maskeleme ayrımı korunuyor.** Yetkisi olmayan görüntüleyici için
+`null` gelen alan "girilmemiş" diye raporlanmıyor — Program Yöneticisi vergi
+numarasını göremez, bu "veri yok" demek değildir. Tutarlar için ikinci bir
+kontrol de burada: kart zaten maskeliyor, paket yine de yetki yoksa tutar
+yazmıyor (bu paket yurt dışındaki bir sağlayıcıya gidiyor).
+
+**Ölçüm.** Aynı girişim (sızıntının göründüğü kayıt), aynı model: rapor 15,7
+sn, **6/6 bölüm**, metinde teknik ifade **0**. Öneriler artık eylem
+cümlesiyle başlıyor ve gerekçesini veriden alıyor ("Seri B turunda
+Uluslararası Mobilite Fonu'nun yer alması…").
+
+**Reddedilen alternatifler:**
+- *JSON'u bırakıp yalnızca talimatı sıkılaştırmak.* Talimat olasılık azaltır,
+  garanti vermez; girdi şema konuştuğu sürece model de konuşuyordu.
+- *Çıktıda kelime değiştirmek.* Gramer bozuyor, cümle anlamını kaydırıyor.
+- *Sızdıran bölümü tümden atmak.* Tek kelime yüzünden sağlam bir analiz
+  kaybı; rapor eksik görünüyor.
+- *Modele şema sözlüğü verip "bu adları kullanma" demek.* Yasaklanacak
+  kelimeyi modele öğretmenin en garip yolu.
+
 ## 4. Ortam tuzakları — tekrar çarpılacak olanlar
 
 ### Faz 0

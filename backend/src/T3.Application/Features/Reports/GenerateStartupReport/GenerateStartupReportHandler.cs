@@ -1,10 +1,8 @@
 using System.Globalization;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using T3.Application.Common.Interfaces;
 using T3.Application.Common.Results;
 using T3.Application.Features.Achievements.ListAchievements;
-using T3.Application.Features.Assistant;
 using T3.Application.Features.Startups;
 using T3.Application.Features.Startups.GetStartupCard;
 using T3.Application.Features.Startups.GetStartupTimeline;
@@ -36,10 +34,36 @@ public sealed class GenerateStartupReportHandler(
 {
     private static readonly CultureInfo Turkish = CultureInfo.GetCultureInfo("tr-TR");
 
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
-    };
+    /// <summary>
+    /// Aynı anda kaç bölüm sorulacağı. Altı bölüm paralel gidiyordu ve bu,
+    /// ücretsiz sağlayıcı katmanında raporu düzenli olarak bozan şeydi:
+    /// 1 Ekim 2026'da canlıda altı bölümün <b>dördü</b> 429 ile döndü, rapor
+    /// "model yanıt veremedi" paragraflarıyla çıktı. Paylaşımlı kovayı tek
+    /// seferde doldurmak yerine ikişer ikişer soruyoruz — toplam süre sıralıya
+    /// göre yarı, kova açısından ise patlama değil akış.
+    /// </summary>
+    private const int SectionConcurrency = 2;
+
+    /// <summary>
+    /// Model turlarının toplam süre bütçesi. Önündeki nginx 120 sn'de okumayı
+    /// bırakıyor; bütçe dolduğunda kalan bölümler modeli hiç beklemeden olgusal
+    /// paragrafa düşüyor. Alternatifi, isteğin vekilde 504'e dönmesi ve
+    /// kullanıcının hiç rapor alamamasıydı.
+    /// </summary>
+    private static readonly TimeSpan ModelBudget = TimeSpan.FromSeconds(90);
+
+    /// <summary>
+    /// Süzme sonrası bir bölümün basılmaya değer en kısa hâli. Bunun altına
+    /// düşen metin yerine kayıtlardan üretilen olgusal özet basılıyor: üç
+    /// kelimelik bir bölüm raporu doldurmuyor, bozuk gösteriyor.
+    /// </summary>
+    private const int MinimumSectionLength = 200;
+
+    private const string SystemPrompt =
+        "Sen T3 Girişim Ekosistemi Yönetim Sistemi için girişim raporları yazan bir "
+        + "analistsin. Yalnızca sana verilen brife dayanırsın. Yazdığın metin doğrudan "
+        + "basılı bir PDF rapora giriyor: teknik terim, alan adı ya da sistem ifadesi "
+        + "kullanmazsın.";
 
     public async Task<Result<PdfFile>> Handle(
         Guid startupId, GenerateStartupReportRequest request, CancellationToken ct)
@@ -134,63 +158,163 @@ public sealed class GenerateStartupReportHandler(
     {
         // Tek bir kanıt paketi, her bölüme aynen gidiyor — "her başlık tüm
         // veriyi kullanarak ayrı cevap versin" isteği tam olarak bu demek.
-        // Dış sağlayıcıya (OpenRouter) gitmeden önce AiRedaction'dan geçiyor:
-        // REST'te görme yetkisi olan bir alanı (ör. ekip e-postası) üçüncü
-        // tarafa aktarmayı kabul etmiş sayılmıyoruz (bkz. AiRedaction.cs).
-        var evidenceJson = AiRedaction.Redact(JsonSerializer.Serialize(
-            new { card = cardValue, timeline = timelineValue, achievements = achievementsValue },
-            JsonOptions));
+        //
+        // Paket Türkçe düzyazı, JSON değil: ham JSON gönderildiğinde model
+        // raporu veritabanı şemasıyla anlatıyordu ("logoUrl alanının null
+        // olması"). Kişisel veri de buraya hiç yazılmıyor — AiRedaction'ın
+        // alan adı kara listesi yerine beyaz liste (bkz. ReportEvidence).
+        var evidence = ReportEvidence.Build(cardValue, timelineValue, achievementsValue);
 
-        // Bölümler paralel üretiliyor: sıralı 6 model turu demo sırasında
-        // kullanıcıyı dakikalarca bekletirdi.
-        var tasks = sections.Select(section => AskSectionAsync(evidenceJson, section, ct)).ToArray();
+        // Bütçe: toplam süre dolduğunda kalan bölümler modeli beklemiyor.
+        // Bağlantı iptali (ct) ile karıştırılmamalı — bütçe bizim kararımız,
+        // iptal kullanıcının.
+        using var budget = new CancellationTokenSource(ModelBudget);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, budget.Token);
+        using var slot = new SemaphoreSlim(SectionConcurrency, SectionConcurrency);
+
+        var factual = FactualSummary(cardValue);
+
+        var tasks = sections.Select(async section =>
+        {
+            // Bütçe dolmuşsa sıraya girmeye değmez: her bölümün kendi zaman
+            // aşımını beklemesi, raporu 120 sn'lik vekil sınırının ötesine
+            // taşıyordu.
+            if (budget.IsCancellationRequested)
+                return UnavailableSection(factual);
+
+            await slot.WaitAsync(ct);
+
+            try
+            {
+                return await AskSectionAsync(evidence, section, factual, linked.Token, ct);
+            }
+            finally
+            {
+                slot.Release();
+            }
+        }).ToArray();
+
         var bodies = await Task.WhenAll(tasks);
 
         return sections.Zip(bodies, (s, b) => new ReportSectionContent(s.Title, b)).ToList();
     }
 
+    /// <param name="modelCt">
+    /// Model çağrısının jetonu: kullanıcının iptaliyle <b>ya da</b> süre
+    /// bütçesiyle iptal olur.
+    /// </param>
+    /// <param name="requestCt">
+    /// İsteğin kendi jetonu. İkisini ayırmak gerekiyor: kullanıcı bağlantıyı
+    /// kapattıysa rapor üretmenin anlamı yok (hata yukarı gider), bütçe
+    /// dolduysa elimizdeki veriyle rapor yine çıkmalı.
+    /// </param>
     private async Task<string> AskSectionAsync(
-        string evidenceJson, ReportSectionDefinition section, CancellationToken ct)
+        string evidence,
+        ReportSectionDefinition section,
+        string factual,
+        CancellationToken modelCt,
+        CancellationToken requestCt)
     {
         var prompt = $"""
-            Aşağıda bir girişimin profil bilgisi, program/gelişim geçmişi ve
-            başarı/finans kayıtları JSON olarak veriliyor.
+            Aşağıda bir girişimin profilinden, program geçmişinden ve
+            başarı/finans kayıtlarından hazırlanmış bir brif var.
 
             Görevin: {section.Instruction}
 
             {ReportSections.FormatInstruction}
 
-            Veri:
-            {evidenceJson}
+            Brif:
+            {evidence}
             """;
+
+        var messages = new List<ChatMessage> { new(ChatRole.User, prompt) };
 
         try
         {
-            // Varsayılan AiOptions.MaxTokens (sohbet/özet için ayarlı) çok
-            // paragraflı bir rapor bölümünü ortasında kesiyordu; bu çağrıya
-            // özel daha geniş bir üst sınır veriliyor (bkz. IChatModel.CompleteAsync).
-            var reply = await model.CompleteAsync(
-                "Sen T3 Girişim Ekosistemi Yönetim Sistemi için ayrıntılı, yalnızca "
-                + "verilen veriye dayalı büyüme raporu bölümleri yazan bir asistansın.",
-                [new ChatMessage(ChatRole.User, prompt)],
-                [],
-                ct,
-                maxTokens: 2000);
+            var first = await AskAsync(messages, modelCt);
 
-            return string.IsNullOrWhiteSpace(reply.Text)
-                ? "Bu bölüm için model şu anda bir yanıt üretemedi."
-                : reply.Text!;
+            if (string.IsNullOrWhiteSpace(first))
+                return UnavailableSection(factual);
+
+            if (!ReportProse.HasTechnicalLeak(first, evidence))
+                return first;
+
+            // Teknik ifade yakalandı. Bölüm bir kez daha isteniyor; modelin
+            // kendi metni de konuşmada duruyor, çünkü "şunu yazdın, böyle
+            // olmaz" demek talimatı tekrar etmekten iyi sonuç veriyor.
+            // Bütçe dolduysa ikinci tur yok: metin elde var, süzülerek
+            // kurtarılabiliyor.
+            var answer = first;
+
+            if (!modelCt.IsCancellationRequested)
+            {
+                messages.Add(new ChatMessage(ChatRole.Assistant, first));
+                messages.Add(new ChatMessage(ChatRole.User, ReportSections.RewriteInstruction));
+
+                var second = await AskAsync(messages, modelCt);
+
+                if (!string.IsNullOrWhiteSpace(second))
+                {
+                    if (!ReportProse.HasTechnicalLeak(second, evidence))
+                        return second;
+
+                    answer = second;
+                }
+            }
+
+            // İkinci deneme de sızdırdı: tüm bölümü çöpe atmak yerine yalnızca
+            // sızdıran cümleler atılıyor. Kalan metin basılmaya değmeyecek
+            // kadar kısaldıysa olgusal özet geçiyor.
+            var cleaned = ReportProse.StripTechnicalSentences(answer!, evidence);
+
+            return cleaned.Length >= MinimumSectionLength ? cleaned : FactualSection(factual);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        catch (Exception ex) when (ex is not OperationCanceledException
+                                   || !requestCt.IsCancellationRequested)
         {
-            // Bölümler paralel gidiyor: ücretsiz modelde biri zaman aşımına
-            // uğrasa/hata dönse bile diğer beş bölümün başarılı sonucunu
-            // tümden kaybetmemek için hata burada yutuluyor, yalnızca bu
-            // bölüm bilgilendirici bir metinle geçiliyor.
-            return "Bu bölüm için model şu anda yanıt veremedi (bağlantı zaman aşımı ya da "
-                + "geçici bir hata). Raporu birkaç dakika sonra yeniden oluşturmayı deneyin.";
+            // Bir bölümün hatası (429, zaman aşımı, bütçenin dolması) diğer
+            // bölümleri düşürmüyor; o bölüm olgusal paragrafla geçiliyor.
+            // Kullanıcı bağlantıyı kapattıysa (requestCt) istisna yukarı gider
+            // — orada rapor üretmenin anlamı yok.
+            return UnavailableSection(factual);
         }
     }
+
+    /// <summary>
+    /// Model turu. Varsayılan <c>AiOptions.MaxTokens</c> (sohbet/özet için
+    /// ayarlı) çok paragraflı bir rapor bölümünü ortasında kesiyordu; bu
+    /// çağrıya özel daha geniş bir üst sınır veriliyor
+    /// (bkz. IChatModel.CompleteAsync).
+    /// </summary>
+    private async Task<string?> AskAsync(
+        IReadOnlyList<ChatMessage> messages, CancellationToken ct)
+    {
+        var reply = await model.CompleteAsync(SystemPrompt, messages, [], ct, maxTokens: 2000);
+
+        return reply.Text?.Trim();
+    }
+
+    /// <summary>
+    /// Model o bölümü yanıtlamadığında yazılan metin. Yalnızca özür cümlesi
+    /// değil: <paramref name="factual"/> ile birlikte **gerçek sayılar**
+    /// gidiyor, böylece rapor her koşulda kullanılabilir bir belge oluyor.
+    /// Eski hâli ("birkaç dakika sonra tekrar deneyin") altı bölümün dördünde
+    /// göründüğünde raporu kullanılamaz kılıyordu.
+    /// </summary>
+    private static string UnavailableSection(string factual) =>
+        "Bu bölüm için dil modeli yanıt veremedi (sağlayıcı kotası ya da geçici bir hata), "
+        + $"bu yüzden yalnızca kayıtlardan üretilen özet gösteriliyor: {factual} "
+        + "Raporu birkaç dakika sonra yeniden oluşturmak bu bölümü tamamlar.";
+
+    /// <summary>
+    /// Model yanıt verdi ama metni iki denemede de rapor diline uymadı
+    /// (bkz. <see cref="ReportProse"/>). Kullanıcıya "model çalışmıyor"
+    /// demiyoruz — çalıştı, metni kullanılabilir değildi.
+    /// </summary>
+    private static string FactualSection(string factual) =>
+        "Bu bölümün metni rapor diline uygun hâle getirilemedi, bu yüzden kayıtlardan "
+        + $"üretilen özet gösteriliyor: {factual} "
+        + "Raporu yeniden oluşturmak bu bölümü tamamlayabilir.";
 
     /// <summary>
     /// Model yoksa (anahtar tanımsız) rapor yine de boş dönmez — her bölüm
@@ -199,12 +323,7 @@ public sealed class GenerateStartupReportHandler(
     private static IReadOnlyList<ReportSectionContent> GenerateFallback(
         StartupCardResponse cardValue, IReadOnlyList<ReportSectionDefinition> sections)
     {
-        var factual =
-            $"{cardValue.Name}, {StartupLabels.Sector(cardValue.Sector)} sektöründe, "
-            + $"{StartupLabels.Status(cardValue.Status).ToLower(Turkish)} durumda bir girişim. "
-            + $"{cardValue.Programs.Count} program kaydı, "
-            + $"{cardValue.Achievements.TotalCount} başarı/finans kaydı, "
-            + $"{cardValue.DocumentCount} doküman bulunuyor.";
+        var factual = FactualSummary(cardValue);
 
         return sections
             .Select(s => new ReportSectionContent(
@@ -213,6 +332,18 @@ public sealed class GenerateStartupReportHandler(
                 + $"temel bir özet gösteriliyor: {factual}"))
             .ToList();
     }
+
+    /// <summary>
+    /// Kayıtlardan üretilen, modelsiz de doğru olan tek paragraf. İki yerde
+    /// kullanılıyor: anahtar hiç yokken tüm rapor, model bir bölümü
+    /// yanıtlamadığında o bölüm.
+    /// </summary>
+    private static string FactualSummary(StartupCardResponse cardValue) =>
+        $"{cardValue.Name}, {StartupLabels.Sector(cardValue.Sector)} sektöründe, "
+        + $"{StartupLabels.Status(cardValue.Status).ToLower(Turkish)} durumda bir girişim. "
+        + $"{cardValue.Programs.Count} program kaydı, "
+        + $"{cardValue.Achievements.TotalCount} başarı/finans kaydı, "
+        + $"{cardValue.DocumentCount} doküman bulunuyor.";
 
     private static string Slugify(string name)
     {

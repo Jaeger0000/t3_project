@@ -23,7 +23,7 @@ T3 Vakfı Bursiyer Yapay Zekâ Creathonu — **Problem 7** çözümü.
 - **Frontend:** React 19 · TypeScript · Vite · Tailwind CSS 4 · TanStack Query
 - **Veritabanı:** PostgreSQL 16 (Docker)
 - **Loglama:** Serilog (konsol + dosya) — Grafana Loki sink'i opsiyonel (`--profile observability`)
-- **AI:** MCP sunucusu (.NET içinde) — model bağlantısı **MCP üzerinden** kurulur; uygulama içi Claude API anahtarı opsiyonel ve bu kurulumda tanımlı değil
+- **AI:** MCP sunucusu (.NET içinde) + panel içi asistan — model **DeepSeek** üzerinden bağlı (`deepseek-flash`); anahtar yoksa ya da sağlayıcı yanıt vermezse asistan yerel planlayıcıya düşer, hata vermez
 
 ## Kurulum
 
@@ -205,7 +205,12 @@ veri yolu yoktur**, dolayısıyla kapsam ve maskeleme kuralları tek yerde kalı
   öneriler, ekip, program geçmişi, başarı/yatırım) tüm veriyi kullanarak ayrı
   bir çağrıda cevap verir; istekle yalnızca belirli bölümler ya da serbest
   metinle özel bir istek de seçilebilir. Arayüzde girişim kartının başlığındaki
-  "AI Raporu" düğmesinden açılır.
+  "AI Raporu" düğmesinden açılır. Modele giden kanıt paketi JSON değil Türkçe
+  düzyazı: ham JSON gönderildiğinde rapor veritabanı şemasını anlatmaya
+  başlıyordu ("logoUrl alanının null olması"), çünkü modelin "bu bilgi eksik"
+  demek için elindeki tek kelime dağarcığı alan adlarıydı. Çıktı ayrıca
+  basılmadan önce teknik ifade denetiminden geçiyor
+  ([§3v](docs/Gelistirme_Kararlari.md)).
 - `export_startups_excel` (sohbet aracı) — süzülmüş girişim listesini gerçek
   bir `.xlsx` dosyasına dönüştürür; REST'in CSV "İndir" ucuyla aynı sorgu ve
   maskeleme mantığını paylaşır. Dosya modele değil kısa ömürlü, tek kullanımlık
@@ -220,21 +225,46 @@ veri yolu yoktur**, dolayısıyla kapsam ve maskeleme kuralları tek yerde kalı
   indirme jetonu MCP'nin metin kanalına taşınmaz, bkz.
   `AssistantToolbox.McpExcludedTools`.)
 
-### Bu kurulumda model bağlantısı: yalnızca MCP
+### Model bağlantısı: iki yol birden
 
-Sistem, dil modelini kendi içine gömmek yerine **MCP sunucusu olarak
-yayımlanıyor**: harici bir ajan (Claude Desktop, Claude Code vb.) `POST /mcp`
-ucuna kendi Bearer jetonuyla bağlanır ve yukarıdaki altı aracı kullanır — kendi
-rolünün yetkisi kadar görerek. Model istemcide, veri sunucuda kalır; kurumun
-API kotası ve anahtarı uygulamaya girmez.
+**MCP yolu** her zaman açık: harici bir ajan (Claude Desktop, Claude Code vb.)
+`POST /mcp` ucuna kendi Bearer jetonuyla bağlanır ve yedi aracı kendi rolünün
+yetkisi kadar görerek kullanır. Model istemcide, veri sunucuda kalır.
 
-Bunun sonucu ürün içinde de görünür: `T3_Ai__ApiKey` tanımlı değil, dolayısıyla
-panel içi sorular yerel planlayıcıyla yanıtlanıyor. Yerel planlayıcı anahtar
+**Panel içi asistan** da modele bağlı: `T3_Ai__ApiKey` + `T3_Ai__Provider` +
+`T3_Ai__Model` tanımlıysa (yerelde `.env`, canlıda `/opt/t3ekosistem/.env`)
+sorular dil modeline gider, araçları model seçer. Kurulum **DeepSeek**
+(`deepseek-flash`) kullanıyor; adaptör OpenAI uyumlu olduğu için OpenRouter ve
+Anthropic de aynı kodla desteklenir, seçim yapılandırmada.
+
+**Neden ücretli bir sağlayıcı.** Önce OpenRouter'ın ücretsiz dilimleri
+denendi ve ölçüm şunu gösterdi: hesap başına günde 50 istek, paylaşımlı havuzda
+her üç istekten birinde 429. Bir AI raporu altı model çağrısı yaptığı için tek
+tık kotanın sekizde birini yiyordu ve rapor bölümlerinin çoğu boş dönüyordu —
+aynı rapor DeepSeek'te **15,9 sn / 6 bölümün 6'sı**, ücretsiz katmanda
+**52 sn / 6 bölümün 2'si**. Maliyet tarafı: yukarıdaki ölçümlerin tamamı
+(bir rapor + yaklaşık 25 sohbet/özet çağrısı) **0,01 USD** tuttu.
+
+Üç durumda da ekran boş kalmaz, çünkü **yerel planlayıcı** yedek yol olarak
+duruyor: anahtar tanımsızsa, model araç çağırmayı desteklemiyorsa ya da
+sağlayıcı yanıt vermiyorsa (ücretsiz katmanda 429 olağan) asistan anahtar
 kelimelerden araç çağrıları üretir ve yanıtı araç özetlerinin birleşiminden
-kurar; cümle üretmediği için uydurma da üretmez. Panel bu durumu rozetle
-("Model: …" / "Yerel plan (model yok)") ve kalıcı bir bilgi notuyla söylüyor —
-kullanıcı hangi modun çalıştığını ekranda okumalı. Anahtar bir gün girilirse
-aynı uç modele bağlanır, başka değişiklik gerekmez.
+kurar — cümle üretmediği için uydurma da üretmez. Panel hangi modun
+çalıştığını rozetle söylüyor: `Model: qwen/…`, `Yerel plan (model yok)` ya da
+`Yerel plan (model yanıt vermedi)`.
+
+> **Sağlayıcı ve model kimliği imaja gömülü değil.** 1 Ekim 2026'da o güne
+> kadar kullanılan ücretsiz dilim (`minimax/minimax-m3:free`) ücretli sürüme
+> taşındı, asistan sağlayıcıdan HTTP 404 almaya başladı ve düzeltme "imajı
+> yeniden derle, sunucuya taşı" demek oldu. Üçü de artık ortamdan geliyor
+> (`T3_AI_PROVIDER`, `T3_AI_MODEL`, `T3_AI_REASONING_EFFORT`): sağlayıcı
+> değiştirmek sunucuda bir satır + `docker compose up -d`.
+
+> **Düşünme eforu `none`.** DeepSeek'in varsayılanı `high`; asistanın işi akıl
+> yürütmek değil, doğru aracı seçip aracın döndürdüğü sayıyı Türkçe cümleye
+> çevirmek. Ölçülen fark aynı soruda 23 çıkış jetonuna karşı 41 (17'si düşünme)
+> — hem gecikme hem fatura. Rapor bölümlerinde daha uzun akıl yürütme
+> istenirse `T3_Ai__ReasoningEffort="low"` yeter, kod değişmez.
 
 ## Proje yapısı
 
@@ -593,7 +623,7 @@ gereken bulguları ([plan](docs/Denetim_Duzeltme_Plani.md)):
   odak halkası %60 opaklık ve "İçeriğe atla" bağlantısı. Sentry **bağlanmadı**
   (hesap/DSN/KVKK aktarım kararı gerekiyor); yerine `ErrorBoundary` var.
 
-**Doğrulama:** 191 birim testi, API'ye gerçek rollerle vuran 310 uçtan uca
+**Doğrulama:** 296 birim testi, API'ye gerçek rollerle vuran 310 uçtan uca
 kontrol (81 + 125 + 104) ve headless Chrome'da 352 render kontrolü
 (32 + 41 + 53 + 75 + 97 + 54) — **temiz tohum verisiyle**. Betikler veriyi
 değiştirdiği için (girişim pasife alma, kullanıcı oluşturma) tam yeşil bir zincir
@@ -641,5 +671,8 @@ Bunlar eksik değil, kapsam kararı — ölçek gerektirdiğinde değişecek yer
   taşınması gerekir.
 - CSV dışa aktarma 2000 satırla sınırlı ve tek seferde üretiliyor; akış
   (streaming) ya da arka plan işi yok.
-- AI sohbeti tek soruluk; oturum geçmişi tutulmuyor, önceki soruya atıf
-  yapılamıyor.
+- AI panelinde kullanım başına ücretlendirilen bir sağlayıcı (DeepSeek) var:
+  bakiye biterse ya da sağlayıcı yanıt vermezse cevap yerel planlayıcıdan gelir
+  — sayılar doğru, cümle kaba; ekran hiçbir koşulda boş kalmaz. AI raporu ucu
+  kullanıcı başına saatte 60 ile sınırlı: tek oturumda bakiyeyi tüketmek
+  kullanıcının elinde olmamalı.

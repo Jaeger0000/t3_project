@@ -22,8 +22,19 @@ public sealed record ChatToolCall(string Id, string Name, JsonElement Arguments)
 
 public sealed record ChatToolResult(string CallId, string Content, bool IsError = false);
 
-/// <summary>Modelin bir turu: ya konuşuyor ya araç çağırıyor, ikisi birden de olabilir.</summary>
-public sealed record ChatTurn(string? Text, IReadOnlyList<ChatToolCall> ToolCalls);
+/// <summary>
+/// Modelin bir turu: ya konuşuyor ya araç çağırıyor, ikisi birden de olabilir.
+/// </summary>
+/// <param name="Model">
+/// Yanıtı gerçekten üreten model. Sağlayıcı yedek zinciri denediğinde (bkz.
+/// AiOptions.FallbackModels) bu, yapılandırılmış birincil modelden farklı
+/// olabilir — arayüzdeki "hangi model yanıtladı" rozeti doğru kalsın diye
+/// cevapla birlikte taşınıyor. Sağlayıcı bildirmezse <c>null</c>.
+/// </param>
+public sealed record ChatTurn(
+    string? Text,
+    IReadOnlyList<ChatToolCall> ToolCalls,
+    string? Model = null);
 
 /// <summary>
 /// Dil modeli adaptörü. Application yalnızca bu arayüzü bilir; hangi sağlayıcı

@@ -117,7 +117,7 @@ public static class DependencyInjection
         {
             services.AddHttpClient<IChatModel, AnthropicChatModel>(client =>
             {
-                client.BaseAddress = new Uri(ai.BaseUrl ?? "https://api.anthropic.com");
+                client.BaseAddress = new Uri(ai.EffectiveBaseUrl());
                 client.Timeout = TimeSpan.FromSeconds(ai.TimeoutSeconds);
                 client.DefaultRequestHeaders.Add("x-api-key", ai.ApiKey);
                 client.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
@@ -126,9 +126,11 @@ public static class DependencyInjection
             return;
         }
 
+        // OpenRouter ve DeepSeek aynı adaptörü paylaşıyor: protokol OpenAI
+        // uyumlu, ayrım taban adres/uç yolu/alan düzeyinde (bkz. AiOptions).
         services.AddHttpClient<IChatModel, OpenRouterChatModel>(client =>
         {
-            client.BaseAddress = new Uri(ai.BaseUrl ?? "https://openrouter.ai");
+            client.BaseAddress = new Uri(ai.EffectiveBaseUrl());
             client.Timeout = TimeSpan.FromSeconds(ai.TimeoutSeconds);
             client.DefaultRequestHeaders.Add("Authorization", $"Bearer {ai.ApiKey}");
 

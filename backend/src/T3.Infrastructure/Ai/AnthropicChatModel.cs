@@ -58,12 +58,12 @@ public sealed class AnthropicChatModel(
             logger.LogWarning(
                 "Dil modeli isteği başarısız: {Status}", (int)response.StatusCode);
 
-            throw new HttpRequestException(
+            throw new ChatModelUnavailableException(
                 $"Dil modeli yanıt vermedi (HTTP {(int)response.StatusCode}).");
         }
 
         var payload = await response.Content.ReadFromJsonAsync<JsonObject>(ct)
-            ?? throw new HttpRequestException("Dil modeli boş yanıt döndü.");
+            ?? throw new ChatModelUnavailableException("Dil modeli boş yanıt döndü.");
 
         return Parse(payload);
     }

@@ -35,6 +35,15 @@ public sealed class AssistantConversationRunner(
     /// <summary>Model en çok bu kadar tur araç çağırabilir; sonsuz döngüye karşı.</summary>
     private const int MaxTurns = 4;
 
+    /// <summary>
+    /// Sağlayıcı yanıt vermediğinde cevabın başına eklenen açıklama. Yedek yola
+    /// düşüldüğü kullanıcıdan saklanmıyor: aynı soru biraz sonra daha iyi bir
+    /// cevap verebilir ve kullanıcı bunu ancak farkı bilirse tekrar dener.
+    /// </summary>
+    private const string YedekYolNotu =
+        "Dil modeli şu anda yanıt vermiyor (sağlayıcı kotası ya da geçici bir hata). "
+        + "Aşağıdaki cevap doğrudan kayıtlardan üretildi:\n\n";
+
     /// <param name="history">
     /// Önceki turların yalnızca metin satırları. Boş geçilirse soru tek başına
     /// sorulmuş olur.
@@ -44,19 +53,49 @@ public sealed class AssistantConversationRunner(
     {
         var sources = new List<AssistantSourceResponse>();
 
-        var answer = model.IsAvailable
-            ? await AskModelAsync(question, history, sources, ct)
-            : await AskLocallyAsync(question, sources, ct);
+        if (!model.IsAvailable)
+            return Sonuc(await AskLocallyAsync(question, sources, ct), sources,
+                AssistantMode.Local, "Yerel plan");
 
-        return new AssistantRunResult(
-            answer,
+        try
+        {
+            var (answer, answeredBy) = await AskModelAsync(question, history, sources, ct);
+
+            // Rozet, yapılandırılmış modeli değil gerçekten yanıtlayan modeli
+            // gösteriyor: sağlayıcı yedek zinciri denediğinde (AiOptions
+            // .FallbackModels) ikisi farklı olabilir ve kullanıcıya yanlış
+            // model adı göstermek, hiç göstermemekten kötü.
+            return Sonuc(answer, sources, AssistantMode.Model, answeredBy ?? model.Name);
+        }
+        catch (ChatModelUnavailableException)
+        {
+            // Sağlayıcı geçici olarak yanıt vermedi. Kullanıcıya hata ekranı
+            // göstermek yerine anahtarsız kurulumun yoluna düşüyoruz: araçlar
+            // (yani veriler) zaten elimizde, eksik olan tek şey cümleyi kuran
+            // model. Demoda "asistan çöktü" görüntüsü, cümlesi kaba ama sayıları
+            // doğru bir cevaptan çok daha pahalı.
+            //
+            // Kaynaklar sıfırlanıyor: yarım kalmış model turunda birikmiş
+            // kayıtlar, kullanıcının gördüğü cevaba ait değil.
+            sources.Clear();
+
+            return Sonuc(YedekYolNotu + await AskLocallyAsync(question, sources, ct), sources,
+                AssistantMode.Local, "Yerel plan (model yanıt vermedi)");
+        }
+    }
+
+    private static AssistantRunResult Sonuc(
+        string answer,
+        List<AssistantSourceResponse> sources,
+        AssistantMode mode,
+        string modelName) =>
+        new(answer,
             sources,
             // Aynı girişim birden çok araçta geçebilir; arayüz aynı bağlantıyı
             // iki kez göstermesin diye burada tekilleştiriliyor.
             [.. sources.SelectMany(s => s.StartupIds).Distinct()],
-            model.IsAvailable ? AssistantMode.Model : AssistantMode.Local,
-            model.IsAvailable ? model.Name : "Yerel plan");
-    }
+            mode,
+            modelName);
 
     /// <summary>
     /// Modelsiz yedek yol. Geçmişi bilinçli olarak yok sayar: yerel planlayıcı
@@ -88,23 +127,29 @@ public sealed class AssistantConversationRunner(
         return OfflineAssistant.Compose(results);
     }
 
-    private async Task<string> AskModelAsync(
+    /// <returns>Cevap metni ve cevabı üreten modelin adı (sağlayıcı bildirirse).</returns>
+    private async Task<(string Answer, string? Model)> AskModelAsync(
         string question,
         IReadOnlyList<ChatMessage> history,
         List<AssistantSourceResponse> sources,
         CancellationToken ct)
     {
         var messages = new List<ChatMessage>(history) { new(ChatRole.User, question) };
+        string? answeredBy = null;
 
         for (var turn = 0; turn < MaxTurns; turn++)
         {
             var reply = await model.CompleteAsync(
                 SystemPrompt(), messages, AssistantToolbox.Catalog, ct);
 
+            // Son turu kim yanıtladıysa rozet onu gösterir: araç turları
+            // arasında sağlayıcı zincirde ilerlemiş olabilir.
+            answeredBy = reply.Model ?? answeredBy;
+
             if (reply.ToolCalls.Count == 0)
-                return string.IsNullOrWhiteSpace(reply.Text)
+                return (string.IsNullOrWhiteSpace(reply.Text)
                     ? "Bu soruyu yanıtlayacak veri bulamadım."
-                    : reply.Text!;
+                    : reply.Text!, answeredBy);
 
             messages.Add(new ChatMessage(ChatRole.Assistant, reply.Text, reply.ToolCalls));
 
@@ -138,7 +183,8 @@ public sealed class AssistantConversationRunner(
             messages.Add(new ChatMessage(ChatRole.Tool, ToolResults: toolResults));
         }
 
-        return "Soruyu araç turları içinde sonuçlandıramadım. Daha dar bir soru sorabilir misiniz?";
+        return ("Soruyu araç turları içinde sonuçlandıramadım. Daha dar bir soru sorabilir misiniz?",
+            answeredBy);
     }
 
     /// <summary>

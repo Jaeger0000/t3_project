@@ -9,7 +9,14 @@ using T3.Application.Common.Interfaces;
 namespace T3.Infrastructure.Ai;
 
 /// <summary>
-/// OpenRouter (OpenAI uyumlu <c>chat/completions</c>) adaptörü.
+/// OpenAI uyumlu <c>chat/completions</c> adaptörü — OpenRouter **ve** DeepSeek
+/// bu sınıfla konuşuyor (ikisi aynı gövde şemasını kullanıyor; taban adres, uç
+/// yolu ve geçide özgü alanlar <see cref="AiOptions"/> üzerinden ayrılıyor).
+///
+/// Sınıf adı tarihsel: ilk sağlayıcı OpenRouter'dı. Adın
+/// <c>OpenAiCompatibleChatModel</c> olması daha doğru olurdu; yeniden
+/// adlandırma ayrı bir değişiklik olarak bekliyor (canlı bir düzeltmenin
+/// ortasında dosya adı değiştirmek, teşhisi gereksiz zorlaştırırdı).
 ///
 /// Anthropic adaptörüyle aynı sınırı korur: sağlayıcıya yalnızca kullanıcının
 /// sorusu, sistem yönergesi ve <em>araçların döndürdüğü, zaten maskelenmiş</em>
@@ -83,10 +90,26 @@ public sealed class OpenRouterChatModel : IChatModel
         int? maxTokens)
     {
         var payload = await PostWithRetryAsync(BuildBody(systemPrompt, messages, tools, maxTokens), ct);
-        return Parse(payload);
+        var turn = Parse(payload);
+
+        // Yedek zincirin devreye girmesi sessiz kalmamalı: birincil modelin
+        // kotası sürekli doluysa bunu günlükten görmek, kullanıcı şikâyetini
+        // beklemekten iyidir.
+        if (turn.Model is { } answeredBy
+            && !answeredBy.Equals(_options.Model, StringComparison.OrdinalIgnoreCase))
+            _logger.LogInformation(
+                "Birincil model {Primary} yerine yedek {Fallback} yanıtladı.",
+                _options.Model, answeredBy);
+
+        return turn;
     }
 
-    internal JsonObject BuildBody(
+    /// <summary>
+    /// İsteği protokole çevirir. <c>public</c>: aynı dosyadaki
+    /// <see cref="Parse"/> ve <see cref="ToMessages"/> gibi birim testten
+    /// doğrulanıyor — protokol eşlemesi sessizce bozulabilen bir yüzey.
+    /// </summary>
+    public JsonObject BuildBody(
         string systemPrompt,
         IReadOnlyList<ChatMessage> messages,
         IReadOnlyList<ChatTool> tools,
@@ -109,6 +132,25 @@ public sealed class OpenRouterChatModel : IChatModel
             ["max_tokens"] = maxTokens ?? _options.MaxTokens,
             ["messages"] = wire
         };
+
+        // Yedek model zinciri. Sağlayıcı birincil modeli kota sınırında
+        // bulursa sıradakine kendi tarafında geçiyor: bizim için tek istek,
+        // kullanıcı için çalışan bir cevap. Tek elemanlı zincirde alan hiç
+        // eklenmiyor — gereksiz alan göndermek sağlayıcı davranışını
+        // açıklanamaz hâle getirir.
+        if (_options.SupportsModelChain())
+        {
+            var chain = _options.ModelChain();
+
+            if (chain.Count > 1)
+                body["models"] = new JsonArray([.. chain.Select(m => (JsonNode)JsonValue.Create(m)!)]);
+        }
+
+        // Düşünme eforu. Sağlayıcı bu alanı tanımıyorsa gönderilmemeli: bilinmeyen
+        // alan kimi uçta yok sayılıyor, kimi uçta 400 üretiyor.
+        if (_options.ResolveProvider() == AiProvider.DeepSeek
+            && !string.IsNullOrWhiteSpace(_options.ReasoningEffort))
+            body["reasoning_effort"] = _options.ReasoningEffort;
 
         if (tools.Count > 0)
         {
@@ -137,12 +179,12 @@ public sealed class OpenRouterChatModel : IChatModel
         for (var attempt = 0; ; attempt++)
         {
             using var response = await _http.PostAsJsonAsync(
-                "/api/v1/chat/completions", body, ct);
+                _options.EffectiveCompletionsPath(), body, ct);
 
             if (response.IsSuccessStatusCode)
             {
                 var payload = await response.Content.ReadFromJsonAsync<JsonObject>(ct)
-                    ?? throw new HttpRequestException("Dil modeli boş yanıt döndü.");
+                    ?? throw new ChatModelUnavailableException("Dil modeli boş yanıt döndü.");
 
                 // OpenRouter başarı kodu döndürüp gövdede hata taşıyabiliyor;
                 // bunu yakalamazsak "model sustu" gibi görünür.
@@ -168,7 +210,10 @@ public sealed class OpenRouterChatModel : IChatModel
                 // yansıtabiliyor ve içinde araç sonuçları (girişim verisi) olabilir.
                 _logger.LogWarning("Dil modeli isteği başarısız: {Status}", status);
 
-                throw new HttpRequestException(
+                // Geçici mi kalıcı mı ayrımı burada yapılmıyor: çağıran taraf her
+                // iki durumda da aynı şeyi yapabilir (yedek yola düş ya da 503
+                // döndür). Durum kodu mesajda duruyor, günlükte de var.
+                throw new ChatModelUnavailableException(
                     $"Dil modeli yanıt vermedi (HTTP {status}).");
             }
 
@@ -222,15 +267,18 @@ public sealed class OpenRouterChatModel : IChatModel
                 || message.Contains("function", StringComparison.OrdinalIgnoreCase)))
             throw new UnsupportedToolsException();
 
-        throw new HttpRequestException("Dil modeli hata döndü.");
+        throw new ChatModelUnavailableException("Dil modeli hata döndü.");
     }
 
     public static ChatTurn Parse(JsonObject payload)
     {
+        // Yanıtlayan model: yedek zincir devredeyse bu, istediğimiz birincil
+        // model olmayabilir. Arayüzdeki rozet buna bakıyor.
+        var answeredBy = payload["model"]?.GetValue<string>();
         var message = payload["choices"]?.AsArray().FirstOrDefault()?["message"] as JsonObject;
 
         if (message is null)
-            return new ChatTurn(null, []);
+            return new ChatTurn(null, [], answeredBy);
 
         var text = ReadContent(message["content"]);
         var calls = new List<ChatToolCall>();
@@ -248,7 +296,7 @@ public sealed class OpenRouterChatModel : IChatModel
                 ParseArguments(function?["arguments"])));
         }
 
-        return new ChatTurn(string.IsNullOrWhiteSpace(text) ? null : text, calls);
+        return new ChatTurn(string.IsNullOrWhiteSpace(text) ? null : text, calls, answeredBy);
     }
 
     /// <summary>

@@ -18,6 +18,7 @@ değerlendirme aşamasına geçemez — **önce MVP, sonra güzellik**.
 | [docs/Problem7_T3_Girisim_Ekosistemi_Proje_Brifi.md](docs/Problem7_T3_Girisim_Ekosistemi_Proje_Brifi.md) | Gereksinim, rol, MVP kapsamı, program kuralları |
 | [docs/Problem7_Teknik_Plan.md](docs/Problem7_Teknik_Plan.md) | Mimari, veri modeli, yetki matrisi, API yüzeyi, faz planı |
 | [docs/Gelistirme_Kararlari.md](docs/Gelistirme_Kararlari.md) | Yerleşik teknik kararlar, reddedilen alternatifler, ortam tuzakları |
+| [docs/Mevcut_Sistem_Raporu.md](docs/Mevcut_Sistem_Raporu.md) | Sıfırdan yazım öncesi tam envanter: 67 uç, 17 tablo, arayüz haritası, teknik borç listesi (B-01…B-15) |
 | [README.md](README.md) | Kurulum, demo hesapları, komutlar, mevcut durum |
 | [scripts/README.md](scripts/README.md) | Çalışan sisteme karşı doğrulama betikleri ve çalıştırma sırası |
 | [.claude/agents/README.md](.claude/agents/README.md) | Projeye özel alt ajanlar: hangi işi hangi ajan yapar, tipik zincirler |

@@ -1,6 +1,7 @@
 using System.Net;
 using FluentValidation;
 using T3.Api.Http;
+using T3.Application.Common.Interfaces;
 
 namespace T3.Api.Middleware;
 
@@ -24,6 +25,16 @@ public sealed class ExceptionHandlingMiddleware(
             // Referans yok: kullanıcının kendi düzeltebileceği bir hata.
             await WriteAsync(context, HttpStatusCode.BadRequest, "Doğrulama hatası",
                 ex.Errors.Select(e => e.ErrorMessage).ToArray());
+        }
+        catch (ChatModelUnavailableException ex)
+        {
+            // Sağlayıcı kotası/geçici hatası bir yazılım arızası değil: 500 +
+            // referans numarası yerine 503 dönüyoruz, istemci "birazdan tekrar
+            // dene" diyebilsin. Yedek yolu olan uçlar (sohbet, kart özeti) buraya
+            // hiç gelmez; bu, yedeği olmayan çağrıların son durağı.
+            logger.LogWarning(ex, "Dil modeli yanıt vermedi: {Path}", context.Request.Path);
+            await WriteAsync(context, HttpStatusCode.ServiceUnavailable,
+                "Dil modeli şu anda yanıt vermiyor. Lütfen birkaç dakika sonra tekrar deneyin.");
         }
         catch (UnauthorizedAccessException ex)
         {

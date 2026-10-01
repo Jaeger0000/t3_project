@@ -1,6 +1,7 @@
 using T3.Api.Authorization;
 using T3.Api.Filters;
 using T3.Api.Http;
+using T3.Api.RateLimiting;
 using T3.Application.Features.Notifications.SendNotification;
 using T3.Application.Features.Reports.GenerateStartupReport;
 using T3.Application.Features.Startups;
@@ -78,10 +79,10 @@ public static class StartupEndpoints
         // GET: veri değiştirmiyor, CSV aktarımıyla (bkz. ReportEndpoints) aynı
         // desen.
         //
-        // Hız sınırı (AuthRateLimit.AiReportPolicy) ŞİMDİLİK KALDIRILDI —
-        // geliştirme/deneme sırasında saatte 6 kovası engelliyordu. Demo/canlı
-        // öncesi geri eklenmeli: `.RequireRateLimiting(AuthRateLimit.AiReportPolicy)`
-        // satırını aşağıya geri koy (politika hâlâ AuthRateLimit.cs'te tanımlı).
+        // Hız sınırı (AuthRateLimit.AiReportPolicy) bir süre kaldırılmıştı
+        // (geliştirmede kova engelliyordu) ve 1 Ekim 2026'da geri eklendi: tek
+        // rapor altı model çağrısı yapıyor, sınırsız uç sağlayıcı kotasını ya
+        // da bakiyeyi tek oturumda tüketip panel asistanını da düşürüyordu.
         group.MapGet("/{id:guid}/ai-report", async (
                 Guid id,
                 string[]? sections,
@@ -103,6 +104,7 @@ public static class StartupEndpoints
                 return Results.File(file.Content, file.ContentType, file.FileName);
             })
             .RequireAuthorization(Policies.GenerateAiReports)
+            .RequireRateLimiting(AuthRateLimit.AiReportPolicy)
             .WithSummary("Girişim için AI destekli, T3 şablonlu PDF raporu üretir.");
 
         // --- Bildirim --------------------------------------------------------
